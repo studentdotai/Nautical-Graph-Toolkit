@@ -215,426 +215,6 @@ class S57Base:
         logger.info(f"--- Finished 'by_enc' conversion ---")
 
 
-class S57Advanced:
-    """
-    Handles advanced, feature-level conversions, primarily for creating
-    layer-centric outputs with feature stamping for traceability.
-    """
-
-    # S-57 open options used throughout the class
-    S57_OPEN_OPTIONS = [
-        'RETURN_PRIMITIVES=OFF',
-        'SPLIT_MULTIPOINT=ON',
-        'ADD_SOUNDG_DEPTH=ON',
-        'UPDATES=APPLY',
-        'LNAM_REFS=ON',
-        'RECODE_BY_DSSI=ON',
-        'LIST_AS_STRING=ON'
-    ]
-
-    def __init__(self, input_path: Union[str, Path], output_dest: Union[str, Dict[str, Any]], output_format: str, overwrite: bool = False, schema: str = 'public'):
-        self.base_converter = S57Base(input_path, output_dest, output_format, overwrite)
-        self.schema = schema
-        self.s57_files = []
-        self.connector = None
-        self._setup_connector()
-
-    def _setup_connector(self):
-        """Initializes the appropriate database/file connector."""
-        fmt = self.base_converter.output_format
-        dest = self.base_converter.output_dest
-        if fmt == 'postgis':
-            self.connector = PostGISConnector(db_params=dest, schema=self.schema)
-        elif fmt in ['gpkg', 'spatialite']:
-            self.connector = FileDBConnector(file_path=dest)
-        else:
-            raise ValueError(f"No connector available for format: {fmt}")
-
-    def _get_enc_name(self, s57_file: Path) -> Optional[str]:
-        """Helper to read the DSID layer and return the ENC name without the .000 extension."""
-        try:
-            # Use fiona for a lightweight read of just the first feature
-            with fiona.open(s57_file, 'r', layer='DSID') as dsid_layer:
-                enc_name = next(iter(dsid_layer))['properties']['DSID_DSNM']
-                # Per request, remove the .000 extension for a cleaner stamped name.
-                if enc_name and enc_name.upper().endswith('.000'):
-                    return enc_name[:-4]
-                return enc_name
-        except Exception as e:
-            logger.error(f"Could not read DSID from {s57_file.name}: {e}")
-            return None
-
-    def convert_to_layers(self):
-        """
-        Merges features from all S-57 files into layer-specific tables or files.
-        Each feature is stamped with its source ENC name ('dsid_dsnm').
-        """
-        # Temporarily set LIST_AS_STRING for this operation, then restore it.
-        original_list_as_string = gdal.GetConfigOption('OGR_S57_LIST_AS_STRING', 'OFF')
-        gdal.SetConfigOption('OGR_S57_LIST_AS_STRING', 'ON')
-
-        try:
-            # The rest of the logic can now proceed
-            self.base_converter.find_s57_files()
-            self.s57_files = self.base_converter.s57_files
-
-            logger.info(f"--- Starting 'by_layer' conversion to format '{self.base_converter.output_format}' ---")
-
-            # 1. Get a comprehensive schema and pre-fetch all ENC names
-            all_layers_schema = self._get_comprehensive_schema()
-            enc_names_map = {s57_file: self._get_enc_name(s57_file) for s57_file in self.s57_files}
-
-            # 2. Prepare destination using the appropriate connector
-            self.connector.check_and_prepare(overwrite=self.base_converter.overwrite)
-
-            # 3. Process each layer, aggregating features from all ENCs
-            for layer_name, schema in all_layers_schema.items():
-                logger.info(f"Processing layer: {layer_name}")
-                self._process_layer_with_gdal(layer_name, schema, enc_names_map)
-        finally:
-            # Restore original OGR_S57_OPTIONS to avoid side effects
-            gdal.SetConfigOption('OGR_S57_LIST_AS_STRING', original_list_as_string)
-
-    def _get_comprehensive_schema(self) -> Dict[str, Dict]:
-        """Scans all files to build a master schema for each unique layer."""
-        logger.info("Scanning all files to build comprehensive layer schemas...")
-        master_schemas = {}
-        
-        # OGR field type to Fiona type mapping
-        ogr_to_fiona_type = {
-            ogr.OFTString: 'str',
-            ogr.OFTInteger: 'int',
-            ogr.OFTInteger64: 'int',
-            ogr.OFTReal: 'float',
-            ogr.OFTDate: 'date',
-            ogr.OFTTime: 'str',
-            ogr.OFTDateTime: 'datetime',
-            ogr.OFTStringList: 'str',  # Convert lists to strings
-            ogr.OFTIntegerList: 'str',  # Convert lists to strings
-            ogr.OFTRealList: 'str',  # Convert lists to strings
-        }
-        
-        # OGR geometry type to Fiona geometry type mapping
-        ogr_to_fiona_geom = {
-            ogr.wkbPoint: 'Point',
-            ogr.wkbLineString: 'LineString', 
-            ogr.wkbPolygon: 'Polygon',
-            ogr.wkbMultiPoint: 'MultiPoint',
-            ogr.wkbMultiLineString: 'MultiLineString',
-            ogr.wkbMultiPolygon: 'MultiPolygon',
-            ogr.wkbNone: 'None',
-            ogr.wkbUnknown: 'Geometry'
-        }
-        
-        for s57_file in self.s57_files:
-            src_ds = None
-            try:
-                # Use GDAL to open the file with S-57 options
-                s57_open_options = [
-                    'RETURN_PRIMITIVES=OFF',
-                    'SPLIT_MULTIPOINT=ON',
-                    'ADD_SOUNDG_DEPTH=ON',
-                    'UPDATES=APPLY',
-                    'LNAM_REFS=ON',
-                    'RECODE_BY_DSSI=ON',
-                    'LIST_AS_STRING=OFF'  # This helps with the field type issues
-                ]
-                
-                src_ds = gdal.OpenEx(str(s57_file), gdal.OF_VECTOR, open_options=s57_open_options)
-                if not src_ds:
-                    logger.warning(f"Could not open {s57_file.name} with GDAL")
-                    continue
-                
-                # Iterate through all layers in the dataset
-                for layer_idx in range(src_ds.GetLayerCount()):
-                    layer = src_ds.GetLayerByIndex(layer_idx)
-                    layer_name = layer.GetName()
-                    
-                    if layer_name not in master_schemas:
-                        # Build schema from layer definition
-                        layer_defn = layer.GetLayerDefn()
-                        properties = {}
-                        
-                        # Get field definitions
-                        for field_idx in range(layer_defn.GetFieldCount()):
-                            field_defn = layer_defn.GetFieldDefn(field_idx)
-                            field_name = field_defn.GetName()
-                            ogr_type = field_defn.GetType()
-                            
-                            # Convert OGR type to Fiona type, defaulting to string for unknown types
-                            fiona_type = ogr_to_fiona_type.get(ogr_type, 'str')
-                            properties[field_name] = fiona_type
-                        
-                        # Add the ENC name stamp field (except for DSID)
-                        if layer_name != 'DSID':
-                            properties['dsid_dsnm'] = 'str'
-                        
-                        # Get geometry type
-                        geom_type = layer_defn.GetGeomType()
-                        fiona_geom_type = ogr_to_fiona_geom.get(geom_type, 'Geometry')
-                        
-                        # Create Fiona-style schema
-                        master_schemas[layer_name] = {
-                            'properties': properties,
-                            'geometry': fiona_geom_type
-                        }
-                    else:
-                        # Merge additional properties from this file's layer
-                        layer_defn = layer.GetLayerDefn()
-                        for field_idx in range(layer_defn.GetFieldCount()):
-                            field_defn = layer_defn.GetFieldDefn(field_idx)
-                            field_name = field_defn.GetName()
-                            
-                            if field_name not in master_schemas[layer_name]['properties']:
-                                ogr_type = field_defn.GetType()
-                                fiona_type = ogr_to_fiona_type.get(ogr_type, 'str')
-                                master_schemas[layer_name]['properties'][field_name] = fiona_type
-                                
-            except Exception as e:
-                logger.warning(f"Could not read schema from {s57_file.name}: {e}")
-            finally:
-                src_ds = None  # Close the dataset
-                
-        logger.info(f"Found {len(master_schemas)} unique layers.")
-        return master_schemas
-
-    def _process_layer_with_gdal(self, layer_name: str, schema: Dict, enc_names_map: Dict):
-        """Process a single layer across all S-57 files using pure GDAL - no Fiona mixing."""
-        
-        # Build list of source datasets for GDAL VectorTranslate
-        source_datasets = []
-        
-        for s57_file in self.s57_files:
-            enc_name = enc_names_map.get(s57_file)
-            if not enc_name:
-                logger.warning(f"Skipping {s57_file.name} due to missing ENC name.")
-                continue
-            
-            # Use GDAL VectorTranslate to extract this layer with ENC stamping
-            try:
-                # First, open the S57 dataset with proper options (like S57Base does)
-                s57_open_options = [
-                    'RETURN_PRIMITIVES=OFF',
-                    'SPLIT_MULTIPOINT=ON',
-                    'ADD_SOUNDG_DEPTH=ON',
-                    'UPDATES=APPLY',
-                    'LNAM_REFS=ON',
-                    'RECODE_BY_DSSI=ON',
-                    'LIST_AS_STRING=ON'
-                ]
-                
-                src_ds = gdal.OpenEx(str(s57_file), gdal.OF_VECTOR, open_options=s57_open_options)
-                if not src_ds:
-                    logger.warning(f"Could not open {s57_file.name} with GDAL")
-                    continue
-                
-                # Create a memory dataset for this layer
-                mem_driver = ogr.GetDriverByName('MEM')
-                mem_ds = mem_driver.CreateDataSource(f'temp_{enc_name}')
-                
-                # Use GDAL VectorTranslate with simple layer copying
-                gdal.VectorTranslate(
-                    destNameOrDestDS=mem_ds,
-                    srcDS=src_ds,  # Use the pre-opened dataset
-                    options=gdal.VectorTranslateOptions(
-                        layers=[layer_name],
-                        layerName=f"{layer_name}_{enc_name}",
-                        dstSRS='EPSG:4326'
-                    )
-                )
-                
-                # Add ENC stamping to the copied layer if it's not DSID
-                if layer_name != 'DSID':
-                    self._add_enc_stamping_to_memory_dataset(mem_ds, f"{layer_name}_{enc_name}", enc_name)
-                
-                source_datasets.append(mem_ds)
-                src_ds = None  # Close source dataset
-                
-            except Exception as e:
-                # Only log if it's not a simple "layer not found" case
-                if "Couldn't fetch requested layer" in str(e):
-                    logger.debug(f"Layer '{layer_name}' not found in {s57_file.name} (expected for different chart types)")
-                else:
-                    logger.warning(f"Could not process layer '{layer_name}' from {s57_file.name}: {e}")
-                continue
-        
-        # Now merge all memory datasets into the destination one by one
-        if source_datasets:
-            dest_path = self._get_destination_path()
-            
-            for i, mem_ds in enumerate(source_datasets):
-                try:
-                    gdal.VectorTranslate(
-                        destNameOrDestDS=dest_path,
-                        srcDS=mem_ds,
-                        options=gdal.VectorTranslateOptions(
-                            layerName=layer_name.lower(),
-                            accessMode='append' if (hasattr(self, '_first_layer_written') or i > 0) else 'overwrite',
-                            dstSRS='EPSG:4326'
-                        )
-                    )
-                except Exception as e:
-                    logger.warning(f"Could not merge dataset {i} for layer '{layer_name}': {e}")
-                    continue
-            
-            self._first_layer_written = True
-            logger.info(f"-> Successfully processed layer '{layer_name}' using pure GDAL")
-        
-        # Clean up memory datasets
-        for mem_ds in source_datasets:
-            mem_ds = None
-
-    def _get_destination_path(self) -> str:
-        """Get the appropriate destination path for GDAL operations."""
-        if self.base_converter.output_format == 'postgis':
-            db_params = self.base_converter.output_dest
-            return (f"PG:dbname='{db_params['dbname']}' host='{db_params['host']}' "
-                   f"port='{db_params['port']}' user='{db_params['user']}' "
-                   f"password='{db_params['password']}' schemas={self.schema}")
-        else:
-            return str(self.base_converter.output_dest)
-
-    def _add_enc_stamping_to_memory_dataset(self, mem_ds: ogr.DataSource, layer_name: str, enc_name: str):
-        """Add ENC stamping field to features in a memory dataset layer."""
-        try:
-            layer = mem_ds.GetLayerByName(layer_name)
-            if not layer:
-                logger.warning(f"Layer '{layer_name}' not found in memory dataset")
-                return
-            
-            # Check if dsid_dsnm field already exists
-            layer_defn = layer.GetLayerDefn()
-            field_exists = False
-            for i in range(layer_defn.GetFieldCount()):
-                if layer_defn.GetFieldDefn(i).GetName() == 'dsid_dsnm':
-                    field_exists = True
-                    break
-            
-            # Add the field if it doesn't exist
-            if not field_exists:
-                field_defn = ogr.FieldDefn('dsid_dsnm', ogr.OFTString)
-                field_defn.SetWidth(256)
-                layer.CreateField(field_defn)
-            
-            # Update all features with the ENC name
-            layer.ResetReading()
-            for feature in layer:
-                feature.SetField('dsid_dsnm', enc_name)
-                layer.SetFeature(feature)
-                
-        except Exception as e:
-            logger.warning(f"Could not add ENC stamping to layer '{layer_name}': {e}")
-
-    def _create_ogr_layer_from_fiona_schema(self, dest_ds: ogr.DataSource, layer_name: str, fiona_schema: Dict, srs: osr.SpatialReference, options: List[str]) -> ogr.Layer:
-        """Creates an OGR layer from a Fiona-style schema dictionary."""
-        # Mapping from Fiona geometry type names to OGR wkb geometry types.
-        geom_type_map = {
-            'Point': ogr.wkbPoint, 'LineString': ogr.wkbLineString, 'Polygon': ogr.wkbPolygon,
-            'MultiPoint': ogr.wkbMultiPoint, 'MultiLineString': ogr.wkbMultiLineString,
-            'MultiPolygon': ogr.wkbMultiPolygon, 'Geometry': ogr.wkbUnknown,
-            'None': ogr.wkbNone, None: ogr.wkbNone
-        }
-        # The schema might have 'None' or None for non-geometric layers like DSID
-        geom_type = geom_type_map.get(fiona_schema.get('geometry'), ogr.wkbUnknown)
-
-        out_layer = dest_ds.CreateLayer(layer_name, srs, geom_type, options=options)
-        if not out_layer:
-            raise IOError(f"Failed to create layer '{layer_name}' in the destination.")
-
-        # Mapping from Fiona field types to OGR field types.
-        field_type_map = {
-            'str': ogr.OFTString,
-            'int': ogr.OFTInteger64,  # Use 64-bit to be safe
-            'float': ogr.OFTReal,
-            'datetime': ogr.OFTDateTime,
-            'date': ogr.OFTDate,
-            'bool': ogr.OFTInteger,  # OGR doesn't have a dedicated boolean type
-        }
-
-        for field_name, fiona_type in fiona_schema['properties'].items():
-            # Default to string if type is unknown. This is robust.
-            ogr_type = field_type_map.get(fiona_type, ogr.OFTString)
-            field_defn = ogr.FieldDefn(field_name, ogr_type)
-
-            # S-57 can have very long string-encoded lists.
-            if ogr_type == ogr.OFTString:
-                field_defn.SetWidth(4096)
-
-            out_layer.CreateField(field_defn)
-
-        return out_layer
-
-    def _write_layer(self, layer_name: str, schema: Dict, features: List[Dict]):
-        """Writes a list of features to a single layer in the destination using OGR."""
-        driver_name = {'gpkg': 'GPKG', 'postgis': 'PostgreSQL', 'spatialite': 'SQLite'}.get(self.base_converter.output_format)
-        driver = ogr.GetDriverByName(driver_name)
-        if not driver:
-            logger.error(f"!! ERROR: OGR driver '{driver_name}' not available.")
-            return
-
-        dest_ds = None
-        try:
-            # 1. Open or Create DataSource
-            if self.base_converter.output_format == 'postgis':
-                db_params = self.base_converter.output_dest
-                pg_conn_str = (f"PG:dbname='{db_params['dbname']}' host='{db_params['host']}' "
-                               f"port='{db_params['port']}' user='{db_params['user']}' "
-                               f"password='{db_params['password']}'")
-                dest_ds = ogr.Open(pg_conn_str, 1)  # update=1
-            else:  # File-based
-                dest_path = Path(self.base_converter.output_dest)
-                if not dest_path.exists():
-                    dsco = ['SPATIALITE=YES'] if driver_name == 'SQLite' else []
-                    dest_ds = driver.CreateDataSource(str(dest_path), options=dsco)
-                else:
-                    dest_ds = ogr.Open(str(dest_path), 1)  # update=1
-
-            if not dest_ds:
-                raise IOError("Could not open or create destination data source.")
-
-            # 2. Get or Create Layer
-            output_layer_name = layer_name.lower()
-            layer_lookup_name = f"{self.schema}.{output_layer_name}" if self.base_converter.output_format == 'postgis' else output_layer_name
-            out_layer = dest_ds.GetLayerByName(layer_lookup_name)
-
-            if not out_layer:
-                srs = osr.SpatialReference()
-                srs.ImportFromEPSG(4326)
-                lco = [f'SCHEMA={self.schema}'] if self.base_converter.output_format == 'postgis' else []
-                out_layer = self._create_ogr_layer_from_fiona_schema(dest_ds, output_layer_name, schema, srs, lco)
-
-            # 3. Write features
-            layer_defn = out_layer.GetLayerDefn()
-            for feature_dict in features:
-                out_feature = ogr.Feature(layer_defn)
-                geom_dict = feature_dict.get('geometry')
-                if geom_dict:
-                    # Use shapely.mapping to correctly serialize the geometry
-                    geom = ogr.CreateGeometryFromJson(json.dumps(mapping(shape(geom_dict))))
-                    if geom:
-                        out_feature.SetGeometry(geom)
-
-                properties = feature_dict.get('properties', {})
-                for field_name, value in properties.items():
-                    field_index = out_feature.GetFieldIndex(field_name)
-                    if field_index != -1:
-                        if value is not None:
-                            # Be robust: if the target field is a string, ensure the value is a string.
-                            # This handles cases where a list might slip through despite OGR_S57_OPTIONS.
-                            field_defn = layer_defn.GetFieldDefn(field_index)
-                            if field_defn.GetType() == ogr.OFTString:
-                                out_feature.SetField(field_index, str(value))
-                            else:
-                                out_feature.SetField(field_index, value)
-
-                out_layer.CreateFeature(out_feature)
-                out_feature = None  # Release memory
-
-            logger.info(f"-> Successfully wrote {len(features)} features to layer '{layer_name.lower()}'.")
-        except Exception as e:
-            logger.error(f"!! ERROR writing layer '{layer_name.lower()}': {e}")
-
-
 class S57Updater:
     """
     Handles incremental, transactional updates of S-57 ENC data into a PostGIS database.
@@ -754,7 +334,7 @@ class S57Updater:
 
                     for i in range(s57_ds.GetLayerCount()):
                         input_layer = s57_ds.GetLayer(i)
-                        self._write_layer_features(dest_ds, input_layer, enc_name)
+                        self._write_layer_features(dest_ds, input_layer, enc_name, new_version['edition'], new_version['update'])
 
                     logger.info(f"Successfully committed update for '{enc_name}'.")
                 finally:
@@ -772,8 +352,8 @@ class S57Updater:
         result = session.execute(query, {'enc_name': enc_name}).fetchone()
         return {'edition': result[0], 'update': result[1]} if result else None
 
-    def _write_layer_features(self, dest_ds: ogr.DataSource, input_layer: ogr.Layer, enc_name: str):
-        """Helper to write features of a single layer to PostGIS using OGR."""
+    def _write_layer_features(self, dest_ds: ogr.DataSource, input_layer: ogr.Layer, enc_name: str, enc_edition: int = None, enc_update: int = None):
+        """Helper to write features of a single layer to PostGIS using OGR with enhanced ENC stamping."""
         output_layer_name = input_layer.GetName().lower()
 
         layer_lookup_name = f"{self.schema}.{output_layer_name}" if self.output_format == 'postgis' else output_layer_name
@@ -786,7 +366,14 @@ class S57Updater:
         for feature in input_layer:
             out_feature = ogr.Feature(out_layer.GetLayerDefn())
             out_feature.SetFrom(feature)
+            
+            # Enhanced ENC stamping for better data validation
             out_feature.SetField('dsid_dsnm', enc_name)
+            if enc_edition is not None:
+                out_feature.SetField('dsid_edtn', enc_edition)
+            if enc_update is not None:
+                out_feature.SetField('dsid_updn', enc_update)
+                
             out_layer.CreateFeature(out_feature)
 
 
@@ -795,26 +382,399 @@ class S57Updater:
 # ==============================================================================
 
 class S57AdvancedConfig:
-    """Configuration class for advanced S57 processing options."""
+    """Enhanced configuration class with comprehensive validation and auto-tuning capabilities for S57 processing."""
     
-    def __init__(self, batch_size: int = 5, memory_limit_mb: int = 512, 
-                 cache_schemas: bool = True, enable_debug_logging: bool = False):
-        self.batch_size = batch_size  # Files per batch
-        self.memory_limit_mb = memory_limit_mb  # Memory limit for caching
-        self.cache_schemas = cache_schemas  # Cache schemas to avoid recomputation
-        self.enable_debug_logging = enable_debug_logging  # Detailed debug info
-        self.streaming_mode = False  # Future: Direct streaming without memory datasets
+    def __init__(self, 
+                 batch_size: Optional[int] = None,
+                 memory_limit_mb: int = 1024,
+                 cache_schemas: bool = True, 
+                 enable_debug_logging: bool = False,
+                 auto_tune_batch_size: bool = True,
+                 target_memory_usage_mb: int = 512,
+                 avg_file_size_mb: float = 8.0,
+                 validate_config: bool = True,
+                 enable_parallel_processing: bool = False,
+                 max_parallel_workers: Optional[int] = None,
+                 parallel_read_only: bool = True,
+                 parallel_db_writes: bool = False,
+                 parallel_validation_level: str = 'strict'):
+        """
+        Initialize configuration with comprehensive validation and auto-tuning capabilities.
+        
+        Args:
+            batch_size: Manual batch size (overrides auto-tuning if provided)
+            memory_limit_mb: Maximum memory limit for processing
+            cache_schemas: Whether to cache schemas to avoid recomputation
+            enable_debug_logging: Enable detailed debug information
+            auto_tune_batch_size: Automatically calculate optimal batch size
+            target_memory_usage_mb: Target memory usage for auto-tuning
+            avg_file_size_mb: Average S-57 file size for calculations
+            validate_config: Whether to perform configuration validation (default: True)
+            enable_parallel_processing: Enable safe parallel processing (default: False)
+            max_parallel_workers: Maximum number of parallel workers (auto-calculated if None)
+            parallel_read_only: Limit parallelization to read-only operations (default: True)
+            parallel_db_writes: Enable parallel database writes (higher risk, default: False)
+            parallel_validation_level: Validation level ('strict', 'moderate', 'minimal')
+        """
+        
+        # Store original values for validation
+        self._manual_batch_provided = batch_size is not None
+        
+        # Set initial values
+        self.memory_limit_mb = memory_limit_mb
+        self.cache_schemas = cache_schemas
+        self.enable_debug_logging = enable_debug_logging
+        self.auto_tune_batch_size = auto_tune_batch_size
+        self.target_memory_usage_mb = target_memory_usage_mb
+        self.avg_file_size_mb = avg_file_size_mb
+        
+        # Enterprise-safe parallel processing settings
+        self.enable_parallel_processing = enable_parallel_processing
+        self.parallel_read_only = parallel_read_only
+        self.parallel_db_writes = parallel_db_writes
+        self.parallel_validation_level = parallel_validation_level
+        
+        # Auto-calculate max workers for enterprise safety
+        if enable_parallel_processing:
+            if max_parallel_workers is None:
+                import os
+                cpu_count = os.cpu_count() or 4
+                # Conservative approach: use max 50% of available cores for enterprise safety
+                self.max_parallel_workers = max(2, min(4, cpu_count // 2))
+            else:
+                self.max_parallel_workers = max_parallel_workers
+        else:
+            self.max_parallel_workers = 1
+        
+        # Perform validation if requested
+        if validate_config:
+            self._validate_config()
+            self._validate_system_resources()
+            self._validate_compatibility()
+            self._validate_parallel_config()
+        
+        # Calculate optimal batch size
+        if auto_tune_batch_size and batch_size is None:
+            self.batch_size = self._calculate_optimal_batch_size()
+            if enable_debug_logging:
+                logger.debug(f"Auto-tuned batch_size to {self.batch_size}")
+        else:
+            self.batch_size = batch_size or 20  # Default fallback
+            
+        # Final validation of calculated batch size
+        if validate_config:
+            self._validate_final_config()
+    
+    def _validate_config(self):
+        """Validate configuration parameters and fix invalid values."""
+        
+        # Memory limits validation
+        if self.memory_limit_mb < 64:
+            logger.warning(f"memory_limit_mb ({self.memory_limit_mb}) is very low. Setting to 64MB minimum.")
+            self.memory_limit_mb = 64
+        elif self.memory_limit_mb > 32768:  # 32GB
+            logger.warning(f"memory_limit_mb ({self.memory_limit_mb}) is extremely high. Verify this is intentional.")
+        
+        # Target memory validation
+        if self.target_memory_usage_mb > self.memory_limit_mb:
+            logger.warning(f"target_memory_usage_mb ({self.target_memory_usage_mb}) exceeds memory_limit_mb ({self.memory_limit_mb}). Adjusting target to limit.")
+            self.target_memory_usage_mb = self.memory_limit_mb
+        
+        # File size validation
+        if self.avg_file_size_mb <= 0:
+            logger.warning(f"avg_file_size_mb ({self.avg_file_size_mb}) must be > 0. Setting to 8MB default.")
+            self.avg_file_size_mb = 8.0
+        elif self.avg_file_size_mb > 1024:  # 1GB
+            logger.warning(f"avg_file_size_mb ({self.avg_file_size_mb}) is very large for S-57 files. Verify this is correct.")
+    
+    def _validate_system_resources(self):
+        """Validate configuration against available system resources."""
+        try:
+            available_memory = self._get_available_memory_mb()
+            
+            # Check if target memory is realistic
+            if self.target_memory_usage_mb > available_memory * 0.8:
+                recommended = int(available_memory * 0.6)
+                logger.warning(f"target_memory_usage_mb ({self.target_memory_usage_mb}MB) may exceed available memory ({available_memory:.0f}MB). "
+                             f"Recommended: {recommended}MB or less.")
+                
+        except Exception as e:
+            logger.debug(f"Could not validate system resources: {e}")
+    
+    def _validate_compatibility(self):
+        """Validate configuration parameter compatibility."""
+        
+        # Auto-tuning vs manual batch size
+        if self.auto_tune_batch_size and self._manual_batch_provided:
+            logger.info("Both auto_tune_batch_size=True and manual batch_size provided. Manual batch_size will override auto-tuning.")
+        
+        # Cache schemas with memory constraints
+        if self.cache_schemas and self.target_memory_usage_mb < 256:
+            logger.warning("cache_schemas=True with low target_memory_usage_mb may cause memory pressure. Consider cache_schemas=False.")
+        
+        # Debug logging performance impact
+        if self.enable_debug_logging:
+            logger.info("Debug logging enabled. This may impact performance for large datasets.")
+    
+    def _validate_parallel_config(self):
+        """Validate parallel processing configuration for enterprise safety."""
+        
+        # Validate parallel processing settings
+        if self.enable_parallel_processing:
+            # Enterprise safety checks
+            if self.parallel_db_writes and not self.parallel_read_only:
+                logger.warning("parallel_db_writes=True with parallel_read_only=False increases data integrity risk. "
+                             "Recommended: Keep parallel_read_only=True for enterprise safety.")
+            
+            # Validation level checks
+            valid_levels = ['strict', 'moderate', 'minimal']
+            if self.parallel_validation_level not in valid_levels:
+                logger.warning(f"Invalid parallel_validation_level '{self.parallel_validation_level}'. "
+                             f"Valid options: {valid_levels}. Setting to 'strict'.")
+                self.parallel_validation_level = 'strict'
+            
+            # Worker count validation
+            if self.max_parallel_workers < 1:
+                logger.warning(f"max_parallel_workers ({self.max_parallel_workers}) must be >= 1. Setting to 1.")
+                self.max_parallel_workers = 1
+            elif self.max_parallel_workers > 8:
+                logger.warning(f"max_parallel_workers ({self.max_parallel_workers}) is very high. "
+                             "For enterprise safety, consider limiting to 4 or fewer workers.")
+            
+            # Enterprise recommendations
+            if self.parallel_db_writes:
+                logger.info("Parallel database writes enabled. Ensure database supports concurrent connections.")
+                
+            if self.parallel_validation_level != 'strict':
+                logger.info(f"Parallel validation level set to '{self.parallel_validation_level}'. "
+                          "For enterprise applications, 'strict' validation is recommended.")
+        
+        else:
+            # Log when parallel processing is disabled for transparency
+            if self.enable_debug_logging:
+                logger.debug("Parallel processing disabled. All operations will run sequentially.")
+    
+    def _validate_final_config(self):
+        """Final validation after batch size calculation."""
+        # Batch size validation
+        if self.batch_size < 1:
+            logger.warning(f"batch_size ({self.batch_size}) must be >= 1. Setting to 1.")
+            self.batch_size = 1
+        elif self.batch_size > 1000:
+            logger.warning(f"batch_size ({self.batch_size}) is very large. Consider reducing for better memory management.")
+        
+        # Validate batch size won't cause memory issues
+        try:
+            available_memory = self._get_available_memory_mb()
+            estimated_usage = self.batch_size * self.avg_file_size_mb * 2.5
+            if estimated_usage > available_memory * 0.9:
+                safe_batch = max(1, int(available_memory * 0.6 / (self.avg_file_size_mb * 2.5)))
+                logger.warning(f"Current batch_size ({self.batch_size}) may cause memory issues. "
+                             f"Estimated usage: {estimated_usage:.0f}MB, Available: {available_memory:.0f}MB. "
+                             f"Suggested batch_size: {safe_batch}")
+        except Exception:
+            pass
+    
+    def _calculate_optimal_batch_size(self) -> int:
+        """Calculate optimal batch size based on available memory and file characteristics."""
+        try:
+            # Get available system memory
+            available_memory_mb = self._get_available_memory_mb()
+            
+            # Use the smaller of target memory or available memory
+            usable_memory_mb = min(self.target_memory_usage_mb, 
+                                  available_memory_mb * 0.6)  # Use 60% of available
+            
+            # Account for processing overhead (typically 2-3x file size)
+            processing_overhead = 2.5
+            memory_per_file = self.avg_file_size_mb * processing_overhead
+            
+            # Calculate optimal batch size
+            optimal_batch = max(1, int(usable_memory_mb / memory_per_file))
+            
+            # Apply reasonable bounds (1-100 files per batch)
+            optimal_batch = min(100, max(1, optimal_batch))
+            
+            if self.enable_debug_logging:
+                logger.debug(f"Memory calculation: available={available_memory_mb}MB, "
+                           f"usable={usable_memory_mb}MB, memory_per_file={memory_per_file}MB, "
+                           f"optimal_batch={optimal_batch}")
+            
+            return optimal_batch
+            
+        except Exception as e:
+            if self.enable_debug_logging:
+                logger.warning(f"Could not auto-tune batch size: {e}. Using default.")
+            return 20  # Safe default
+    
+    def _get_available_memory_mb(self) -> float:
+        """Get available system memory in MB."""
+        try:
+            import psutil
+            memory = psutil.virtual_memory()
+            available_mb = memory.available / (1024 * 1024)
+            return available_mb
+        except ImportError:
+            # psutil not available, estimate based on typical systems
+            if self.enable_debug_logging:
+                logger.debug("psutil not available, using conservative memory estimate")
+            return 4096  # Conservative 4GB estimate
+        except Exception:
+            return 4096  # Fallback
+    
+    def adjust_for_file_count(self, file_count: int) -> None:
+        """Dynamically adjust batch size based on actual file count."""
+        if not self.auto_tune_batch_size:
+            return
+            
+        # For small datasets, don't overbatch
+        if file_count < self.batch_size:
+            original_batch = self.batch_size
+            self.batch_size = max(1, file_count // 2) if file_count > 2 else 1
+            
+            if self.enable_debug_logging and self.batch_size != original_batch:
+                logger.debug(f"Adjusted batch_size from {original_batch} to {self.batch_size} "
+                           f"for {file_count} files")
+    
+    def validate_for_dataset(self, file_count: int, total_size_mb: Optional[float] = None) -> Dict[str, Any]:
+        """
+        Validate configuration against actual dataset characteristics.
+        
+        Args:
+            file_count: Number of S-57 files to process
+            total_size_mb: Total dataset size in MB (optional)
+            
+        Returns:
+            Dictionary with validation results and recommendations
+        """
+        validation_results = {
+            'is_valid': True,
+            'warnings': [],
+            'recommendations': [],
+            'estimated_metrics': {}
+        }
+        
+        # Validate against file count
+        if self.batch_size > file_count:
+            validation_results['warnings'].append(
+                f"batch_size ({self.batch_size}) exceeds file_count ({file_count}). "
+                f"Will be automatically adjusted to {max(1, file_count // 2) if file_count > 2 else 1}."
+            )
+        
+        # Estimate processing time and memory
+        estimated_batches = (file_count + self.batch_size - 1) // self.batch_size
+        estimated_memory = self.batch_size * self.avg_file_size_mb * 2.5
+        
+        validation_results['estimated_metrics'] = {
+            'estimated_batches': estimated_batches,
+            'estimated_peak_memory_mb': round(estimated_memory, 1),
+            'files_per_batch': min(self.batch_size, file_count)
+        }
+        
+        # Memory usage recommendations
+        if total_size_mb:
+            actual_avg_size = total_size_mb / file_count
+            if abs(actual_avg_size - self.avg_file_size_mb) > self.avg_file_size_mb * 0.5:
+                validation_results['recommendations'].append(
+                    f"Actual average file size ({actual_avg_size:.1f}MB) differs significantly from "
+                    f"configured avg_file_size_mb ({self.avg_file_size_mb}MB). Consider updating configuration."
+                )
+        
+        return validation_results
+    
+    def is_configuration_safe(self) -> bool:
+        """Quick check if configuration is safe for processing."""
+        try:
+            available_memory = self._get_available_memory_mb()
+            estimated_usage = self.batch_size * self.avg_file_size_mb * 2.5
+            return estimated_usage <= available_memory * 0.8
+        except:
+            return True  # Assume safe if can't determine
+    
+    def get_configuration_summary(self) -> str:
+        """Get a human-readable configuration summary with recommendations."""
+        summary = []
+        summary.append("=== S57AdvancedConfig Summary ===")
+        summary.append(f"Batch Size: {self.batch_size} {'(auto-tuned)' if self.auto_tune_batch_size else '(manual)'}")
+        summary.append(f"Target Memory: {self.target_memory_usage_mb}MB")
+        summary.append(f"Memory Limit: {self.memory_limit_mb}MB")
+        summary.append(f"Average File Size: {self.avg_file_size_mb}MB")
+        summary.append(f"Cache Schemas: {self.cache_schemas}")
+        
+        # Add parallel processing information
+        summary.append(f"\n=== Parallel Processing ===")
+        summary.append(f"Enabled: {self.enable_parallel_processing}")
+        if self.enable_parallel_processing:
+            summary.append(f"Max Workers: {self.max_parallel_workers}")
+            summary.append(f"Read-Only Mode: {self.parallel_read_only}")
+            summary.append(f"DB Writes: {self.parallel_db_writes}")
+            summary.append(f"Validation Level: {self.parallel_validation_level}")
+            
+            # Enterprise safety assessment
+            if self.parallel_read_only and not self.parallel_db_writes:
+                summary.append("🛡️  Enterprise Safety: HIGH (read-only parallelization)")
+            elif self.parallel_db_writes and self.parallel_validation_level == 'strict':
+                summary.append("🛡️  Enterprise Safety: MODERATE (parallel writes with strict validation)")
+            else:
+                summary.append("⚠️  Enterprise Safety: REVIEW RECOMMENDED")
+        else:
+            summary.append("🛡️  Enterprise Safety: MAXIMUM (sequential processing)")
+        
+        # Add recommendations
+        try:
+            available_memory = self._get_available_memory_mb()
+            estimated_usage = self.batch_size * self.avg_file_size_mb * 2.5
+            
+            summary.append("\n=== Estimates ===")
+            summary.append(f"Estimated Peak Memory: {estimated_usage:.1f}MB")
+            summary.append(f"Available System Memory: {available_memory:.1f}MB")
+            summary.append(f"Memory Usage Ratio: {(estimated_usage/available_memory)*100:.1f}%")
+            
+            if estimated_usage > available_memory * 0.8:
+                summary.append("\n⚠️  WARNING: High memory usage predicted")
+            elif estimated_usage < available_memory * 0.2:
+                summary.append("\n💡 INFO: Conservative memory usage - could increase batch_size for better performance")
+            else:
+                summary.append("\n✅ Memory usage looks optimal")
+                
+        except Exception:
+            summary.append("\n(Could not estimate memory usage)")
+        
+        return "\n".join(summary)
+    
+    def get_memory_info(self) -> Dict[str, Any]:
+        """Get detailed memory configuration information."""
+        try:
+            available_memory = self._get_available_memory_mb()
+            estimated_usage = self.batch_size * self.avg_file_size_mb * 2.5
+            
+            return {
+                'batch_size': self.batch_size,
+                'estimated_memory_usage_mb': round(estimated_usage, 1),
+                'available_memory_mb': round(available_memory, 1),
+                'memory_limit_mb': self.memory_limit_mb,
+                'target_memory_mb': self.target_memory_usage_mb,
+                'avg_file_size_mb': self.avg_file_size_mb,
+                'auto_tuned': self.auto_tune_batch_size,
+                'parallel_enabled': self.enable_parallel_processing,
+                'parallel_workers': self.max_parallel_workers,
+                'parallel_safety_level': 'HIGH' if (self.parallel_read_only and not self.parallel_db_writes) else 'MODERATE' if self.parallel_db_writes else 'MAXIMUM',
+                'is_safe': self.is_configuration_safe()
+            }
+        except Exception:
+            return {'error': 'Could not retrieve memory information'}
 
 
-class S57AdvancedOptimized:
+class S57Advanced:
     """
-    Optimized version of S57Advanced with better performance and memory usage.
+    Advanced, feature-level conversions with high performance and memory optimization.
     
-    Key improvements:
+    Key features:
     - Single file pass instead of multiple opens
     - Batch processing to manage memory usage
     - Dataset caching during processing
     - Reduced temporary memory dataset creation
+    - Layer-centric outputs with feature stamping for traceability
     """
 
     def __init__(self, input_path: Union[str, Path], output_dest: Union[str, Dict[str, Any]], 
@@ -830,6 +790,9 @@ class S57AdvancedOptimized:
         # Cache for file information to avoid multiple opens
         self._file_cache = {}
         
+        # Initialize thread pool for parallel operations
+        self._thread_pool = None
+        
     def _setup_connector(self):
         """Initializes the appropriate database/file connector."""
         fmt = self.base_converter.output_format
@@ -842,18 +805,38 @@ class S57AdvancedOptimized:
             raise ValueError(f"No connector available for format: {fmt}")
         
     def convert_to_layers(self):
-        """Optimized layer conversion with caching and batching."""
+        """Optimized layer conversion with auto-tuning and adaptive batching."""
         original_list_as_string = gdal.GetConfigOption('OGR_S57_LIST_AS_STRING', 'OFF')
         gdal.SetConfigOption('OGR_S57_LIST_AS_STRING', 'ON')
 
         try:
-            self.base_converter.find_s57_files()
-            self.s57_files = self.base_converter.s57_files
+            # Use parallel file discovery if enabled
+            if self.config.enable_parallel_processing:
+                logger.info("Using enterprise-safe parallel processing")
+                self.s57_files = self._parallel_file_discovery()
+            else:
+                self.base_converter.find_s57_files()
+                self.s57_files = self.base_converter.s57_files
             
-            logger.info(f"--- Starting optimized 'by_layer' conversion (batch size: {self.config.batch_size}) ---")
+            # Auto-adjust batch size based on actual file count
+            self.config.adjust_for_file_count(len(self.s57_files))
+            
+            # Log configuration information
+            if self.config.enable_debug_logging:
+                memory_info = self.config.get_memory_info()
+                logger.debug(f"Configuration: {memory_info}")
+            
+            logger.info(f"--- Starting optimized 'by_layer' conversion ---")
+            logger.info(f"Files to process: {len(self.s57_files)}, Batch size: {self.config.batch_size}")
+            if self.config.enable_parallel_processing:
+                safety_level = self.config.get_memory_info().get('parallel_safety_level', 'MAXIMUM')
+                logger.info(f"Parallel processing enabled with {safety_level} safety level")
             
             # 1. Pre-process all files once to get schemas and ENC names
-            self._preprocess_files()
+            if self.config.enable_parallel_processing and self.config.parallel_read_only:
+                self._parallel_preprocess_files()
+            else:
+                self._preprocess_files()
             
             # 2. Get unified schema from cached data
             all_layers_schema = self._build_unified_schema()
@@ -869,6 +852,8 @@ class S57AdvancedOptimized:
         finally:
             gdal.SetConfigOption('OGR_S57_LIST_AS_STRING', original_list_as_string)
             self._cleanup_cache()
+            if self.config.enable_parallel_processing:
+                self._cleanup_parallel_resources()
 
     def _preprocess_files(self):
         """Process all files once to extract schemas and ENC names."""
@@ -902,6 +887,8 @@ class S57AdvancedOptimized:
         try:
             file_info = {
                 'enc_name': None,
+                'enc_edition': None,
+                'enc_update': None,
                 'layers': {},
                 'dataset': src_ds  # Keep dataset open for later use
             }
@@ -911,16 +898,26 @@ class S57AdvancedOptimized:
                 layer = src_ds.GetLayerByIndex(layer_idx)
                 layer_name = layer.GetName()
                 
-                # Get ENC name from DSID layer
+                # Get ENC metadata from DSID layer
                 if layer_name == 'DSID' and layer.GetFeatureCount() > 0:
                     layer.ResetReading()
                     feature = layer.GetNextFeature()
                     if feature:
+                        # Extract ENC name
                         enc_name_raw = feature.GetField('DSID_DSNM')
                         if enc_name_raw and enc_name_raw.upper().endswith('.000'):
                             file_info['enc_name'] = enc_name_raw[:-4]
                         else:
                             file_info['enc_name'] = enc_name_raw
+                        
+                        # Extract ENC edition and update information for validation
+                        file_info['enc_edition'] = feature.GetField('DSID_EDTN')
+                        file_info['enc_update'] = feature.GetField('DSID_UPDN')
+                        
+                        if self.config.enable_debug_logging:
+                            logger.debug(f"ENC Metadata for {file_info['enc_name']}: "
+                                       f"Edition={file_info['enc_edition']}, "
+                                       f"Update={file_info['enc_update']}")
                 
                 # Build layer schema
                 layer_defn = layer.GetLayerDefn()
@@ -1006,9 +1003,15 @@ class S57AdvancedOptimized:
                         )
                     )
                     
-                    # Add ENC stamping
+                    # Add enhanced ENC stamping for data validation
                     if layer_name != 'DSID':
-                        self._add_enc_stamping_to_memory_dataset(mem_ds, f"{layer_name}_{enc_name}", enc_name)
+                        self._add_enc_stamping_to_memory_dataset(
+                            mem_ds, 
+                            f"{layer_name}_{enc_name}", 
+                            enc_name, 
+                            file_info.get('enc_edition'),
+                            file_info.get('enc_update')
+                        )
                     
                     temp_datasets.append(mem_ds)
                     
@@ -1052,9 +1055,11 @@ class S57AdvancedOptimized:
                         'properties': layer_schema['fields'].copy(),
                         'geometry': layer_schema['geometry_type']
                     }
-                    # Add ENC stamp field (except DSID)
+                    # Add enhanced ENC stamping fields for data validation (except DSID)
                     if layer_name != 'DSID':
                         unified_schemas[layer_name]['properties']['dsid_dsnm'] = 'str'
+                        unified_schemas[layer_name]['properties']['dsid_edtn'] = 'int'
+                        unified_schemas[layer_name]['properties']['dsid_updn'] = 'int'
                 else:
                     # Merge additional fields
                     for field_name, field_type in layer_schema['fields'].items():
@@ -1074,32 +1079,49 @@ class S57AdvancedOptimized:
         else:
             return str(self.base_converter.output_dest)
 
-    def _add_enc_stamping_to_memory_dataset(self, mem_ds: ogr.DataSource, layer_name: str, enc_name: str):
-        """Add ENC stamping field to features in a memory dataset layer."""
+    def _add_enc_stamping_to_memory_dataset(self, mem_ds: ogr.DataSource, layer_name: str, enc_name: str, enc_edition: int = None, enc_update: int = None):
+        """Add ENC stamping fields to features in a memory dataset layer for enhanced data validation."""
         try:
             layer = mem_ds.GetLayerByName(layer_name)
             if not layer:
                 logger.warning(f"Layer '{layer_name}' not found in memory dataset")
                 return
             
-            # Check if dsid_dsnm field already exists
+            # Define ENC stamping fields for enhanced data validation
+            stamping_fields = [
+                ('dsid_dsnm', ogr.OFTString, 256, enc_name),
+                ('dsid_edtn', ogr.OFTInteger, None, enc_edition),
+                ('dsid_updn', ogr.OFTInteger, None, enc_update)
+            ]
+            
             layer_defn = layer.GetLayerDefn()
-            field_exists = False
-            for i in range(layer_defn.GetFieldCount()):
-                if layer_defn.GetFieldDefn(i).GetName() == 'dsid_dsnm':
-                    field_exists = True
-                    break
             
-            # Add the field if it doesn't exist
-            if not field_exists:
-                field_defn = ogr.FieldDefn('dsid_dsnm', ogr.OFTString)
-                field_defn.SetWidth(256)
-                layer.CreateField(field_defn)
+            # Check and add missing stamping fields
+            for field_name, field_type, field_width, field_value in stamping_fields:
+                if field_value is None:
+                    continue  # Skip if no value to stamp
+                    
+                field_exists = False
+                for i in range(layer_defn.GetFieldCount()):
+                    if layer_defn.GetFieldDefn(i).GetName() == field_name:
+                        field_exists = True
+                        break
+                
+                # Add the field if it doesn't exist
+                if not field_exists:
+                    field_defn = ogr.FieldDefn(field_name, field_type)
+                    if field_width:
+                        field_defn.SetWidth(field_width)
+                    layer.CreateField(field_defn)
+                    if self.config.enable_debug_logging:
+                        logger.debug(f"Added ENC stamping field '{field_name}' to layer '{layer_name}'")
             
-            # Update all features with the ENC name
+            # Update all features with the ENC metadata
             layer.ResetReading()
             for feature in layer:
-                feature.SetField('dsid_dsnm', enc_name)
+                for field_name, _, _, field_value in stamping_fields:
+                    if field_value is not None:
+                        feature.SetField(field_name, field_value)
                 layer.SetFeature(feature)
                 
         except Exception as e:
@@ -1144,71 +1166,162 @@ class S57AdvancedOptimized:
             ogr.wkbNone: 'None'
         }
         return mapping.get(ogr_geom_type, 'Geometry')
-
-
-class S57StreamingProcessor:
-    """
-    Alternative streaming processor for very large S-57 datasets.
     
-    This class processes S-57 files with minimal memory usage by streaming
-    features directly to the destination without creating intermediate datasets.
-    """
-    
-    def __init__(self, input_path: Union[str, Path], output_dest: Union[str, Dict[str, Any]], 
-                 output_format: str, schema: str = 'public', 
-                 stream_chunk_size: int = 1000):
-        self.input_path = Path(input_path).resolve()
-        self.output_dest = output_dest
-        self.output_format = output_format.lower()
-        self.schema = schema
-        self.stream_chunk_size = stream_chunk_size  # Features per chunk
-        self.s57_files = []
+    def _parallel_file_discovery(self) -> List[Path]:
+        """Enterprise-safe parallel file discovery and validation."""
+        if not self.config.enable_parallel_processing:
+            # Fallback to sequential discovery
+            self.base_converter.find_s57_files()
+            return self.base_converter.s57_files
         
-    def stream_convert_to_layers(self):
-        """Stream conversion with minimal memory footprint."""
-        logger.info("--- Starting streaming conversion (minimal memory mode) ---")
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        import os
         
-        # Find S-57 files
-        if self.input_path.is_dir():
-            self.s57_files = list(self.input_path.rglob('*.000'))
-        elif self.input_path.is_file():
-            self.s57_files = [self.input_path]
+        try:
+            if self.config.enable_debug_logging:
+                logger.debug(f"Starting parallel file discovery with {self.config.max_parallel_workers} workers")
             
-        if not self.s57_files:
-            raise FileNotFoundError(f"No S-57 files found in: {self.input_path}")
+            # Start with sequential directory scan for safety
+            input_path = Path(self.base_converter.input_path)
+            potential_files = []
             
-        logger.info(f"Found {len(self.s57_files)} S-57 file(s) for streaming")
-        
-        # Get all unique layers across files
-        all_layers = self._discover_layers()
-        
-        # Process each layer using streaming approach
-        for layer_name in all_layers:
-            logger.info(f"Streaming layer: {layer_name}")
-            self._stream_layer(layer_name)
+            if input_path.is_file():
+                potential_files = [input_path]
+            else:
+                # Use safe glob pattern instead of parallel directory walking
+                potential_files = list(input_path.rglob('*.000'))
+            
+            if not potential_files:
+                logger.warning("No S-57 files (*.000) found in input path")
+                return []
+            
+            # Parallel validation of discovered files
+            validated_files = []
+            with ThreadPoolExecutor(max_workers=self.config.max_parallel_workers) as executor:
+                # Submit validation tasks
+                future_to_file = {
+                    executor.submit(self._validate_s57_file, file_path): file_path
+                    for file_path in potential_files
+                }
+                
+                # Collect results with enterprise error handling
+                for future in as_completed(future_to_file):
+                    file_path = future_to_file[future]
+                    try:
+                        if future.result():  # File is valid
+                            validated_files.append(file_path)
+                    except Exception as exc:
+                        logger.warning(f"File validation failed for {file_path}: {exc}")
+                        if self.config.parallel_validation_level == 'strict':
+                            # In strict mode, any validation failure fails the entire process
+                            raise RuntimeError(f"Strict validation failed for {file_path}: {exc}")
+            
+            if self.config.enable_debug_logging:
+                logger.debug(f"Parallel file discovery completed: {len(validated_files)} valid S-57 files found")
+            
+            return sorted(validated_files)
+            
+        except Exception as e:
+            logger.error(f"Parallel file discovery failed: {e}")
+            if self.config.parallel_validation_level == 'strict':
+                raise
+            else:
+                logger.info("Falling back to sequential file discovery")
+                self.base_converter.find_s57_files()
+                return self.base_converter.s57_files
     
-    def _discover_layers(self) -> set:
-        """Quickly discover all unique layers without loading full schemas."""
-        all_layers = set()
-        
-        for s57_file in self.s57_files:
-            try:
-                # Use fiona just for layer discovery (lightweight)
-                layers = fiona.listlayers(s57_file)
-                all_layers.update(layers)
-            except Exception as e:
-                logger.warning(f"Could not discover layers in {s57_file.name}: {e}")
-                continue
-        
-        logger.info(f"Discovered {len(all_layers)} unique layers for streaming")
-        return all_layers
+    def _validate_s57_file(self, file_path: Path) -> bool:
+        """Thread-safe validation of S-57 file."""
+        try:
+            # Basic file existence and extension check
+            if not file_path.exists() or not file_path.suffix.lower() == '.000':
+                return False
+            
+            # Quick GDAL validity check (read-only)
+            dataset = gdal.Open(str(file_path), gdal.GA_ReadOnly)
+            if dataset is None:
+                return False
+            
+            # Check if it's actually an S-57 file
+            driver_name = dataset.GetDriver().GetDescription()
+            dataset = None  # Close immediately
+            
+            return driver_name == 'S57'
+            
+        except Exception:
+            return False
     
-    def _stream_layer(self, layer_name: str):
-        """Stream a single layer from all files with chunked processing."""
-        # This is a placeholder for the streaming implementation
-        # Would use OGR feature iteration with direct writes to avoid memory buildup
-        logger.info(f"Streaming layer '{layer_name}' with chunk size {self.stream_chunk_size}")
-        # Implementation would go here...
+    def _parallel_preprocess_files(self) -> Dict[str, Dict]:
+        """Enterprise-safe parallel preprocessing of S-57 files."""
+        if not self.config.enable_parallel_processing or not self.config.parallel_read_only:
+            # Fallback to sequential preprocessing
+            return self._sequential_preprocess_files()
+        
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        
+        try:
+            if self.config.enable_debug_logging:
+                logger.debug(f"Starting parallel file preprocessing with {self.config.max_parallel_workers} workers")
+            
+            file_info_cache = {}
+            failed_files = []
+            
+            with ThreadPoolExecutor(max_workers=self.config.max_parallel_workers) as executor:
+                # Submit preprocessing tasks
+                future_to_file = {
+                    executor.submit(self._extract_file_info, file_path): file_path
+                    for file_path in self.s57_files
+                }
+                
+                # Collect results with enterprise error handling
+                for future in as_completed(future_to_file):
+                    file_path = future_to_file[future]
+                    try:
+                        file_info = future.result()
+                        if file_info:
+                            file_info_cache[str(file_path)] = file_info
+                        else:
+                            failed_files.append(file_path)
+                    except Exception as exc:
+                        logger.warning(f"File preprocessing failed for {file_path}: {exc}")
+                        failed_files.append(file_path)
+                        if self.config.parallel_validation_level == 'strict':
+                            raise RuntimeError(f"Strict preprocessing failed for {file_path}: {exc}")
+            
+            # Enterprise safety check
+            if failed_files:
+                failure_rate = len(failed_files) / len(self.s57_files)
+                if failure_rate > 0.1:  # More than 10% failure rate
+                    logger.error(f"High failure rate in parallel preprocessing: {len(failed_files)}/{len(self.s57_files)} files failed")
+                    if self.config.parallel_validation_level in ['strict', 'moderate']:
+                        raise RuntimeError("Unacceptable failure rate in parallel preprocessing")
+                else:
+                    logger.warning(f"Some files failed preprocessing: {len(failed_files)} files")
+            
+            if self.config.enable_debug_logging:
+                logger.debug(f"Parallel preprocessing completed: {len(file_info_cache)} files processed successfully")
+            
+            self._file_cache = file_info_cache
+            return file_info_cache
+            
+        except Exception as e:
+            logger.error(f"Parallel preprocessing failed: {e}")
+            if self.config.parallel_validation_level == 'strict':
+                raise
+            else:
+                logger.info("Falling back to sequential preprocessing")
+                return self._sequential_preprocess_files()
+    
+    def _sequential_preprocess_files(self) -> Dict[str, Dict]:
+        """Sequential fallback for file preprocessing."""
+        self._preprocess_files()
+        return self._file_cache
+    
+    def _cleanup_parallel_resources(self):
+        """Clean up parallel processing resources."""
+        if self._thread_pool is not None:
+            self._thread_pool.shutdown(wait=True)
+            self._thread_pool = None
 
 
 # ==============================================================================
