@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "maritime-module-v1"
+version = "0.1.0"
+authors = [
+  { name="Viktor Kolbasov", email="you@example.com" },
+]
+
+description = "A comprehensive maritime analysis and routing toolkit."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "beautifulsoup4>=4.13.4",
+    "fiona>=1.10.1",
+    "gdal==3.11.3",
+    "geoalchemy2>=0.18.0",
+    "geopandas>=1.1.1",
+    "ipykernel>=6.30.0",
+    "pandas>=2.3.1",
+    "psycopg2-binary>=2.9.10",
+    "pydantic>=2.11.7",
+    "pytest>=8.4.1",
+    "pytest-mock>=3.14.1",
+    "python-dotenv>=1.1.1",
+    "requests>=2.32.4",
+    "sqlalchemy>=2.0.41",
+]
+
