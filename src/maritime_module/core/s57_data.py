@@ -215,172 +215,6 @@ class S57Base:
         logger.info(f"--- Finished 'by_enc' conversion ---")
 
 
-class S57Updater:
-    """
-    Handles incremental, transactional updates of S-57 ENC data into a PostGIS database.
-    """
-
-    def __init__(self, output_format: str, dest_conn: Union[str, Path, Dict[str, Any]], schema: str = 'public'):
-        self.output_format = output_format.lower()
-        self.dest_conn = dest_conn
-        self.schema = schema
-        self.engine = None
-        self.Session = None
-        self.s57_driver = ogr.GetDriverByName('S57')
-        if not self.s57_driver:
-            raise RuntimeError("S-57 OGR driver not found.")
-        self._validate_inputs()
-        self.connect()
-
-    def _validate_inputs(self):
-        """Validates the combination of output format and connection parameters."""
-        if self.output_format not in ['postgis', 'spatialite']:
-            raise ValueError(f"Unsupported output format for Updater: {self.output_format}")
-        if self.output_format == 'postgis' and not isinstance(self.dest_conn, dict):
-            raise ValueError("For PostGIS, dest_conn must be a dictionary of connection parameters.")
-        if self.output_format == 'spatialite' and not isinstance(self.dest_conn, (str, Path)):
-            raise ValueError("For SpatiaLite, dest_conn must be a file path string or Path object.")
-
-    def connect(self):
-        """Establishes a connection to the destination database (PostGIS or SpatiaLite)."""
-        if self.Session:
-            return
-
-        try:
-            conn_str = ""
-            db_name = ""
-            if self.output_format == 'postgis':
-                db_params = self.dest_conn
-                db_name = db_params['dbname']
-                conn_str = (f"postgresql+psycopg2://{db_params['user']}:{db_params['password']}@"
-                            f"{db_params['host']}:{db_params['port']}/{db_name}")
-            elif self.output_format == 'spatialite':
-                db_path = Path(self.dest_conn).resolve()
-                db_path.parent.mkdir(parents=True, exist_ok=True)
-                db_name = db_path.name
-                conn_str = f"sqlite:///{str(db_path)}"
-
-            self.engine = create_engine(conn_str)
-            self.Session = sessionmaker(bind=self.engine)
-            logger.info(f"Successfully connected to {self.output_format} database '{db_name}'")
-        except Exception as e:
-            logger.error(f"Database connection to {self.output_format} failed: {e}")
-            raise
-
-    def update_enc(self, s57_file_path: str, force_overwrite: bool = False):
-        """
-        Processes a single S-57 file and updates the PostGIS database within a transaction.
-        """
-        self.connect()
-        s57_ds = self.s57_driver.Open(s57_file_path, 0)
-        if not s57_ds:
-            logger.error(f"Could not open S-57 file: {s57_file_path}")
-            return
-
-        dsid_layer = s57_ds.GetLayerByName('DSID')
-        if not dsid_layer or dsid_layer.GetFeatureCount() == 0:
-            logger.error(f"DSID layer not found or is empty in {s57_file_path}")
-            return
-
-        dsid_feature = dsid_layer.GetNextFeature()
-        enc_name_raw = dsid_feature.GetField('DSID_DSNM')
-        # Per request, remove the .000 extension for a cleaner stamped name, ensuring
-        # consistency with how S57Advanced stores the name.
-        if enc_name_raw and enc_name_raw.upper().endswith('.000'):
-            enc_name = enc_name_raw[:-4]
-        else:
-            enc_name = enc_name_raw
-        new_version = {'edition': dsid_feature.GetField('DSID_EDTN'), 'update': dsid_feature.GetField('DSID_UPDN')}
-
-        with self.Session() as session:
-            with session.begin():  # Manages the transaction (commit/rollback)
-                inspector = inspect(self.engine)
-                existing_version = self._get_existing_version(session, inspector, enc_name)
-
-                if existing_version and not force_overwrite:
-                    if (new_version['edition'] < existing_version['edition'] or
-                            (new_version['edition'] == existing_version['edition'] and new_version['update'] <=
-                             existing_version['update'])):
-                        logger.info(f"Skipping '{enc_name}': A newer or same version exists.")
-                        return
-
-                logger.info(f"Processing update for '{enc_name}'...")
-
-                # 1. Delete all existing features for this ENC
-                for i in range(s57_ds.GetLayerCount()):
-                    layer_name = s57_ds.GetLayer(i).GetName().lower()
-                    table_name_for_delete = f'"{self.schema}"."{layer_name}"' if self.output_format == 'postgis' else f'"{layer_name}"'
-
-                    # Check if table exists before trying to delete from it
-                    has_table = inspector.has_table(layer_name, schema=self.schema if self.output_format == 'postgis' else None)
-                    if has_table:
-                        delete_sql = text(f'DELETE FROM {table_name_for_delete} WHERE dsid_dsnm = :enc_name')
-                        session.execute(delete_sql, {'enc_name': enc_name})
-
-                # 2. Open destination for writing and insert new features
-                dest_ds = None
-                try:
-                    if self.output_format == 'postgis':
-                        db_params = self.dest_conn
-                        pg_conn_str = (f"PG: dbname='{db_params['dbname']}' host='{db_params['host']}' "
-                                       f"port='{db_params['port']}' user='{db_params['user']}' "
-                                       f"password='{db_params['password']}'")
-                        dest_ds = ogr.Open(pg_conn_str, 1)
-                    elif self.output_format == 'spatialite':
-                        dest_ds = ogr.Open(str(self.dest_conn), 1)
-
-                    if not dest_ds:
-                        raise RuntimeError("Could not open destination data source for writing.")
-
-                    for i in range(s57_ds.GetLayerCount()):
-                        input_layer = s57_ds.GetLayer(i)
-                        self._write_layer_features(dest_ds, input_layer, enc_name, new_version['edition'], new_version['update'])
-
-                    logger.info(f"Successfully committed update for '{enc_name}'.")
-                finally:
-                    dest_ds = None  # Close OGR connection
-
-    def _get_existing_version(self, session: Session, inspector: inspect, enc_name: str) -> Optional[Dict[str, Any]]:
-        """Queries the DSID table for the existing version of an ENC."""
-        table_name = "dsid"
-        schema_name = self.schema if self.output_format == 'postgis' else None
-        if not inspector.has_table(table_name, schema=schema_name):
-            return None
-
-        table_name_for_query = f'"{schema_name}"."{table_name}"' if self.output_format == 'postgis' else f'"{table_name}"'
-        query = text(f'SELECT dsid_edtn, dsid_updn FROM {table_name_for_query} WHERE dsid_dsnm = :enc_name')
-        result = session.execute(query, {'enc_name': enc_name}).fetchone()
-        return {'edition': result[0], 'update': result[1]} if result else None
-
-    def _write_layer_features(self, dest_ds: ogr.DataSource, input_layer: ogr.Layer, enc_name: str, enc_edition: int = None, enc_update: int = None):
-        """Helper to write features of a single layer to PostGIS using OGR with enhanced ENC stamping."""
-        output_layer_name = input_layer.GetName().lower()
-
-        layer_lookup_name = f"{self.schema}.{output_layer_name}" if self.output_format == 'postgis' else output_layer_name
-        out_layer = dest_ds.GetLayerByName(layer_lookup_name)
-        if not out_layer:
-            logger.warning(f"Table '{output_layer_name}' not found. Skipping layer.")
-            return
-
-        input_layer.ResetReading()
-        for feature in input_layer:
-            out_feature = ogr.Feature(out_layer.GetLayerDefn())
-            out_feature.SetFrom(feature)
-            
-            # Enhanced ENC stamping for better data validation
-            out_feature.SetField('dsid_dsnm', enc_name)
-            if enc_edition is not None:
-                out_feature.SetField('dsid_edtn', enc_edition)
-            if enc_update is not None:
-                out_feature.SetField('dsid_updn', enc_update)
-                
-            out_layer.CreateFeature(out_feature)
-
-
-# ==============================================================================
-# OPTIMIZED CONVERSION CLASSES
-# ==============================================================================
-
 class S57AdvancedConfig:
     """Enhanced configuration class with comprehensive validation and auto-tuning capabilities for S57 processing."""
     
@@ -1056,10 +890,16 @@ class S57Advanced:
                         'geometry': layer_schema['geometry_type']
                     }
                     # Add enhanced ENC stamping fields for data validation (except DSID)
+                    # Use format-specific field naming: uppercase for GPKG, lowercase for others
                     if layer_name != 'DSID':
-                        unified_schemas[layer_name]['properties']['dsid_dsnm'] = 'str'
-                        unified_schemas[layer_name]['properties']['dsid_edtn'] = 'int'
-                        unified_schemas[layer_name]['properties']['dsid_updn'] = 'int'
+                        if self.base_converter.output_format == 'gpkg':
+                            unified_schemas[layer_name]['properties']['DSID_DSNM'] = 'str'
+                            unified_schemas[layer_name]['properties']['DSID_EDTN'] = 'int'
+                            unified_schemas[layer_name]['properties']['DSID_UPDN'] = 'int'
+                        else:
+                            unified_schemas[layer_name]['properties']['dsid_dsnm'] = 'str'
+                            unified_schemas[layer_name]['properties']['dsid_edtn'] = 'int'
+                            unified_schemas[layer_name]['properties']['dsid_updn'] = 'int'
                 else:
                     # Merge additional fields
                     for field_name, field_type in layer_schema['fields'].items():
@@ -1088,11 +928,19 @@ class S57Advanced:
                 return
             
             # Define ENC stamping fields for enhanced data validation
-            stamping_fields = [
-                ('dsid_dsnm', ogr.OFTString, 256, enc_name),
-                ('dsid_edtn', ogr.OFTInteger, None, enc_edition),
-                ('dsid_updn', ogr.OFTInteger, None, enc_update)
-            ]
+            # Use format-specific field naming: uppercase for GPKG, lowercase for others
+            if self.base_converter.output_format == 'gpkg':
+                stamping_fields = [
+                    ('DSID_DSNM', ogr.OFTString, 256, enc_name),
+                    ('DSID_EDTN', ogr.OFTInteger, None, enc_edition),
+                    ('DSID_UPDN', ogr.OFTInteger, None, enc_update)
+                ]
+            else:
+                stamping_fields = [
+                    ('dsid_dsnm', ogr.OFTString, 256, enc_name),
+                    ('dsid_edtn', ogr.OFTInteger, None, enc_edition),
+                    ('dsid_updn', ogr.OFTInteger, None, enc_update)
+                ]
             
             layer_defn = layer.GetLayerDefn()
             
@@ -1323,6 +1171,181 @@ class S57Advanced:
             self._thread_pool.shutdown(wait=True)
             self._thread_pool = None
 
+# ==============================================================================
+# DATABASE UPDATE CLASS
+# ==============================================================================
+
+class S57Updater:
+    """
+    Handles incremental, transactional updates of S-57 ENC data into a PostGIS database.
+    """
+
+    def __init__(self, output_format: str, dest_conn: Union[str, Path, Dict[str, Any]], schema: str = 'public'):
+        self.output_format = output_format.lower()
+        self.dest_conn = dest_conn
+        self.schema = schema
+        self.engine = None
+        self.Session = None
+        self.s57_driver = ogr.GetDriverByName('S57')
+        if not self.s57_driver:
+            raise RuntimeError("S-57 OGR driver not found.")
+        self._validate_inputs()
+        self.connect()
+
+    def _validate_inputs(self):
+        """Validates the combination of output format and connection parameters."""
+        if self.output_format not in ['postgis', 'spatialite']:
+            raise ValueError(f"Unsupported output format for Updater: {self.output_format}")
+        if self.output_format == 'postgis' and not isinstance(self.dest_conn, dict):
+            raise ValueError("For PostGIS, dest_conn must be a dictionary of connection parameters.")
+        if self.output_format == 'spatialite' and not isinstance(self.dest_conn, (str, Path)):
+            raise ValueError("For SpatiaLite, dest_conn must be a file path string or Path object.")
+
+    def connect(self):
+        """Establishes a connection to the destination database (PostGIS or SpatiaLite)."""
+        if self.Session:
+            return
+
+        try:
+            conn_str = ""
+            db_name = ""
+            if self.output_format == 'postgis':
+                db_params = self.dest_conn
+                db_name = db_params['dbname']
+                conn_str = (f"postgresql+psycopg2://{db_params['user']}:{db_params['password']}@"
+                            f"{db_params['host']}:{db_params['port']}/{db_name}")
+            elif self.output_format == 'spatialite':
+                db_path = Path(self.dest_conn).resolve()
+                db_path.parent.mkdir(parents=True, exist_ok=True)
+                db_name = db_path.name
+                conn_str = f"sqlite:///{str(db_path)}"
+
+            self.engine = create_engine(conn_str)
+            self.Session = sessionmaker(bind=self.engine)
+            logger.info(f"Successfully connected to {self.output_format} database '{db_name}'")
+        except Exception as e:
+            logger.error(f"Database connection to {self.output_format} failed: {e}")
+            raise
+
+    def update_enc(self, s57_file_path: str, force_overwrite: bool = False):
+        """
+        Processes a single S-57 file and updates the PostGIS database within a transaction.
+        """
+        self.connect()
+        s57_ds = self.s57_driver.Open(s57_file_path, 0)
+        if not s57_ds:
+            logger.error(f"Could not open S-57 file: {s57_file_path}")
+            return
+
+        dsid_layer = s57_ds.GetLayerByName('DSID')
+        if not dsid_layer or dsid_layer.GetFeatureCount() == 0:
+            logger.error(f"DSID layer not found or is empty in {s57_file_path}")
+            return
+
+        dsid_feature = dsid_layer.GetNextFeature()
+        enc_name_raw = dsid_feature.GetField('DSID_DSNM')
+        # Per request, remove the .000 extension for a cleaner stamped name, ensuring
+        # consistency with how S57Advanced stores the name.
+        if enc_name_raw and enc_name_raw.upper().endswith('.000'):
+            enc_name = enc_name_raw[:-4]
+        else:
+            enc_name = enc_name_raw
+        new_version = {'edition': dsid_feature.GetField('DSID_EDTN'), 'update': dsid_feature.GetField('DSID_UPDN')}
+
+        with self.Session() as session:
+            with session.begin():  # Manages the transaction (commit/rollback)
+                inspector = inspect(self.engine)
+                existing_version = self._get_existing_version(session, inspector, enc_name)
+
+                if existing_version and not force_overwrite:
+                    if (new_version['edition'] < existing_version['edition'] or
+                            (new_version['edition'] == existing_version['edition'] and new_version['update'] <=
+                             existing_version['update'])):
+                        logger.info(f"Skipping '{enc_name}': A newer or same version exists.")
+                        return
+
+                logger.info(f"Processing update for '{enc_name}'...")
+
+                # 1. Delete all existing features for this ENC
+                for i in range(s57_ds.GetLayerCount()):
+                    layer_name = s57_ds.GetLayer(i).GetName().lower()
+                    table_name_for_delete = f'"{self.schema}"."{layer_name}"' if self.output_format == 'postgis' else f'"{layer_name}"'
+
+                    # Check if table exists before trying to delete from it
+                    has_table = inspector.has_table(layer_name,
+                                                    schema=self.schema if self.output_format == 'postgis' else None)
+                    if has_table:
+                        delete_sql = text(f'DELETE FROM {table_name_for_delete} WHERE dsid_dsnm = :enc_name')
+                        session.execute(delete_sql, {'enc_name': enc_name})
+
+                # 2. Open destination for writing and insert new features
+                dest_ds = None
+                try:
+                    if self.output_format == 'postgis':
+                        db_params = self.dest_conn
+                        pg_conn_str = (f"PG: dbname='{db_params['dbname']}' host='{db_params['host']}' "
+                                       f"port='{db_params['port']}' user='{db_params['user']}' "
+                                       f"password='{db_params['password']}'")
+                        dest_ds = ogr.Open(pg_conn_str, 1)
+                    elif self.output_format == 'spatialite':
+                        dest_ds = ogr.Open(str(self.dest_conn), 1)
+
+                    if not dest_ds:
+                        raise RuntimeError("Could not open destination data source for writing.")
+
+                    for i in range(s57_ds.GetLayerCount()):
+                        input_layer = s57_ds.GetLayer(i)
+                        self._write_layer_features(dest_ds, input_layer, enc_name, new_version['edition'],
+                                                   new_version['update'])
+
+                    logger.info(f"Successfully committed update for '{enc_name}'.")
+                finally:
+                    dest_ds = None  # Close OGR connection
+
+    def _get_existing_version(self, session: Session, inspector: inspect, enc_name: str) -> Optional[Dict[str, Any]]:
+        """Queries the DSID table for the existing version of an ENC."""
+        table_name = "dsid"
+        schema_name = self.schema if self.output_format == 'postgis' else None
+        if not inspector.has_table(table_name, schema=schema_name):
+            return None
+
+        table_name_for_query = f'"{schema_name}"."{table_name}"' if self.output_format == 'postgis' else f'"{table_name}"'
+        query = text(f'SELECT dsid_edtn, dsid_updn FROM {table_name_for_query} WHERE dsid_dsnm = :enc_name')
+        result = session.execute(query, {'enc_name': enc_name}).fetchone()
+        return {'edition': result[0], 'update': result[1]} if result else None
+
+    def _write_layer_features(self, dest_ds: ogr.DataSource, input_layer: ogr.Layer, enc_name: str,
+                              enc_edition: int = None, enc_update: int = None):
+        """Helper to write features of a single layer to PostGIS using OGR with enhanced ENC stamping."""
+        output_layer_name = input_layer.GetName().lower()
+
+        layer_lookup_name = f"{self.schema}.{output_layer_name}" if self.output_format == 'postgis' else output_layer_name
+        out_layer = dest_ds.GetLayerByName(layer_lookup_name)
+        if not out_layer:
+            logger.warning(f"Table '{output_layer_name}' not found. Skipping layer.")
+            return
+
+        input_layer.ResetReading()
+        for feature in input_layer:
+            out_feature = ogr.Feature(out_layer.GetLayerDefn())
+            out_feature.SetFrom(feature)
+
+            # Enhanced ENC stamping for better data validation
+            # Use format-specific field naming: uppercase for GPKG, lowercase for others
+            if self.output_format == 'gpkg':
+                out_feature.SetField('DSID_DSNM', enc_name)
+                if enc_edition is not None:
+                    out_feature.SetField('DSID_EDTN', enc_edition)
+                if enc_update is not None:
+                    out_feature.SetField('DSID_UPDN', enc_update)
+            else:
+                out_feature.SetField('dsid_dsnm', enc_name)
+                if enc_edition is not None:
+                    out_feature.SetField('dsid_edtn', enc_edition)
+                if enc_update is not None:
+                    out_feature.SetField('dsid_updn', enc_update)
+
+            out_layer.CreateFeature(out_feature)
 
 # ==============================================================================
 # DATABASE ANALYSIS CLASS
@@ -1354,15 +1377,23 @@ class PostGISManager:
 
     def get_layer(self, layer_name: str, filter_by_enc: Optional[List[str]] = None) -> gpd.GeoDataFrame:
         """Retrieves a full layer from the database as a GeoDataFrame."""
+        # --- Hardening Step: Validate table name against database metadata ---
+        # This prevents SQL injection via the layer_name parameter by ensuring
+        # it corresponds to an actual, existing table before being used in a query.
+        inspector = inspect(self.engine)
+        safe_layer_name = layer_name.lower()
+        if not inspector.has_table(safe_layer_name, schema=self.schema):
+            logger.warning(f"Layer '{layer_name}' not found in schema '{self.schema}'.")
+            return gpd.GeoDataFrame()  # Return empty dataframe if table doesn't exist
+
         # The base SQL query is defined without any user data.
-        sql = f'SELECT * FROM "{self.schema}"."{layer_name.lower()}"'
+        sql = f'SELECT * FROM "{self.schema}"."{safe_layer_name}"'
         params = None  # Initialize params as None
 
         if filter_by_enc:
             # 1. Add a placeholder to the SQL for the IN clause.
-            #    The database driver will handle this placeholder safely.5
+            #    The database driver will handle this placeholder safely.
             sql += " WHERE dsid_dsnm IN %s"
-
             # 2. The data is passed as a separate tuple.
             #    The driver ensures this data is treated as literal values, not code.
             params = (tuple(filter_by_enc),)
@@ -1432,3 +1463,730 @@ class PostGISManager:
             df['is_outdated'] = 'Unknown'
 
         return df
+
+    def verify_feature_update_status(self, layer_name: str = None) -> pd.DataFrame:
+        """
+        Verifies that Edition and Update values in feature layers correspond to DSID layer values.
+        This verification applies only to layer-centric data structures where features are stamped
+        with dsid_edtn and dsid_updn fields.
+        
+        Args:
+            layer_name (str, optional): Specific layer to verify. If None, verifies all layers.
+        
+        Returns:
+            pd.DataFrame: Verification results with columns:
+                - layer_name: Name of the layer
+                - enc_name: ENC identifier 
+                - dsid_edition: Edition from DSID layer
+                - dsid_update: Update from DSID layer
+                - feature_edition: Edition from feature layer
+                - feature_update: Update from feature layer
+                - edition_match: Boolean indicating if editions match
+                - update_match: Boolean indicating if updates match
+                - status: Overall verification status ('VALID', 'MISMATCH', 'MISSING_DATA')
+        """
+        # Get DSID reference data
+        dsid_sql = f'SELECT dsid_dsnm, dsid_edtn, dsid_updn FROM "{self.schema}"."dsid"'
+        dsid_df = pd.read_sql(dsid_sql, self.engine)
+        # Clean ENC names by removing .000 extension for consistent lookup with stamped features
+        dsid_df['dsid_dsnm_clean'] = dsid_df['dsid_dsnm'].str.replace('.000', '', case=False)
+        dsid_lookup = dsid_df.set_index('dsid_dsnm_clean')
+        
+        # Get list of tables in the schema (excluding DSID)
+        tables_sql = text("""
+        SELECT table_name 
+        FROM information_schema.tables 
+        WHERE table_schema = :schema 
+          AND table_name != 'dsid'
+          AND table_type = 'BASE TABLE'
+        """)
+        tables_df = pd.read_sql(tables_sql, self.engine, params={'schema': self.schema})
+        
+        if layer_name:
+            # Filter to specific layer
+            tables_df = tables_df[tables_df['table_name'] == layer_name.lower()]
+            if tables_df.empty:
+                logger.warning(f"Layer '{layer_name}' not found in schema '{self.schema}'")
+                return pd.DataFrame()
+        
+        verification_results = []
+        
+        for _, row in tables_df.iterrows():
+            table = row['table_name']
+            
+            # Check if table has stamping fields (dsid_dsnm, dsid_edtn, dsid_updn)
+            columns_sql = text("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_schema = :schema 
+              AND table_name = :table
+              AND column_name IN ('dsid_dsnm', 'dsid_edtn', 'dsid_updn')
+            """)
+            columns_df = pd.read_sql(columns_sql, self.engine, params={'schema': self.schema, 'table': table})
+            stamping_columns = set(columns_df['column_name'].tolist())
+            
+            if not {'dsid_dsnm', 'dsid_edtn', 'dsid_updn'}.issubset(stamping_columns):
+                # Skip tables that don't have stamping fields (not layer-centric)
+                continue
+                
+            # Get unique ENC entries from the feature layer
+            features_sql = f"""
+            SELECT DISTINCT dsid_dsnm, dsid_edtn, dsid_updn, COUNT(*) as feature_count
+            FROM "{self.schema}"."{table}"
+            WHERE dsid_dsnm IS NOT NULL
+            GROUP BY dsid_dsnm, dsid_edtn, dsid_updn
+            """
+            features_df = pd.read_sql(features_sql, self.engine)
+            
+            # Verify each ENC entry in this layer
+            for _, feature_row in features_df.iterrows():
+                enc_name = feature_row['dsid_dsnm']
+                feature_edition = feature_row['dsid_edtn']
+                feature_update = feature_row['dsid_updn']
+                feature_count = feature_row['feature_count']
+                
+                # Look up corresponding DSID values
+                if enc_name in dsid_lookup.index:
+                    dsid_edition = dsid_lookup.loc[enc_name, 'dsid_edtn']
+                    dsid_update = dsid_lookup.loc[enc_name, 'dsid_updn']
+                    
+                    # Convert to integers for consistent comparison (handle string/int mismatch)
+                    try:
+                        dsid_edition_int = int(dsid_edition) if dsid_edition is not None else None
+                        dsid_update_int = int(dsid_update) if dsid_update is not None else None
+                        feature_edition_int = int(feature_edition) if feature_edition is not None else None
+                        feature_update_int = int(feature_update) if feature_update is not None else None
+                        
+                        # Check for matches
+                        edition_match = (feature_edition_int == dsid_edition_int)
+                        update_match = (feature_update_int == dsid_update_int)
+                    except (ValueError, TypeError):
+                        # If conversion fails, fall back to string comparison
+                        edition_match = (str(feature_edition) == str(dsid_edition))
+                        update_match = (str(feature_update) == str(dsid_update))
+                    
+                    if edition_match and update_match:
+                        status = 'VALID'
+                    else:
+                        status = 'MISMATCH'
+                        
+                    verification_results.append({
+                        'layer_name': table,
+                        'enc_name': enc_name,
+                        'dsid_edition': dsid_edition,
+                        'dsid_update': dsid_update, 
+                        'feature_edition': feature_edition,
+                        'feature_update': feature_update,
+                        'feature_count': feature_count,
+                        'edition_match': edition_match,
+                        'update_match': update_match,
+                        'status': status
+                    })
+                else:
+                    # ENC not found in DSID layer
+                    verification_results.append({
+                        'layer_name': table,
+                        'enc_name': enc_name,
+                        'dsid_edition': None,
+                        'dsid_update': None,
+                        'feature_edition': feature_edition,
+                        'feature_update': feature_update,
+                        'feature_count': feature_count,
+                        'edition_match': False,
+                        'update_match': False,
+                        'status': 'MISSING_DATA'
+                    })
+        
+        results_df = pd.DataFrame(verification_results)
+        
+        if not results_df.empty:
+            # Sort by status (problems first), then by layer and ENC name
+            status_order = {'MISMATCH': 0, 'MISSING_DATA': 1, 'VALID': 2}
+            results_df['status_order'] = results_df['status'].map(status_order)
+            results_df = results_df.sort_values(['status_order', 'layer_name', 'enc_name'])
+            results_df = results_df.drop('status_order', axis=1)
+            
+            # Log summary
+            status_counts = results_df['status'].value_counts()
+            logger.info(f"Feature update status verification complete: {dict(status_counts)}")
+            
+        return results_df
+
+
+class SpatiaLiteManager:
+    """
+    Provides tools to query and analyze ENC data stored in a SpatiaLite database.
+    """
+
+    def __init__(self, db_path: Union[str, Path]):
+        self.db_path = Path(db_path).resolve()
+        self.engine = None
+        self.connect()
+
+    def connect(self):
+        """Establishes a connection to the SpatiaLite database."""
+        if self.engine:
+            return
+        try:
+            # Ensure parent directory exists
+            self.db_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            conn_str = f"sqlite:///{str(self.db_path)}"
+            self.engine = create_engine(conn_str)
+            logger.info(f"Successfully connected to SpatiaLite database '{self.db_path.name}'")
+        except Exception as e:
+            logger.error(f"SpatiaLite database connection failed: {e}")
+            raise
+
+    def get_layer(self, layer_name: str, filter_by_enc: Optional[List[str]] = None) -> gpd.GeoDataFrame:
+        """Retrieves a full layer from the database as a GeoDataFrame."""
+        # Use fiona to check for layer existence, as it's more direct and robust for file-based sources.
+        try:
+            import fiona
+            layers = fiona.listlayers(self.db_path)
+        except Exception as e:
+            logger.error(f"Could not read layers from SpatiaLite DB '{self.db_path}': {e}")
+            return gpd.GeoDataFrame()
+
+        safe_layer_name = layer_name.lower()
+        if safe_layer_name not in layers:
+            logger.warning(f"Layer '{layer_name}' not found in database.")
+            return gpd.GeoDataFrame()
+
+        where_clause = None
+        if filter_by_enc:
+            # Create a safe WHERE clause for the underlying OGR driver.
+            # The values are derived from file names, so simple quoting is safe.
+            enc_list_str = ", ".join([f"'{enc}'" for enc in filter_by_enc])
+            where_clause = f"dsid_dsnm IN ({enc_list_str})"
+
+        # Use gpd.read_file, which is the correct, high-level function for reading file-based sources.
+        return gpd.read_file(self.db_path, layer=safe_layer_name, where=where_clause)
+
+    def get_enc_summary(self, check_noaa: bool = False) -> pd.DataFrame:
+        """
+        Provides a summary of all ENCs in the database.
+        Optionally checks against the live NOAA database to flag outdated charts.
+
+        Args:
+            check_noaa (bool): If True, fetches data from NOAA to check for outdated ENCs.
+
+        Returns:
+            pd.DataFrame: A DataFrame with ENC summary. If check_noaa is True, it
+                          includes an 'is_outdated' boolean column.
+        """
+        # Check if dsid table exists
+        inspector = inspect(self.engine)
+        if not inspector.has_table('dsid'):
+            logger.warning("DSID table not found in database")
+            return pd.DataFrame()
+
+        sql = 'SELECT dsid_dsnm, dsid_edtn, dsid_updn FROM "dsid"'
+        df = pd.read_sql(sql, self.engine)
+        df.rename(columns={'dsid_dsnm': 'ENC_Name', 'dsid_edtn': 'Edition', 'dsid_updn': 'Update'}, inplace=True)
+
+        if not check_noaa:
+            return df
+
+        logger.info("Checking against NOAA database for latest versions...")
+        try:
+            noaa_db = NoaaDatabase()
+            noaa_df = noaa_db.get_dataframe()
+
+            # Clean local ENC names to match NOAA format
+            df['ENC_Name_Clean'] = df['ENC_Name'].str.split('.').str[0]
+
+            # Prepare NOAA data for efficient lookup
+            noaa_df_renamed = noaa_df.rename(columns={'Edition': 'NOAA_Edition', 'Update': 'NOAA_Update'})
+            noaa_lookup = noaa_df_renamed.set_index('ENC_Name')[['NOAA_Edition', 'NOAA_Update']]
+
+            # Merge the NOAA data
+            merged_df = df.join(noaa_lookup, on='ENC_Name_Clean')
+
+            # Ensure all version columns are numeric
+            for col in ['Edition', 'Update', 'NOAA_Edition', 'NOAA_Update']:
+                merged_df[col] = pd.to_numeric(merged_df[col], errors='coerce')
+
+            # Determine if the local ENC is outdated
+            is_outdated = (
+                    (merged_df['Edition'] < merged_df['NOAA_Edition']) |
+                    ((merged_df['Edition'] == merged_df['NOAA_Edition']) & (
+                                merged_df['Update'] < merged_df['NOAA_Update']))
+            )
+
+            df['is_outdated'] = is_outdated.values
+            df['is_outdated'].fillna(False, inplace=True)
+            df.drop(columns=['ENC_Name_Clean'], inplace=True)
+
+        except (ConnectionError, RuntimeError) as e:
+            logger.error(f"Could not fetch or process NOAA data: {e}")
+            df['is_outdated'] = 'Unknown'
+
+        return df
+
+    def verify_feature_update_status(self, layer_name: str = None) -> pd.DataFrame:
+        """
+        Verifies that Edition and Update values in feature layers correspond to DSID layer values.
+        This verification applies only to layer-centric data structures where features are stamped
+        with dsid_edtn and dsid_updn fields.
+        
+        Args:
+            layer_name (str, optional): Specific layer to verify. If None, verifies all layers.
+        
+        Returns:
+            pd.DataFrame: Verification results with columns:
+                - layer_name: Name of the layer
+                - enc_name: ENC identifier 
+                - dsid_edition: Edition from DSID layer
+                - dsid_update: Update from DSID layer
+                - feature_edition: Edition from feature layer
+                - feature_update: Update from feature layer
+                - edition_match: Boolean indicating if editions match
+                - update_match: Boolean indicating if updates match
+                - status: Overall verification status ('VALID', 'MISMATCH', 'MISSING_DATA')
+        """
+        # Get DSID reference data
+        inspector = inspect(self.engine)
+        if not inspector.has_table('dsid'):
+            logger.warning("DSID table not found in database")
+            return pd.DataFrame()
+
+        dsid_sql = 'SELECT dsid_dsnm, dsid_edtn, dsid_updn FROM "dsid"'
+        dsid_df = pd.read_sql(dsid_sql, self.engine)
+        # Clean ENC names by removing .000 extension for consistent lookup with stamped features
+        dsid_df['dsid_dsnm_clean'] = dsid_df['dsid_dsnm'].str.replace('.000', '', case=False)
+        dsid_lookup = dsid_df.set_index('dsid_dsnm_clean')
+        
+        # Get list of tables (excluding DSID and spatial index tables)
+        all_tables = inspector.get_table_names()
+        # Filter out spatial index tables (rtree_*) that require rtree module
+        tables_to_check = [t for t in all_tables if t != 'dsid' and not t.startswith('rtree_')]
+        
+        if layer_name:
+            # Filter to specific layer
+            layer_name_lower = layer_name.lower()
+            if layer_name_lower not in tables_to_check:
+                logger.warning(f"Layer '{layer_name}' not found in database")
+                return pd.DataFrame()
+            tables_to_check = [layer_name_lower]
+        
+        verification_results = []
+        layer_centric_tables = []
+        
+        for table in tables_to_check:
+            # Check if table has stamping fields
+            columns = [col['name'] for col in inspector.get_columns(table)]
+            stamping_columns = set(columns)
+            
+            if not {'dsid_dsnm', 'dsid_edtn', 'dsid_updn'}.issubset(stamping_columns):
+                # Skip tables that don't have stamping fields
+                continue
+            
+            layer_centric_tables.append(table)
+        
+        # Check if any tables have stamping fields
+        if not layer_centric_tables:
+            logger.warning("No layer-centric tables found. This SpatiaLite database appears to be created with 'by_enc' mode, "
+                         "which doesn't include ENC stamping fields (dsid_dsnm, dsid_edtn, dsid_updn) in feature layers. "
+                         "Feature update verification only works with 'by_layer' mode data structures.")
+            return pd.DataFrame()
+        
+        for table in layer_centric_tables:
+                
+            # Get unique ENC entries from the feature layer
+            features_sql = f"""
+            SELECT DISTINCT dsid_dsnm, dsid_edtn, dsid_updn, COUNT(*) as feature_count
+            FROM "{table}"
+            WHERE dsid_dsnm IS NOT NULL
+            GROUP BY dsid_dsnm, dsid_edtn, dsid_updn
+            """
+            features_df = pd.read_sql(features_sql, self.engine)
+            
+            # Verify each ENC entry in this layer
+            for _, feature_row in features_df.iterrows():
+                enc_name = feature_row['dsid_dsnm']
+                feature_edition = feature_row['dsid_edtn']
+                feature_update = feature_row['dsid_updn']
+                feature_count = feature_row['feature_count']
+                
+                # Look up corresponding DSID values
+                if enc_name in dsid_lookup.index:
+                    dsid_edition = dsid_lookup.loc[enc_name, 'dsid_edtn']
+                    dsid_update = dsid_lookup.loc[enc_name, 'dsid_updn']
+                    
+                    # Convert to integers for consistent comparison (handle string/int mismatch)
+                    try:
+                        dsid_edition_int = int(dsid_edition) if dsid_edition is not None else None
+                        dsid_update_int = int(dsid_update) if dsid_update is not None else None
+                        feature_edition_int = int(feature_edition) if feature_edition is not None else None
+                        feature_update_int = int(feature_update) if feature_update is not None else None
+                        
+                        # Check for matches
+                        edition_match = (feature_edition_int == dsid_edition_int)
+                        update_match = (feature_update_int == dsid_update_int)
+                    except (ValueError, TypeError):
+                        # If conversion fails, fall back to string comparison
+                        edition_match = (str(feature_edition) == str(dsid_edition))
+                        update_match = (str(feature_update) == str(dsid_update))
+                    
+                    if edition_match and update_match:
+                        status = 'VALID'
+                    else:
+                        status = 'MISMATCH'
+                        
+                    verification_results.append({
+                        'layer_name': table,
+                        'enc_name': enc_name,
+                        'dsid_edition': dsid_edition,
+                        'dsid_update': dsid_update, 
+                        'feature_edition': feature_edition,
+                        'feature_update': feature_update,
+                        'feature_count': feature_count,
+                        'edition_match': edition_match,
+                        'update_match': update_match,
+                        'status': status
+                    })
+                else:
+                    # ENC not found in DSID layer
+                    verification_results.append({
+                        'layer_name': table,
+                        'enc_name': enc_name,
+                        'dsid_edition': None,
+                        'dsid_update': None,
+                        'feature_edition': feature_edition,
+                        'feature_update': feature_update,
+                        'feature_count': feature_count,
+                        'edition_match': False,
+                        'update_match': False,
+                        'status': 'MISSING_DATA'
+                    })
+        
+        results_df = pd.DataFrame(verification_results)
+        
+        if not results_df.empty:
+            # Sort by status (problems first), then by layer and ENC name
+            status_order = {'MISMATCH': 0, 'MISSING_DATA': 1, 'VALID': 2}
+            results_df['status_order'] = results_df['status'].map(status_order)
+            results_df = results_df.sort_values(['status_order', 'layer_name', 'enc_name'])
+            results_df = results_df.drop('status_order', axis=1)
+            
+            # Log summary
+            status_counts = results_df['status'].value_counts()
+            logger.info(f"Feature update status verification complete: {dict(status_counts)}")
+            
+        return results_df
+
+
+class GPKGManager:
+    """
+    Provides tools to query and analyze ENC data stored in a GeoPackage file.
+    """
+
+    def __init__(self, gpkg_path: Union[str, Path]):
+        self.gpkg_path = Path(gpkg_path).resolve()
+        self.engine = None
+        self.connect()
+
+    def connect(self):
+        """Establishes a connection to the GeoPackage database."""
+        if self.engine:
+            return
+        try:
+            if not self.gpkg_path.exists():
+                raise FileNotFoundError(f"GeoPackage file not found: {self.gpkg_path}")
+            
+            # Use SQLite driver with options to avoid rtree module issues
+            conn_str = f"sqlite:///{str(self.gpkg_path)}"
+            # Disable spatial index queries to avoid rtree module dependency
+            self.engine = create_engine(conn_str, connect_args={'check_same_thread': False})
+            logger.info(f"Successfully connected to GeoPackage '{self.gpkg_path.name}'")
+        except Exception as e:
+            logger.error(f"GeoPackage connection failed: {e}")
+            raise
+
+    def get_layer(self, layer_name: str, filter_by_enc: Optional[List[str]] = None) -> gpd.GeoDataFrame:
+        """Retrieves a full layer from the GeoPackage as a GeoDataFrame."""
+        # Use fiona to check for layer existence, as it's more direct and robust for file-based sources.
+        try:
+            import fiona
+            layers = fiona.listlayers(self.gpkg_path)
+        except Exception as e:
+            logger.error(f"Could not read layers from GeoPackage '{self.gpkg_path}': {e}")
+            return gpd.GeoDataFrame()
+
+        safe_layer_name = layer_name.lower()
+        if safe_layer_name not in layers:
+            logger.warning(f"Layer '{layer_name}' not found in GeoPackage.")
+            return gpd.GeoDataFrame()
+
+        where_clause = None
+        if filter_by_enc:
+            # Create a safe WHERE clause for the underlying OGR driver.
+            # GPKG uses uppercase field names from S-57 standard
+            enc_list_str = ", ".join([f"'{enc}'" for enc in filter_by_enc])
+            where_clause = f"DSID_DSNM IN ({enc_list_str})"
+
+        # Use gpd.read_file, which is the correct, high-level function for reading file-based sources.
+        return gpd.read_file(self.gpkg_path, layer=safe_layer_name, where=where_clause)
+
+    def get_enc_summary(self, check_noaa: bool = False) -> pd.DataFrame:
+        """
+        Provides a summary of all ENCs in the GeoPackage.
+        Optionally checks against the live NOAA database to flag outdated charts.
+
+        Args:
+            check_noaa (bool): If True, fetches data from NOAA to check for outdated ENCs.
+
+        Returns:
+            pd.DataFrame: A DataFrame with ENC summary. If check_noaa is True, it
+                          includes an 'is_outdated' boolean column.
+        """
+        # Check if dsid table exists
+        inspector = inspect(self.engine)
+        if not inspector.has_table('dsid'):
+            logger.warning("DSID table not found in GeoPackage")
+            return pd.DataFrame()
+
+        # GPKG uses uppercase field names from S-57 standard
+        sql = 'SELECT "DSID_DSNM", "DSID_EDTN", "DSID_UPDN" FROM "dsid"'
+        df = pd.read_sql(sql, self.engine)
+        df.rename(columns={'DSID_DSNM': 'ENC_Name', 'DSID_EDTN': 'Edition', 'DSID_UPDN': 'Update'}, inplace=True)
+
+        if not check_noaa:
+            return df
+
+        logger.info("Checking against NOAA database for latest versions...")
+        try:
+            noaa_db = NoaaDatabase()
+            noaa_df = noaa_db.get_dataframe()
+
+            # Clean local ENC names to match NOAA format
+            df['ENC_Name_Clean'] = df['ENC_Name'].str.split('.').str[0]
+
+            # Prepare NOAA data for efficient lookup
+            noaa_df_renamed = noaa_df.rename(columns={'Edition': 'NOAA_Edition', 'Update': 'NOAA_Update'})
+            noaa_lookup = noaa_df_renamed.set_index('ENC_Name')[['NOAA_Edition', 'NOAA_Update']]
+
+            # Merge the NOAA data
+            merged_df = df.join(noaa_lookup, on='ENC_Name_Clean')
+
+            # Ensure all version columns are numeric
+            for col in ['Edition', 'Update', 'NOAA_Edition', 'NOAA_Update']:
+                merged_df[col] = pd.to_numeric(merged_df[col], errors='coerce')
+
+            # Determine if the local ENC is outdated
+            is_outdated = (
+                    (merged_df['Edition'] < merged_df['NOAA_Edition']) |
+                    ((merged_df['Edition'] == merged_df['NOAA_Edition']) & (
+                                merged_df['Update'] < merged_df['NOAA_Update']))
+            )
+
+            df['is_outdated'] = is_outdated.values
+            df['is_outdated'].fillna(False, inplace=True)
+            df.drop(columns=['ENC_Name_Clean'], inplace=True)
+
+        except (ConnectionError, RuntimeError) as e:
+            logger.error(f"Could not fetch or process NOAA data: {e}")
+            df['is_outdated'] = 'Unknown'
+
+        return df
+
+    def verify_feature_update_status(self, layer_name: str = None) -> pd.DataFrame:
+        """
+        Verifies that Edition and Update values in feature layers correspond to DSID layer values.
+        This verification applies only to layer-centric data structures where features are stamped
+        with dsid_edtn and dsid_updn fields.
+        
+        Args:
+            layer_name (str, optional): Specific layer to verify. If None, verifies all layers.
+        
+        Returns:
+            pd.DataFrame: Verification results with columns:
+                - layer_name: Name of the layer
+                - enc_name: ENC identifier 
+                - dsid_edition: Edition from DSID layer
+                - dsid_update: Update from DSID layer
+                - feature_edition: Edition from feature layer
+                - feature_update: Update from feature layer
+                - edition_match: Boolean indicating if editions match
+                - update_match: Boolean indicating if updates match
+                - status: Overall verification status ('VALID', 'MISMATCH', 'MISSING_DATA')
+        """
+        # Get DSID reference data
+        inspector = inspect(self.engine)
+        if not inspector.has_table('dsid'):
+            logger.warning("DSID table not found in GeoPackage")
+            return pd.DataFrame()
+
+        # Check if this is a layer-centric structure
+        # GPKG uses uppercase field names from S-57 standard
+        try:
+            dsid_sql = 'SELECT "DSID_DSNM", "DSID_EDTN", "DSID_UPDN" FROM "dsid"'
+            dsid_df = pd.read_sql(dsid_sql, self.engine)
+            # Rename to standard format for processing
+            dsid_df = dsid_df.rename(columns={
+                'DSID_DSNM': 'dsid_dsnm',
+                'DSID_EDTN': 'dsid_edtn', 
+                'DSID_UPDN': 'dsid_updn'
+            })
+            # Clean ENC names by removing .000 extension for consistent lookup with stamped features
+            dsid_df['dsid_dsnm_clean'] = dsid_df['dsid_dsnm'].str.replace('.000', '', case=False)
+        except Exception as e:
+            logger.error(f"Could not read DSID table: {e}")
+            return pd.DataFrame()
+        
+        if dsid_df.empty:
+            logger.warning("DSID table is empty")
+            return pd.DataFrame()
+
+        dsid_lookup = dsid_df.set_index('dsid_dsnm_clean')
+        
+        # Get list of tables (excluding DSID and GeoPackage metadata tables)
+        all_tables = inspector.get_table_names()
+        # Filter out GeoPackage system tables and spatial index tables
+        gpkg_system_tables = {
+            'gpkg_contents', 'gpkg_geometry_columns', 'gpkg_spatial_ref_sys',
+            'gpkg_tile_matrix', 'gpkg_tile_matrix_set', 'gpkg_metadata',
+            'gpkg_metadata_reference', 'gpkg_data_columns', 'gpkg_extensions',
+            'sqlite_sequence'
+        }
+        # Also filter out spatial index tables (rtree_*) that require rtree module
+        tables_to_check = [t for t in all_tables 
+                          if t != 'dsid' 
+                          and t not in gpkg_system_tables 
+                          and not t.startswith('rtree_')]
+        
+        if layer_name:
+            # Filter to specific layer
+            layer_name_lower = layer_name.lower()
+            if layer_name_lower not in tables_to_check:
+                logger.warning(f"Layer '{layer_name}' not found in GeoPackage")
+                return pd.DataFrame()
+            tables_to_check = [layer_name_lower]
+        
+        verification_results = []
+        layer_centric_tables = []
+        
+        for table in tables_to_check:
+            # Check if table has stamping fields
+            try:
+                columns = [col['name'] for col in inspector.get_columns(table)]
+                stamping_columns = set(columns)
+            except Exception as e:
+                # Handle rtree module issues or other column inspection errors
+                logger.debug(f"Could not inspect columns for table '{table}': {e}")
+                # Try a direct SQL query instead
+                try:
+                    test_sql = f'PRAGMA table_info("{table}")'
+                    cols_df = pd.read_sql(test_sql, self.engine)
+                    stamping_columns = set(cols_df['name'].tolist())
+                except Exception as e2:
+                    logger.warning(f"Could not get column info for table '{table}': {e2}")
+                    continue
+            
+            # GPKG uses uppercase stamping fields
+            if not {'DSID_DSNM', 'DSID_EDTN', 'DSID_UPDN'}.issubset(stamping_columns):
+                # Skip tables that don't have stamping fields
+                continue
+            
+            layer_centric_tables.append(table)
+        
+        # Check if any tables have stamping fields
+        if not layer_centric_tables:
+            logger.warning("No layer-centric tables found. This GeoPackage appears to be created with 'by_enc' mode, "
+                         "which doesn't include ENC stamping fields (DSID_DSNM, DSID_EDTN, DSID_UPDN) in feature layers. "
+                         "Feature update verification only works with 'by_layer' mode data structures.")
+            return pd.DataFrame()
+        
+        for table in layer_centric_tables:
+                
+            # Get unique ENC entries from the feature layer
+            # GPKG uses uppercase field names
+            features_sql = f"""
+            SELECT DISTINCT "DSID_DSNM", "DSID_EDTN", "DSID_UPDN", COUNT(*) as feature_count
+            FROM "{table}"
+            WHERE "DSID_DSNM" IS NOT NULL
+            GROUP BY "DSID_DSNM", "DSID_EDTN", "DSID_UPDN"
+            """
+            features_df = pd.read_sql(features_sql, self.engine)
+            
+            # Rename columns for consistent processing
+            features_df = features_df.rename(columns={
+                'DSID_DSNM': 'dsid_dsnm',
+                'DSID_EDTN': 'dsid_edtn',
+                'DSID_UPDN': 'dsid_updn'
+            })
+            
+            # Verify each ENC entry in this layer
+            for _, feature_row in features_df.iterrows():
+                enc_name = feature_row['dsid_dsnm']
+                feature_edition = feature_row['dsid_edtn']
+                feature_update = feature_row['dsid_updn']
+                feature_count = feature_row['feature_count']
+                
+                # Look up corresponding DSID values
+                if enc_name in dsid_lookup.index:
+                    dsid_edition = dsid_lookup.loc[enc_name, 'dsid_edtn']
+                    dsid_update = dsid_lookup.loc[enc_name, 'dsid_updn']
+                    
+                    # Convert to integers for consistent comparison (handle string/int mismatch)
+                    try:
+                        dsid_edition_int = int(dsid_edition) if dsid_edition is not None else None
+                        dsid_update_int = int(dsid_update) if dsid_update is not None else None
+                        feature_edition_int = int(feature_edition) if feature_edition is not None else None
+                        feature_update_int = int(feature_update) if feature_update is not None else None
+                        
+                        # Check for matches
+                        edition_match = (feature_edition_int == dsid_edition_int)
+                        update_match = (feature_update_int == dsid_update_int)
+                    except (ValueError, TypeError):
+                        # If conversion fails, fall back to string comparison
+                        edition_match = (str(feature_edition) == str(dsid_edition))
+                        update_match = (str(feature_update) == str(dsid_update))
+                    
+                    if edition_match and update_match:
+                        status = 'VALID'
+                    else:
+                        status = 'MISMATCH'
+                        
+                    verification_results.append({
+                        'layer_name': table,
+                        'enc_name': enc_name,
+                        'dsid_edition': dsid_edition,
+                        'dsid_update': dsid_update, 
+                        'feature_edition': feature_edition,
+                        'feature_update': feature_update,
+                        'feature_count': feature_count,
+                        'edition_match': edition_match,
+                        'update_match': update_match,
+                        'status': status
+                    })
+                else:
+                    # ENC not found in DSID layer
+                    verification_results.append({
+                        'layer_name': table,
+                        'enc_name': enc_name,
+                        'dsid_edition': None,
+                        'dsid_update': None,
+                        'feature_edition': feature_edition,
+                        'feature_update': feature_update,
+                        'feature_count': feature_count,
+                        'edition_match': False,
+                        'update_match': False,
+                        'status': 'MISSING_DATA'
+                    })
+        
+        results_df = pd.DataFrame(verification_results)
+        
+        if not results_df.empty:
+            # Sort by status (problems first), then by layer and ENC name
+            status_order = {'MISMATCH': 0, 'MISSING_DATA': 1, 'VALID': 2}
+            results_df['status_order'] = results_df['status'].map(status_order)
+            results_df = results_df.sort_values(['status_order', 'layer_name', 'enc_name'])
+            results_df = results_df.drop('status_order', axis=1)
+            
+            # Log summary
+            status_counts = results_df['status'].value_counts()
+            logger.info(f"Feature update status verification complete: {dict(status_counts)}")
+            
+        return results_df

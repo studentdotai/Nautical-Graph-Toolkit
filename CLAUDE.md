@@ -13,7 +13,7 @@ The project follows a layered architecture:
 - **Core Layer** (`src/maritime_module/core/`): Main conversion and data processing classes
   - `S57Converter`: High-performance bulk S-57 to GIS format conversion
   - `S57Base`: Simple one-to-one ENC conversions using gdal.VectorTranslate
-  - `S57Advanced`: Feature-level conversions with ENC source stamping
+  - `S57Advanced`: Optimized feature-level conversions with ENC source stamping, batch processing, and memory management
   - `S57Updater`: Incremental, transactional updates for PostGIS
   - `PostGISManager`: Database querying and analysis tools
 
