@@ -104,6 +104,156 @@ class PostGISConnector(DatabaseConnector):
                         summary_data.append({'schema': schema_name, 'table': table_name, 'feature_count': 'Error'})
         return pd.DataFrame(summary_data)
 
+    def validate_database_integrity(self, check_layers: List[str] = None) -> pd.DataFrame:
+        """
+        Comprehensive database validation for operational awareness.
+        
+        Args:
+            check_layers: Specific layers to check, or None for all layers
+            
+        Returns:
+            pd.DataFrame: Validation results with issues categorized by severity
+        """
+        logger.info("🔍 Starting comprehensive database integrity check...")
+        
+        self.connect()
+        validation_results = []
+        
+        with self.engine.connect() as connection:
+            inspector = inspect(self.engine)
+            
+            # Get all tables/layers
+            if check_layers:
+                available_layers = check_layers
+            else:
+                available_layers = inspector.get_table_names(schema=self.schema)
+            
+            # Remove DSID from layer list for feature checks
+            feature_layers = [layer for layer in available_layers if layer.lower() != 'dsid']
+            
+            logger.info(f"Checking {len(feature_layers)} layers for integrity issues...")
+            
+            for layer_name in feature_layers:
+                table_name_query = f'"{self.schema}"."{layer_name}"'
+                
+                try:
+                    # Check for true duplicate features (same fidn+fids+ENC but DIFFERENT versions)
+                    dup_query = text(f'''
+                        SELECT dsid_dsnm as enc_name,
+                               fidn, fids,
+                               COUNT(*) as duplicate_count,
+                               COUNT(DISTINCT CONCAT(dsid_edtn::TEXT, '.', dsid_updn::TEXT)) as version_count,
+                               STRING_AGG(CONCAT(dsid_edtn::TEXT, '.', dsid_updn::TEXT), ', ' ORDER BY dsid_edtn, dsid_updn) as versions
+                        FROM {table_name_query}
+                        WHERE dsid_dsnm IS NOT NULL
+                          AND fidn IS NOT NULL 
+                          AND fids IS NOT NULL
+                        GROUP BY dsid_dsnm, fidn, fids
+                        HAVING COUNT(*) > 1 AND COUNT(DISTINCT CONCAT(dsid_edtn::TEXT, '.', dsid_updn::TEXT)) > 1
+                        ORDER BY dsid_dsnm, duplicate_count DESC
+                    ''')
+                    
+                    duplicates = connection.execute(dup_query).fetchall()
+                    for dup in duplicates:
+                        severity = 'CRITICAL' if layer_name in ['soundg', 'depcnt', 'depare', 'obstrn', 'wrecks'] else 'WARNING'
+                        validation_results.append({
+                            'layer_name': layer_name,
+                            'enc_name': dup.enc_name,
+                            'issue_type': 'DUPLICATE_FEATURES',
+                            'severity': severity,
+                            'details': f"Feature ID {dup.fidn}:{dup.fids} appears {dup.duplicate_count} times in versions: {dup.versions}",
+                            'feature_count': dup.duplicate_count,
+                            'feature_id': f"{dup.fidn}:{dup.fids}",
+                            'versions': dup.versions
+                        })
+                    
+                    # Check for multiple versions of same ENC (incomplete atomic updates)
+                    version_query = text(f'''
+                        SELECT dsid_dsnm as enc_name,
+                               COUNT(DISTINCT CONCAT(dsid_edtn::TEXT, '.', dsid_updn::TEXT)) as version_count,
+                               STRING_AGG(DISTINCT CONCAT(dsid_edtn::TEXT, '.', dsid_updn::TEXT), ', ' ORDER BY CONCAT(dsid_edtn::TEXT, '.', dsid_updn::TEXT)) as versions,
+                               COUNT(*) as total_features
+                        FROM {table_name_query}
+                        WHERE dsid_dsnm IS NOT NULL
+                        GROUP BY dsid_dsnm
+                        HAVING COUNT(DISTINCT CONCAT(dsid_edtn::TEXT, '.', dsid_updn::TEXT)) > 1
+                        ORDER BY dsid_dsnm
+                    ''')
+                    
+                    multi_versions = connection.execute(version_query).fetchall()
+                    for mv in multi_versions:
+                        validation_results.append({
+                            'layer_name': layer_name,
+                            'enc_name': mv.enc_name,
+                            'issue_type': 'MULTIPLE_VERSIONS',
+                            'severity': 'CRITICAL',
+                            'details': f"ENC has {mv.version_count} versions ({mv.versions}) with {mv.total_features} total features",
+                            'feature_count': mv.total_features,
+                            'feature_id': 'N/A',
+                            'versions': mv.versions
+                        })
+                    
+                    # Check for missing critical navigation layers
+                    if layer_name in ['soundg', 'depcnt', 'depare']:
+                        empty_query = text(f'SELECT COUNT(*) FROM {table_name_query}')
+                        count = connection.execute(empty_query).scalar()
+                        
+                        if count == 0:
+                            validation_results.append({
+                                'layer_name': layer_name,
+                                'enc_name': 'ALL_ENCS',
+                                'issue_type': 'EMPTY_CRITICAL_LAYER',
+                                'severity': 'CRITICAL',
+                                'details': f"Critical navigation layer '{layer_name}' is completely empty",
+                                'feature_count': 0,
+                                'feature_id': 'N/A',
+                                'versions': 'N/A'
+                            })
+                
+                except Exception as e:
+                    validation_results.append({
+                        'layer_name': layer_name,
+                        'enc_name': 'UNKNOWN',
+                        'issue_type': 'VALIDATION_ERROR',
+                        'severity': 'ERROR',
+                        'details': f"Could not validate layer: {str(e)}",
+                        'feature_count': 0,
+                        'feature_id': 'N/A',
+                        'versions': 'N/A'
+                    })
+        
+        results_df = pd.DataFrame(validation_results)
+        
+        if not results_df.empty:
+            # Sort by severity, then by layer
+            severity_order = {'CRITICAL': 0, 'WARNING': 1, 'ERROR': 2}
+            results_df['severity_order'] = results_df['severity'].map(severity_order)
+            results_df = results_df.sort_values(['severity_order', 'layer_name', 'enc_name'])
+            results_df = results_df.drop('severity_order', axis=1)
+            
+            # Log summary
+            severity_counts = results_df['severity'].value_counts()
+            issue_counts = results_df['issue_type'].value_counts()
+            
+            logger.warning(f"🚨 Database validation found {len(results_df)} issues:")
+            logger.warning(f"   Severity breakdown: {dict(severity_counts)}")
+            logger.warning(f"   Issue types: {dict(issue_counts)}")
+            
+            # Highlight critical issues
+            critical_issues = results_df[results_df['severity'] == 'CRITICAL']
+            if not critical_issues.empty:
+                logger.error(f"🔴 {len(critical_issues)} CRITICAL issues require immediate attention!")
+                
+                # Show specific critical issues
+                for _, issue in critical_issues.head(5).iterrows():
+                    logger.error(f"   • {issue['layer_name']}: {issue['details']}")
+                if len(critical_issues) > 5:
+                    logger.error(f"   • ... and {len(critical_issues) - 5} more critical issues")
+        else:
+            logger.info("✅ Database validation passed - no issues found")
+        
+        return results_df
+
 
 class FileDBConnector(DatabaseConnector):
     """Handles preparation for file-based databases like GeoPackage and SpatiaLite."""
