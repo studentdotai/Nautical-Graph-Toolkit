@@ -1212,28 +1212,6 @@ class S57Updater:
         self.connect()
         self._setup_connector()
 
-    def _get_ogr_connection(self, write_mode: bool = True) -> ogr.DataSource:
-        """Get or create a reusable OGR connection to avoid connection exhaustion."""
-        if self.dest_ds is None:
-            if self.output_format == 'postgis':
-                db_params = self.dest_conn
-                pg_conn_str = (f"PG: dbname='{db_params['dbname']}' host='{db_params['host']}' "
-                               f"port='{db_params['port']}' user='{db_params['user']}' "
-                               f"password='{db_params['password']}'")
-                self.dest_ds = ogr.Open(pg_conn_str, 1 if write_mode else 0)
-            elif self.output_format == 'spatialite':
-                self.dest_ds = ogr.Open(str(self.dest_conn), 1 if write_mode else 0)
-                
-            if not self.dest_ds:
-                raise RuntimeError("Could not open destination for OGR operations")
-                
-        return self.dest_ds
-
-    def _close_ogr_connection(self):
-        """Close the OGR connection to free resources."""
-        if self.dest_ds:
-            self.dest_ds = None
-
     def _setup_connector(self):
         """Initialize the appropriate database/file connector."""
         if self.output_format == 'postgis':
@@ -1296,7 +1274,7 @@ class S57Updater:
         """
         logger.info(f"Starting layer-centric update from: {update_path}")
         update_path = Path(update_path)
-        
+
         try:
             # Open a single, reusable OGR connection for the entire update process
             self.dest_ds = self._open_ogr_destination()
@@ -1490,42 +1468,23 @@ class S57Updater:
         
         # Get the LATEST (highest) version for each ENC to handle multiple versions
         # First get max edition, then max update within that edition
-        if self.output_format == 'postgis':
-            # Use PostgreSQL casting syntax
-            query = text(f'''
-                WITH latest_versions AS (
-                    SELECT dsid_dsnm,
-                           dsid_edtn::INTEGER as edition,
-                           dsid_updn::INTEGER as updn,
-                           ROW_NUMBER() OVER (
-                               PARTITION BY dsid_dsnm 
-                               ORDER BY dsid_edtn::INTEGER DESC, dsid_updn::INTEGER DESC
-                           ) as rn
-                    FROM {table_name_for_query}
-                    WHERE dsid_dsnm IS NOT NULL
-                )
-                SELECT dsid_dsnm, edition, updn
-                FROM latest_versions 
-                WHERE rn = 1
-            ''')
-        else:
-            # Use SQLite casting syntax (though this method shouldn't be called for file-based DBs)
-            query = text(f'''
-                WITH latest_versions AS (
-                    SELECT dsid_dsnm,
-                           CAST(dsid_edtn AS INTEGER) as edition,
-                           CAST(dsid_updn AS INTEGER) as updn,
-                           ROW_NUMBER() OVER (
-                               PARTITION BY dsid_dsnm 
-                               ORDER BY CAST(dsid_edtn AS INTEGER) DESC, CAST(dsid_updn AS INTEGER) DESC
-                           ) as rn
-                    FROM {table_name_for_query}
-                    WHERE dsid_dsnm IS NOT NULL
-                )
-                SELECT dsid_dsnm, edition, updn
-                FROM latest_versions 
-                WHERE rn = 1
-            ''')
+        # This method is only called for PostGIS, so we use PostgreSQL syntax.
+        query = text(f'''
+            WITH latest_versions AS (
+                SELECT dsid_dsnm,
+                       dsid_edtn::INTEGER as edition,
+                       dsid_updn::INTEGER as updn,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY dsid_dsnm 
+                           ORDER BY dsid_edtn::INTEGER DESC, dsid_updn::INTEGER DESC
+                       ) as rn
+                FROM {table_name_for_query}
+                WHERE dsid_dsnm IS NOT NULL
+            )
+            SELECT dsid_dsnm, edition, updn
+            FROM latest_versions 
+            WHERE rn = 1
+        ''')
         
         with self.Session() as session:
             result = session.execute(query).fetchall()
@@ -1616,11 +1575,10 @@ class S57Updater:
         # Group update candidates by layers to process each layer atomically
         layer_updates = self._group_updates_by_layer()
         
-        # Open shared OGR connection once for all operations
+        # Use the shared OGR connection that was opened in update_from_location
         try:
-            dest_ds = self._get_ogr_connection(write_mode=True)
-            logger.debug("Opened shared OGR connection for updates")
-            
+            logger.debug("Using shared OGR connection for updates")
+
             if self.output_format == 'postgis':
                 # Use SQLAlchemy session for PostGIS
                 with self.Session() as session:
@@ -1628,18 +1586,18 @@ class S57Updater:
                         try:
                             # Step 1: Handle DSID layer specially (metadata update)
                             self._process_dsid_updates(session)
-                            
+
                             # Step 2: Process each geographic layer independently
                             for layer_name, enc_updates in layer_updates.items():
                                 logger.info(f"Processing layer: {layer_name}")
                                 self._process_layer_updates(session, layer_name, enc_updates)
-                                
+
                             # Mark all as successfully processed
                             for candidate in self.update_candidates:
                                 self.processed_encs.append(candidate)
-                                
+
                             logger.info("All layer updates committed successfully")
-                            
+
                         except Exception as e:
                             logger.error(f"Layer update failed, rolling back: {e}")
                             # Session rollback is automatic on exception
@@ -1649,26 +1607,25 @@ class S57Updater:
                 try:
                     # Step 1: Handle DSID layer specially (metadata update)
                     self._process_dsid_updates(None)  # No session needed for OGR-only
-                    
+
                     # Step 2: Process each geographic layer independently
                     for layer_name, enc_updates in layer_updates.items():
                         logger.info(f"Processing layer: {layer_name}")
                         self._process_layer_updates(None, layer_name, enc_updates)  # No session needed
-                        
+
                     # Mark all as successfully processed
                     for candidate in self.update_candidates:
                         self.processed_encs.append(candidate)
-                        
+
                     logger.info("All layer updates completed successfully")
-                    
+
                 except Exception as e:
                     logger.error(f"Layer update failed: {e}")
                     raise
-                        
+
         finally:
-            # Close shared OGR connection
-            self._close_ogr_connection()
-            logger.debug("Closed shared OGR connection")
+            # OGR connection will be closed in update_from_location's finally block
+            logger.debug("Layer updates completed")
 
     def _group_updates_by_layer(self) -> Dict[str, List[Dict]]:
         """Group update candidates by S-57 layer for atomic processing."""
@@ -1854,13 +1811,11 @@ class S57Updater:
         enc_name_clean = candidate['enc_name']  # Clean name for logging
         enc_name_raw = candidate['file_info']['enc_name_raw']  # Original with .000 for DSID
         new_version = candidate['new_version']
-        
-        # Use shared OGR connection to avoid connection exhaustion
-        dest_ds = self._get_ogr_connection(write_mode=True)
 
+        # Use shared OGR connection from self.dest_ds
         # Get destination DSID layer
         layer_lookup_name = f"{self.schema}.dsid" if self.output_format == 'postgis' else "dsid"
-        out_layer = dest_ds.GetLayerByName(layer_lookup_name)
+        out_layer = self.dest_ds.GetLayerByName(layer_lookup_name)
 
         if not out_layer:
             logger.warning("Output DSID layer not found")
@@ -2034,12 +1989,10 @@ class S57Updater:
         new_version = candidate['new_version']
         features_added = 0
 
-        # Use shared OGR connection to avoid connection exhaustion
-        dest_ds = self._get_ogr_connection(write_mode=True)
-        
+        # Use shared OGR connection from self.dest_ds
         layer_name = input_layer.GetName().lower()
         layer_lookup_name = f"{self.schema}.{layer_name}" if self.output_format == 'postgis' else layer_name
-        out_layer = dest_ds.GetLayerByName(layer_lookup_name)
+        out_layer = self.dest_ds.GetLayerByName(layer_lookup_name)
         
         if not out_layer:
             logger.warning(f"Output layer '{layer_name}' not found - skipping")
@@ -2442,10 +2395,9 @@ class S57Updater:
                 candidate['file_info']['dataset'] = None
         
         self._file_cache.clear()
-        
-        # Close OGR connection
-        self._close_ogr_connection()
-        
+
+        # OGR connection is managed in update_from_location method
+
         if self.Session:
             self.Session.close_all()
 
