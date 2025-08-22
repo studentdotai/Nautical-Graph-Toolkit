@@ -1261,35 +1261,52 @@ class S57Updater:
             logger.error(f"Database connection setup for {self.output_format} failed: {e}")
             raise
 
-    def update_from_location(self, update_path: Union[str, Path], force_overwrite: bool = False) -> Dict[str, Any]:
+    def update_from_location(self, update_path: Union[str, Path], force_overwrite: bool = False, 
+                             force_clean_install: bool = False, enc_filter: Optional[List[str]] = None) -> Dict[str, Any]:
         """
         Main method for layer-centric ENC updates from an update location.
         
         Args:
             update_path: Path to directory containing updated S-57 files
             force_overwrite: If True, update even if database version is newer
+            force_clean_install: If True, perform clean deletion and reinstallation of selected ENCs
+            enc_filter: List of ENC names to process (if None, process all found ENCs)
             
         Returns:
             Dict containing detailed update report with changes, errors, etc.
         """
-        logger.info(f"Starting layer-centric update from: {update_path}")
+        mode_str = "force clean install" if force_clean_install else "layer-centric update"
+        logger.info(f"Starting {mode_str} from: {update_path}")
         update_path = Path(update_path)
 
         try:
             # Open a single, reusable OGR connection for the entire update process
             self.dest_ds = self._open_ogr_destination()
 
-            # 1. Discover and compare ENC versions
-            self._discover_update_candidates(update_path, force_overwrite)
-            
-            if not self.update_candidates:
-                logger.info("No ENCs require updating.")
-                return self.change_report
-            
-            logger.info(f"Found {len(self.update_candidates)} ENCs requiring updates")
-            
-            # 2. Process updates layer by layer using S57Advanced workflow
-            self._process_layer_centric_updates()
+            if force_clean_install:
+                # 1. Force clean install: discover ENCs and clean install
+                self._discover_force_install_candidates(update_path, enc_filter)
+                
+                if not self.update_candidates:
+                    logger.info("No ENCs found for force clean install.")
+                    return self.change_report
+                
+                logger.info(f"Found {len(self.update_candidates)} ENCs for force clean install")
+                
+                # 2. Process force clean install
+                self._process_force_clean_install()
+            else:
+                # 1. Standard update: discover and compare ENC versions
+                self._discover_update_candidates(update_path, force_overwrite)
+                
+                if not self.update_candidates:
+                    logger.info("No ENCs require updating.")
+                    return self.change_report
+                
+                logger.info(f"Found {len(self.update_candidates)} ENCs requiring updates")
+                
+                # 2. Process updates layer by layer using S57Advanced workflow
+                self._process_layer_centric_updates()
             
             # 3. Validate results and detect duplicates
             self._validate_updates()
@@ -1396,6 +1413,49 @@ class S57Updater:
                     'error': 'File processing failed',
                     'details': str(e)
                 })
+
+    def _discover_force_install_candidates(self, update_path: Path, enc_filter: Optional[List[str]]):
+        """Discover S-57 files for force clean install without version comparison."""
+        logger.info("Discovering ENCs for force clean install...")
+        
+        # Find all S-57 files
+        s57_files = list(update_path.rglob("*.000"))
+        if not s57_files:
+            logger.warning(f"No S-57 files found in {update_path}")
+            return
+        
+        # Process each file as a force install candidate
+        for s57_file in s57_files:
+            try:
+                file_info = self._extract_enc_info(s57_file)
+                enc_name = file_info['enc_name']
+                
+                # Apply ENC filter if provided
+                if enc_filter and enc_name not in enc_filter:
+                    logger.debug(f"Skipping {enc_name}: Not in filter list")
+                    continue
+                
+                # Add as force install candidate (no version checking needed)
+                self.update_candidates.append({
+                    'file_path': s57_file,
+                    'enc_name': enc_name,
+                    'new_version': file_info['version'],
+                    'existing_version': None,  # Will be determined during deletion
+                    'file_info': file_info,
+                    'force_clean_install': True  # Flag to identify force install candidates
+                })
+                logger.info(f"Added force install candidate: {enc_name} "
+                           f"(Version: {file_info['version']['edition']}.{file_info['version']['update']})")
+                
+            except Exception as e:
+                logger.warning(f"Could not process {s57_file.name}: {e}")
+                self.change_report['errors'].append({
+                    'file': str(s57_file),
+                    'error': 'File processing failed for force install',
+                    'details': str(e)
+                })
+        
+        logger.info(f"Found {len(self.update_candidates)} ENCs for force clean install")
 
     def _get_database_enc_versions(self) -> Dict[str, Dict[str, int]]:
         """Get all ENC versions currently in the database."""
@@ -1627,6 +1687,189 @@ class S57Updater:
             # OGR connection will be closed in update_from_location's finally block
             logger.debug("Layer updates completed")
 
+    def _process_force_clean_install(self):
+        """Process force clean install: delete-then-create flow for true clean slate."""
+        logger.info("Processing force clean install...")
+        
+        # Get existing database versions for the ENCs we're installing for reporting
+        existing_db_versions = self._get_database_enc_versions()
+        
+        # Update candidate info with existing versions for reporting
+        for candidate in self.update_candidates:
+            enc_name = candidate['enc_name']
+            candidate['existing_version'] = existing_db_versions.get(enc_name)
+            # Mark as force clean install for modified deletion behavior
+            candidate['force_clean_install'] = True
+        
+        # Use delete-then-create flow instead of add-then-delete
+        try:
+            if self.output_format == 'postgis':
+                # Use SQLAlchemy session for PostGIS
+                with self.Session() as session:
+                    with session.begin():
+                        try:
+                            # Step 1: First DELETE all existing data for target ENCs
+                            self._force_delete_all_enc_data(session)
+                            
+                            # Step 2: Then ADD new ENC data using existing methods
+                            self._force_add_all_enc_data(session)
+                            
+                            # Mark all as successfully processed
+                            for candidate in self.update_candidates:
+                                self.processed_encs.append(candidate)
+                            
+                            logger.info("Force clean install completed successfully")
+                            
+                        except Exception as e:
+                            logger.error(f"Force clean install failed, rolling back: {e}")
+                            # Session rollback is automatic on exception
+                            raise
+            else:
+                # Use OGR-only operations for file-based databases
+                try:
+                    # Step 1: First DELETE all existing data for target ENCs
+                    self._force_delete_all_enc_data(None)
+                    
+                    # Step 2: Then ADD new ENC data
+                    self._force_add_all_enc_data(None)
+                    
+                    # Mark all as successfully processed
+                    for candidate in self.update_candidates:
+                        self.processed_encs.append(candidate)
+                    
+                    logger.info("Force clean install completed successfully")
+                    
+                except Exception as e:
+                    logger.error(f"Force clean install failed: {e}")
+                    raise
+                    
+        finally:
+            # OGR connection will be closed in update_from_location's finally block
+            logger.debug("Force clean install completed")
+
+    def _force_delete_all_enc_data(self, session: Optional[Session]):
+        """Delete ALL existing data for force clean install ENCs across all layers."""
+        logger.info("🗑️ Step 1: Deleting ALL existing data for force clean install...")
+        
+        enc_names = [candidate['enc_name'] for candidate in self.update_candidates]
+        logger.info(f"🗑️ Force deleting all data for ENCs: {enc_names}")
+        
+        if self.output_format == 'postgis':
+            self._force_delete_sql(session, enc_names)
+        else:
+            self._force_delete_ogr(enc_names)
+        
+        logger.info("🗑️ Force deletion completed")
+
+    def _force_delete_sql(self, session: Session, enc_names: List[str]):
+        """Delete all ENC data using SQL for PostGIS - delete first approach."""
+        # Get all layers that might contain ENC data
+        inspector = inspect(self.engine)
+        all_tables = inspector.get_table_names(schema=self.schema)
+        
+        # Filter to ENC tables (exclude system tables)
+        enc_tables = [table for table in all_tables 
+                     if not table.startswith('spatial_') and not table.startswith('geometry_')]
+        
+        total_deleted = 0
+        
+        for table_name in enc_tables:
+            try:
+                # Check if table has dsid_dsnm column using direct SQL to avoid geometry type warnings
+                columns_query = text("""
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_schema = :schema_name 
+                    AND table_name = :table_name
+                """)
+                result = session.execute(columns_query, {'schema_name': self.schema, 'table_name': table_name})
+                columns = [row[0] for row in result]
+                
+                if 'dsid_dsnm' not in columns:
+                    continue
+                
+                # Delete all features for the specified ENCs
+                delete_sql = text(f'DELETE FROM "{self.schema}"."{table_name}" WHERE dsid_dsnm = ANY(:enc_names)')
+                result = session.execute(delete_sql, {'enc_names': enc_names})
+                
+                if result.rowcount > 0:
+                    total_deleted += result.rowcount
+                    logger.info(f"🗑️ Force deleted {result.rowcount} features from {table_name}")
+                    
+            except Exception as e:
+                logger.warning(f"Could not force delete from table {table_name}: {e}")
+        
+        logger.info(f"🗑️ Total force deletion: {total_deleted} features across all layers")
+
+    def _force_delete_ogr(self, enc_names: List[str]):
+        """Delete all ENC data using OGR for file-based databases - delete first approach."""
+        layer_count = self.dest_ds.GetLayerCount()
+        total_deleted = 0
+        
+        for i in range(layer_count):
+            layer = self.dest_ds.GetLayerByIndex(i)
+            layer_name = layer.GetName()
+            
+            try:
+                # Check if layer has dsid_dsnm field
+                layer_defn = layer.GetLayerDefn()
+                if layer_defn.GetFieldIndex('dsid_dsnm') == -1:
+                    continue
+                
+                # Delete all features for each ENC
+                layer_deleted = 0
+                for enc_name in enc_names:
+                    layer.SetAttributeFilter(f"dsid_dsnm = '{enc_name}'")
+                    
+                    # Collect FIDs to delete
+                    fids_to_delete = []
+                    layer.ResetReading()
+                    for feature in layer:
+                        fids_to_delete.append(feature.GetFID())
+                    
+                    # Delete features
+                    for fid in fids_to_delete:
+                        if layer.DeleteFeature(fid) == 0:  # 0 = success
+                            layer_deleted += 1
+                
+                if layer_deleted > 0:
+                    total_deleted += layer_deleted
+                    layer.SyncToDisk()
+                    logger.info(f"🗑️ Force deleted {layer_deleted} features from {layer_name}")
+                
+                # Clear filter
+                layer.SetAttributeFilter(None)
+                layer.ResetReading()
+                
+            except Exception as e:
+                logger.warning(f"Could not force delete from layer {layer_name}: {e}")
+        
+        logger.info(f"🗑️ Total force deletion: {total_deleted} features across all layers")
+
+    def _force_add_all_enc_data(self, session: Optional[Session]):
+        """Add new ENC data after force deletion using existing layer-centric methods."""
+        logger.info("📦 Step 2: Adding new ENC data after force deletion...")
+        
+        # Group candidates by layer for processing
+        layer_updates = self._group_updates_by_layer()
+        
+        # Process DSID metadata first
+        self._process_dsid_updates(session)
+        
+        # Process each layer
+        for layer_name, enc_updates in layer_updates.items():
+            logger.info(f"📦 Installing layer: {layer_name}")
+            
+            # Add new features to this layer
+            for update_info in enc_updates:
+                candidate = update_info['candidate']
+                input_layer = update_info['layer']  # Use 'layer' key as provided by _group_updates_by_layer()
+                
+                features_added = self._add_layer_features(candidate, input_layer)
+                logger.info(f"📦 Added {features_added} features for {candidate['enc_name']} in {layer_name}")
+        
+        logger.info("📦 New ENC data installation completed")
+
     def _group_updates_by_layer(self) -> Dict[str, List[Dict]]:
         """Group update candidates by S-57 layer for atomic processing."""
         layer_updates = {}
@@ -1767,16 +2010,14 @@ class S57Updater:
         for enc_name_clean, enc_name_raw, new_version in successfully_updated_dsids:
             try:
                 table_name_for_query = f'"{self.schema}"."dsid"' if self.output_format == 'postgis' else '"dsid"'
+                # This method is only called for PostGIS, so we can use its casting syntax
+                cast_int = "::INTEGER"
+
                 # Remove old entries but keep the newly added one
                 # Use explicit type casting to handle VARCHAR vs INTEGER comparison
-                if self.output_format == 'postgis':
-                    delete_sql = text(f'''DELETE FROM {table_name_for_query} 
-                                         WHERE dsid_dsnm IN (:enc_clean, :enc_raw) 
-                                         AND NOT (dsid_edtn::INTEGER = :new_edition AND dsid_updn::INTEGER = :new_update)''')
-                else:
-                    delete_sql = text(f'''DELETE FROM {table_name_for_query} 
-                                         WHERE dsid_dsnm IN (:enc_clean, :enc_raw) 
-                                         AND NOT (CAST(dsid_edtn AS INTEGER) = :new_edition AND CAST(dsid_updn AS INTEGER) = :new_update)''')
+                delete_sql = text(f'''DELETE FROM {table_name_for_query} 
+                                     WHERE dsid_dsnm IN (:enc_clean, :enc_raw) 
+                                     AND NOT (dsid_edtn{cast_int} = :new_edition AND dsid_updn{cast_int} = :new_update)''')
                 result = session.execute(delete_sql, {
                     'enc_clean': enc_name_clean,
                     'enc_raw': enc_name_raw,
@@ -2031,34 +2272,34 @@ class S57Updater:
             new_version = candidate['new_version']
             
             try:
-                # First check what exists before deletion for debugging
-                check_sql = text(f'''SELECT dsid_edtn, dsid_updn, COUNT(*) 
-                                    FROM {table_name_for_delete} 
-                                    WHERE dsid_dsnm = :enc_name 
-                                    GROUP BY dsid_edtn, dsid_updn''')
-                existing_versions = session.execute(check_sql, {'enc_name': enc_name}).fetchall()
+                # For debugging, check what exists before deletion. This adds a DB round-trip,
+                # so it's only active when debug logging is enabled.
+                if self.config.enable_debug_logging:
+                    check_sql = text(f'''SELECT dsid_edtn, dsid_updn, COUNT(*) 
+                                        FROM {table_name_for_delete} 
+                                        WHERE dsid_dsnm = :enc_name 
+                                        GROUP BY dsid_edtn, dsid_updn''')
+                    existing_versions = session.execute(check_sql, {'enc_name': enc_name}).fetchall()
+
+                    if existing_versions:
+                        logger.info(f"Existing versions in {layer_name} for {enc_name}:")
+                        for edition, update, count in existing_versions:
+                            logger.info(f"  - Version {edition}.{update}: {count} features")
                 
-                if existing_versions:
-                    logger.info(f"Existing versions in {layer_name} for {enc_name}:")
-                    for edition, update, count in existing_versions:
-                        logger.info(f"  - Version {edition}.{update}: {count} features")
-                
-                # Delete only OLD versions, preserve the newly added version
+                # Normal update: delete only OLD versions, preserve the newly added version
+                # This method is only called for PostGIS, so we use its casting syntax
+                cast_int = "::INTEGER"
                 # Use type casting to handle VARCHAR vs INTEGER comparison
-                if self.output_format == 'postgis':
-                    delete_sql = text(f'''DELETE FROM {table_name_for_delete} 
-                                         WHERE dsid_dsnm = :enc_name 
-                                         AND NOT (dsid_edtn::INTEGER = :new_edition AND dsid_updn::INTEGER = :new_update)''')
-                else:
-                    delete_sql = text(f'''DELETE FROM {table_name_for_delete} 
-                                         WHERE dsid_dsnm = :enc_name 
-                                         AND NOT (CAST(dsid_edtn AS INTEGER) = :new_edition AND CAST(dsid_updn AS INTEGER) = :new_update)''')
+                delete_sql = text(f'''DELETE FROM {table_name_for_delete} 
+                                     WHERE dsid_dsnm = :enc_name 
+                                     AND NOT (dsid_edtn{cast_int} = :new_edition AND dsid_updn{cast_int} = :new_update)''')
                 
                 result = session.execute(delete_sql, {
                     'enc_name': enc_name,
                     'new_edition': new_version['edition'],
                     'new_update': new_version['update']
                 })
+                
                 deleted_count = result.rowcount
                 total_deleted += deleted_count
                 
@@ -2091,14 +2332,15 @@ class S57Updater:
             new_version = candidate['new_version']
             
             try:
-                # First, count existing features for logging
-                layer.SetAttributeFilter(f"dsid_dsnm = '{enc_name}'")
-                existing_count = layer.GetFeatureCount()
+                # For debugging, count existing features for logging. This adds an extra
+                # filter operation, so it's only active when debug logging is enabled.
+                if self.config.enable_debug_logging:
+                    layer.SetAttributeFilter(f"dsid_dsnm = '{enc_name}'")
+                    existing_count = layer.GetFeatureCount()
+                    if existing_count > 0:
+                        logger.info(f"Found {existing_count} existing features for {enc_name} in {layer_name}")
                 
-                if existing_count > 0:
-                    logger.info(f"Found {existing_count} existing features for {enc_name} in {layer_name}")
-                
-                # Set filter to find OLD features (not the newly added version)
+                # Normal update: set filter to find OLD features (not the newly added version)
                 filter_sql = (f"dsid_dsnm = '{enc_name}' AND NOT "
                              f"(dsid_edtn = {new_version['edition']} AND dsid_updn = {new_version['update']})")
                 
@@ -2112,7 +2354,7 @@ class S57Updater:
                     fids_to_delete.append(feature.GetFID())
                     feature = layer.GetNextFeature()
                 
-                # Delete old features
+                # Delete features
                 deleted_count = 0
                 for fid in fids_to_delete:
                     if layer.DeleteFeature(fid) == 0:  # 0 = success in OGR
@@ -2139,6 +2381,36 @@ class S57Updater:
         # Synchronize changes to disk
         layer.SyncToDisk()
         logger.info(f"🗑️ Total removed {total_deleted} old features from {layer_name}")
+
+    def force_update_from_location(self, update_path: Union[str, Path], 
+                                  enc_filter: Optional[List[str]] = None) -> Dict[str, Any]:
+        """
+        Convenience method for force clean install of ENCs from update location.
+        
+        This performs a complete deletion and reinstallation of specified ENCs,
+        bypassing version comparison and providing a clean slate for problematic updates.
+        
+        Args:
+            update_path: Path to directory containing updated S-57 files
+            enc_filter: List of specific ENC names to process (if None, processes all found ENCs)
+            
+        Returns:
+            Dict containing detailed update report with changes, errors, etc.
+            
+        Example:
+            # Force reinstall all ENCs from update folder
+            report = updater.force_update_from_location('/path/to/update/folder')
+            
+            # Force reinstall only specific ENCs
+            report = updater.force_update_from_location('/path/to/update/folder', 
+                                                      enc_filter=['US3CA52M', 'US1GC09M'])
+        """
+        return self.update_from_location(
+            update_path=update_path,
+            force_overwrite=False,  # Not relevant for force clean install
+            force_clean_install=True,
+            enc_filter=enc_filter
+        )
 
     def _validate_updates(self):
         """Validate update results and detect potential issues."""
@@ -2338,12 +2610,16 @@ class S57Updater:
         
         # Add detailed information about successful updates
         for candidate in self.processed_encs:
+            # Determine operation type
+            operation_type = 'force_clean_install' if candidate.get('force_clean_install', False) else 'update'
+            
             update_info = {
                 'enc_name': candidate['enc_name'],
                 'file_path': str(candidate['file_path']),
                 'old_version': candidate.get('existing_version'),
                 'new_version': candidate['new_version'],
                 'timestamp': pd.Timestamp.now(),
+                'operation_type': operation_type,
                 'layers_updated': []
             }
             
