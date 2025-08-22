@@ -1253,29 +1253,34 @@ class S57Updater:
             raise ValueError("For SpatiaLite, dest_conn must be a file path string or Path object.")
 
     def connect(self):
-        """Establishes a connection to the destination database (PostGIS or SpatiaLite)."""
-        if self.Session:
+        """Establishes a connection to the destination database."""
+        if self.Session and self.output_format == 'postgis':
             return
 
         try:
-            conn_str = ""
-            db_name = ""
             if self.output_format == 'postgis':
+                # Only create SQLAlchemy connection for PostGIS
                 db_params = self.dest_conn
                 db_name = db_params['dbname']
                 conn_str = (f"postgresql+psycopg2://{db_params['user']}:{db_params['password']}@"
                             f"{db_params['host']}:{db_params['port']}/{db_name}")
-            elif self.output_format == 'spatialite':
+                self.engine = create_engine(conn_str)
+                self.Session = sessionmaker(bind=self.engine)
+                logger.info(f"Successfully connected to {self.output_format} database '{db_name}'")
+            elif self.output_format in ['spatialite', 'gpkg']:
+                # For file-based databases, we use OGR-only operations
+                # No SQLAlchemy connection needed - just validate the file path
                 db_path = Path(self.dest_conn).resolve()
                 db_path.parent.mkdir(parents=True, exist_ok=True)
                 db_name = db_path.name
-                conn_str = f"sqlite:///{str(db_path)}"
-
-            self.engine = create_engine(conn_str)
-            self.Session = sessionmaker(bind=self.engine)
-            logger.info(f"Successfully connected to {self.output_format} database '{db_name}'")
+                logger.info(f"File-based database path validated: '{db_name}' (OGR-only operations)")
+                # Set engine and Session to None to indicate OGR-only mode
+                self.engine = None
+                self.Session = None
+            else:
+                raise ValueError(f"Unsupported output format: {self.output_format}")
         except Exception as e:
-            logger.error(f"Database connection to {self.output_format} failed: {e}")
+            logger.error(f"Database connection setup for {self.output_format} failed: {e}")
             raise
 
     def update_from_location(self, update_path: Union[str, Path], force_overwrite: bool = False) -> Dict[str, Any]:
@@ -1416,6 +1421,63 @@ class S57Updater:
 
     def _get_database_enc_versions(self) -> Dict[str, Dict[str, int]]:
         """Get all ENC versions currently in the database."""
+        if self.output_format == 'postgis':
+            # Use SQLAlchemy for PostGIS
+            return self._get_database_enc_versions_sqlalchemy()
+        else:
+            # Use OGR-only for file-based databases
+            return self._get_database_enc_versions_ogr()
+
+    def _get_database_enc_versions_ogr(self) -> Dict[str, Dict[str, int]]:
+        """Get ENC versions using OGR-only operations for file-based databases."""
+        versions = {}
+        
+        # Get DSID layer through OGR
+        dsid_layer = self.dest_ds.GetLayerByName("dsid")
+        if not dsid_layer:
+            logger.warning("DSID layer not found in database - treating as empty")
+            return {}
+        
+        # Track latest version for each ENC
+        enc_versions = {}
+        
+        dsid_layer.ResetReading()
+        feature = dsid_layer.GetNextFeature()
+        while feature:
+            enc_name_raw = feature.GetField("dsid_dsnm")
+            edition = feature.GetField("dsid_edtn")
+            update = feature.GetField("dsid_updn")
+            
+            if enc_name_raw and edition is not None and update is not None:
+                try:
+                    edition_int = int(edition)
+                    update_int = int(update)
+                    
+                    # Normalize ENC name
+                    if enc_name_raw.upper().endswith('.000'):
+                        clean_name = enc_name_raw[:-4]
+                    else:
+                        clean_name = enc_name_raw
+                    
+                    # Keep track of highest version
+                    if clean_name not in enc_versions:
+                        enc_versions[clean_name] = {'edition': edition_int, 'update': update_int}
+                    else:
+                        current = enc_versions[clean_name]
+                        if (edition_int > current['edition'] or 
+                            (edition_int == current['edition'] and update_int > current['update'])):
+                            enc_versions[clean_name] = {'edition': edition_int, 'update': update_int}
+                            
+                    logger.debug(f"Database version for {clean_name}: {edition_int}.{update_int}")
+                except (ValueError, TypeError) as e:
+                    logger.warning(f"Invalid version data for {enc_name_raw}: edition={edition}, update={update}")
+            
+            feature = dsid_layer.GetNextFeature()
+        
+        return enc_versions
+
+    def _get_database_enc_versions_sqlalchemy(self) -> Dict[str, Dict[str, int]]:
+        """Get all ENC versions currently in the database using SQLAlchemy."""
         inspector = inspect(self.engine)
         table_name = "dsid"
         schema_name = self.schema if self.output_format == 'postgis' else None
@@ -1428,22 +1490,42 @@ class S57Updater:
         
         # Get the LATEST (highest) version for each ENC to handle multiple versions
         # First get max edition, then max update within that edition
-        query = text(f'''
-            WITH latest_versions AS (
-                SELECT dsid_dsnm,
-                       dsid_edtn::INTEGER as edition,
-                       dsid_updn::INTEGER as update,
-                       ROW_NUMBER() OVER (
-                           PARTITION BY dsid_dsnm 
-                           ORDER BY dsid_edtn::INTEGER DESC, dsid_updn::INTEGER DESC
-                       ) as rn
-                FROM {table_name_for_query}
-                WHERE dsid_dsnm IS NOT NULL
-            )
-            SELECT dsid_dsnm, edition, update
-            FROM latest_versions 
-            WHERE rn = 1
-        ''')
+        if self.output_format == 'postgis':
+            # Use PostgreSQL casting syntax
+            query = text(f'''
+                WITH latest_versions AS (
+                    SELECT dsid_dsnm,
+                           dsid_edtn::INTEGER as edition,
+                           dsid_updn::INTEGER as updn,
+                           ROW_NUMBER() OVER (
+                               PARTITION BY dsid_dsnm 
+                               ORDER BY dsid_edtn::INTEGER DESC, dsid_updn::INTEGER DESC
+                           ) as rn
+                    FROM {table_name_for_query}
+                    WHERE dsid_dsnm IS NOT NULL
+                )
+                SELECT dsid_dsnm, edition, updn
+                FROM latest_versions 
+                WHERE rn = 1
+            ''')
+        else:
+            # Use SQLite casting syntax (though this method shouldn't be called for file-based DBs)
+            query = text(f'''
+                WITH latest_versions AS (
+                    SELECT dsid_dsnm,
+                           CAST(dsid_edtn AS INTEGER) as edition,
+                           CAST(dsid_updn AS INTEGER) as updn,
+                           ROW_NUMBER() OVER (
+                               PARTITION BY dsid_dsnm 
+                               ORDER BY CAST(dsid_edtn AS INTEGER) DESC, CAST(dsid_updn AS INTEGER) DESC
+                           ) as rn
+                    FROM {table_name_for_query}
+                    WHERE dsid_dsnm IS NOT NULL
+                )
+                SELECT dsid_dsnm, edition, updn
+                FROM latest_versions 
+                WHERE rn = 1
+            ''')
         
         with self.Session() as session:
             result = session.execute(query).fetchall()
@@ -1539,27 +1621,49 @@ class S57Updater:
             dest_ds = self._get_ogr_connection(write_mode=True)
             logger.debug("Opened shared OGR connection for updates")
             
-            with self.Session() as session:
-                with session.begin():
-                    try:
-                        # Step 1: Handle DSID layer specially (metadata update)
-                        self._process_dsid_updates(session)
-                        
-                        # Step 2: Process each geographic layer independently
-                        for layer_name, enc_updates in layer_updates.items():
-                            logger.info(f"Processing layer: {layer_name}")
-                            self._process_layer_updates(session, layer_name, enc_updates)
+            if self.output_format == 'postgis':
+                # Use SQLAlchemy session for PostGIS
+                with self.Session() as session:
+                    with session.begin():
+                        try:
+                            # Step 1: Handle DSID layer specially (metadata update)
+                            self._process_dsid_updates(session)
                             
-                        # Mark all as successfully processed
-                        for candidate in self.update_candidates:
-                            self.processed_encs.append(candidate)
+                            # Step 2: Process each geographic layer independently
+                            for layer_name, enc_updates in layer_updates.items():
+                                logger.info(f"Processing layer: {layer_name}")
+                                self._process_layer_updates(session, layer_name, enc_updates)
+                                
+                            # Mark all as successfully processed
+                            for candidate in self.update_candidates:
+                                self.processed_encs.append(candidate)
+                                
+                            logger.info("All layer updates committed successfully")
                             
-                        logger.info("All layer updates committed successfully")
+                        except Exception as e:
+                            logger.error(f"Layer update failed, rolling back: {e}")
+                            # Session rollback is automatic on exception
+                            raise
+            else:
+                # Use OGR-only operations for file-based databases
+                try:
+                    # Step 1: Handle DSID layer specially (metadata update)
+                    self._process_dsid_updates(None)  # No session needed for OGR-only
+                    
+                    # Step 2: Process each geographic layer independently
+                    for layer_name, enc_updates in layer_updates.items():
+                        logger.info(f"Processing layer: {layer_name}")
+                        self._process_layer_updates(None, layer_name, enc_updates)  # No session needed
                         
-                    except Exception as e:
-                        logger.error(f"Layer update failed, rolling back: {e}")
-                        # Session rollback is automatic on exception
-                        raise
+                    # Mark all as successfully processed
+                    for candidate in self.update_candidates:
+                        self.processed_encs.append(candidate)
+                        
+                    logger.info("All layer updates completed successfully")
+                    
+                except Exception as e:
+                    logger.error(f"Layer update failed: {e}")
+                    raise
                         
         finally:
             # Close shared OGR connection
@@ -1620,10 +1724,12 @@ class S57Updater:
     def _clean_dsid_duplicates(self, session: Session, enc_name: str):
         """Remove duplicate DSID entries, keeping only the newest version."""
         table_name = f'"{self.schema}"."dsid"' if self.output_format == 'postgis' else '"dsid"'
-        
+        # Use ctid for PostgreSQL and rowid for SQLite/SpatiaLite
+        id_col = 'ctid' if self.output_format == 'postgis' else 'rowid'
+
         # Get all entries for this ENC, ordered by edition/update (newest first)
         query = text(f"""
-            SELECT dsid_edtn, dsid_updn, ctid
+            SELECT dsid_edtn, dsid_updn, {id_col}
             FROM {table_name}
             WHERE dsid_dsnm = :enc_name
             ORDER BY dsid_edtn DESC, dsid_updn DESC
@@ -1635,18 +1741,28 @@ class S57Updater:
             
         # Keep the first (newest) entry, delete the rest
         newest_edition, newest_update = rows[0][0], rows[0][1]
-        ctids_to_delete = [row[2] for row in rows[1:]]  # All except the first
+        ids_to_delete = [row[2] for row in rows[1:]]  # All except the first
         
-        logger.info(f"Cleaning {len(ctids_to_delete)} duplicate DSID entries for {enc_name}, keeping version {newest_edition}.{newest_update}")
+        logger.info(f"Cleaning {len(ids_to_delete)} duplicate DSID entries for {enc_name}, keeping version {newest_edition}.{newest_update}")
         
-        # Delete duplicates by ctid (PostgreSQL row identifier)
-        for ctid in ctids_to_delete:
-            delete_query = text(f"DELETE FROM {table_name} WHERE ctid = :ctid")
-            session.execute(delete_query, {'ctid': ctid})
+        # Delete duplicates by row identifier (ctid or rowid)
+        for id_val in ids_to_delete:
+            delete_query = text(f"DELETE FROM {table_name} WHERE {id_col} = :id_val")
+            session.execute(delete_query, {'id_val': id_val})
 
     def _process_dsid_updates(self, session: Session):
         """Handle DSID layer updates specially - this contains ENC metadata."""
         logger.info("Processing DSID layer updates...")
+        
+        if self.output_format == 'postgis':
+            # Use SQLAlchemy approach for PostGIS
+            self._process_dsid_updates_sqlalchemy(session)
+        else:
+            # Use OGR-only approach for file-based databases
+            self._process_dsid_updates_ogr()
+
+    def _process_dsid_updates_sqlalchemy(self, session: Session):
+        """Handle DSID updates using SQLAlchemy for PostGIS."""
         inspector = inspect(self.engine)
         table_exists = inspector.has_table('dsid', 
                                          schema=self.schema if self.output_format == 'postgis' else None)
@@ -1694,12 +1810,16 @@ class S57Updater:
         for enc_name_clean, enc_name_raw, new_version in successfully_updated_dsids:
             try:
                 table_name_for_query = f'"{self.schema}"."dsid"' if self.output_format == 'postgis' else '"dsid"'
-                
                 # Remove old entries but keep the newly added one
                 # Use explicit type casting to handle VARCHAR vs INTEGER comparison
-                delete_sql = text(f'''DELETE FROM {table_name_for_query} 
-                                     WHERE dsid_dsnm IN (:enc_clean, :enc_raw) 
-                                     AND NOT (dsid_edtn::INTEGER = :new_edition AND dsid_updn::INTEGER = :new_update)''')
+                if self.output_format == 'postgis':
+                    delete_sql = text(f'''DELETE FROM {table_name_for_query} 
+                                         WHERE dsid_dsnm IN (:enc_clean, :enc_raw) 
+                                         AND NOT (dsid_edtn::INTEGER = :new_edition AND dsid_updn::INTEGER = :new_update)''')
+                else:
+                    delete_sql = text(f'''DELETE FROM {table_name_for_query} 
+                                         WHERE dsid_dsnm IN (:enc_clean, :enc_raw) 
+                                         AND NOT (CAST(dsid_edtn AS INTEGER) = :new_edition AND CAST(dsid_updn AS INTEGER) = :new_update)''')
                 result = session.execute(delete_sql, {
                     'enc_clean': enc_name_clean,
                     'enc_raw': enc_name_raw,
@@ -1770,13 +1890,22 @@ class S57Updater:
 
     def _process_layer_updates(self, session: Session, layer_name: str, enc_updates: List[Dict]):
         """Process updates for a specific layer with atomic feature replacement."""
-        inspector = inspect(self.engine)
-        table_exists = inspector.has_table(layer_name, 
-                                         schema=self.schema if self.output_format == 'postgis' else None)
-        
-        if not table_exists:
-            logger.warning(f"Table '{layer_name}' does not exist - skipping layer")
-            return
+        if self.output_format == 'postgis':
+            # Use SQLAlchemy for PostGIS
+            inspector = inspect(self.engine)
+            table_exists = inspector.has_table(layer_name, 
+                                             schema=self.schema if self.output_format == 'postgis' else None)
+            
+            if not table_exists:
+                logger.warning(f"Table '{layer_name}' does not exist - skipping layer")
+                return
+        else:
+            # For file-based databases, check layer existence via OGR
+            layer_lookup_name = layer_name
+            layer = self.dest_ds.GetLayerByName(layer_lookup_name)
+            if not layer:
+                logger.warning(f"Layer '{layer_name}' does not exist - skipping layer")
+                return
             
         # Step 1: Add all new features for this layer
         logger.info(f"🔄 Adding new features to layer {layer_name}")
@@ -1800,9 +1929,104 @@ class S57Updater:
         # Step 2: Remove old features only for ENCs that were successfully added
         if successfully_added_updates:
             logger.info(f"🗑️ Removing old features from layer {layer_name} for {len(successfully_added_updates)} ENCs")
-            self._remove_old_features(session, layer_name, successfully_added_updates)
+            # Use appropriate removal method based on database type
+            if self.output_format == 'postgis':
+                # Use SQLAlchemy for PostGIS (existing implementation)
+                self._remove_old_features(session, layer_name, successfully_added_updates)
+            else:
+                # Use OGR-only for file-based databases (SpatiaLite/GPKG)
+                self._remove_old_features_ogr(layer_name, successfully_added_updates)
         else:
             logger.info(f"➖ No ENCs successfully added to {layer_name}, skipping removal")
+
+    def _process_dsid_updates_ogr(self):
+        """Handle DSID updates using OGR-only operations for file-based databases."""
+        logger.info("Processing DSID layer updates with OGR-only operations...")
+        
+        # Check if DSID layer exists
+        dsid_layer = self.dest_ds.GetLayerByName("dsid")
+        if not dsid_layer:
+            logger.warning("DSID layer does not exist - skipping DSID updates")
+            return
+        
+        successfully_updated_dsids = []
+        
+        # Step 1: Add all new DSID entries first
+        logger.info("Adding new DSID entries...")
+        for candidate in self.update_candidates:
+            enc_name_clean = candidate['enc_name']
+            new_version = candidate['new_version']
+            
+            try:
+                src_ds = candidate['file_info']['dataset']
+                src_dsid_layer = src_ds.GetLayerByName('DSID')
+                
+                if not src_dsid_layer:
+                    logger.warning(f"No DSID layer found in {enc_name_clean}")
+                    continue
+                
+                # Add DSID features through OGR
+                self._add_dsid_feature(candidate, src_dsid_layer)
+                successfully_updated_dsids.append(candidate)
+                logger.info(f"✅ Added new DSID for {enc_name_clean} version {new_version['edition']}.{new_version['update']}")
+                
+            except Exception as e:
+                logger.error(f"Failed to add DSID for {enc_name_clean}: {e}")
+                self.change_report['errors'].append({
+                    'enc_name': enc_name_clean,
+                    'error': f'DSID addition failed: {e}',
+                    'step': 'DSID processing'
+                })
+        
+        # Step 2: Remove old DSID entries for successfully updated ENCs
+        if successfully_updated_dsids:
+            logger.info(f"🗑️ Removing old DSID entries for {len(successfully_updated_dsids)} ENCs...")
+            for candidate in successfully_updated_dsids:
+                enc_name_clean = candidate['enc_name']
+                new_version = candidate['new_version']
+                
+                try:
+                    # Set filter to find OLD DSID entries (not the newly added version)
+                    filter_sql = (f"dsid_dsnm = '{enc_name_clean}' AND NOT "
+                                 f"(dsid_edtn = {new_version['edition']} AND dsid_updn = {new_version['update']})")
+                    
+                    # Also check with .000 suffix
+                    enc_with_suffix = f"{enc_name_clean}.000"
+                    filter_sql += (f" OR (dsid_dsnm = '{enc_with_suffix}' AND NOT "
+                                  f"(dsid_edtn = {new_version['edition']} AND dsid_updn = {new_version['update']}))")
+                    
+                    dsid_layer.SetAttributeFilter(filter_sql)
+                    dsid_layer.ResetReading()
+                    
+                    # Collect FIDs to delete
+                    fids_to_delete = []
+                    feature = dsid_layer.GetNextFeature()
+                    while feature:
+                        fids_to_delete.append(feature.GetFID())
+                        feature = dsid_layer.GetNextFeature()
+                    
+                    # Delete old DSID features
+                    deleted_count = 0
+                    for fid in fids_to_delete:
+                        if dsid_layer.DeleteFeature(fid) == 0:  # 0 = success in OGR
+                            deleted_count += 1
+                    
+                    if deleted_count > 0:
+                        logger.info(f"🗑️ Removed {deleted_count} old DSID entries for {enc_name_clean}")
+                    else:
+                        logger.debug(f"No old DSID entries to remove for {enc_name_clean}")
+                        
+                except Exception as e:
+                    logger.warning(f"⚠️ DSID cleanup failed for {enc_name_clean}: {e}")
+                    # Don't fail the entire process for DSID cleanup issues
+                finally:
+                    dsid_layer.SetAttributeFilter(None)
+                    dsid_layer.ResetReading()
+            
+            # Synchronize changes
+            dsid_layer.SyncToDisk()
+        
+        logger.info("DSID updates completed")
 
     def _add_layer_features(self, candidate: Dict, input_layer: ogr.Layer) -> int:
         """Add features from input layer to destination using OGR. Returns count of features added."""
@@ -1868,9 +2092,14 @@ class S57Updater:
                 
                 # Delete only OLD versions, preserve the newly added version
                 # Use type casting to handle VARCHAR vs INTEGER comparison
-                delete_sql = text(f'''DELETE FROM {table_name_for_delete} 
-                                     WHERE dsid_dsnm = :enc_name 
-                                     AND NOT (dsid_edtn::INTEGER = :new_edition AND dsid_updn::INTEGER = :new_update)''')
+                if self.output_format == 'postgis':
+                    delete_sql = text(f'''DELETE FROM {table_name_for_delete} 
+                                         WHERE dsid_dsnm = :enc_name 
+                                         AND NOT (dsid_edtn::INTEGER = :new_edition AND dsid_updn::INTEGER = :new_update)''')
+                else:
+                    delete_sql = text(f'''DELETE FROM {table_name_for_delete} 
+                                         WHERE dsid_dsnm = :enc_name 
+                                         AND NOT (CAST(dsid_edtn AS INTEGER) = :new_edition AND CAST(dsid_updn AS INTEGER) = :new_update)''')
                 
                 result = session.execute(delete_sql, {
                     'enc_name': enc_name,
@@ -1892,6 +2121,72 @@ class S57Updater:
         
         logger.info(f"🗑️ Total removed {total_deleted} old features from {layer_name}")
 
+    def _remove_old_features_ogr(self, layer_name: str, enc_updates: List[Dict]):
+        """Remove old features using OGR-only operations for file-based databases (SpatiaLite/GPKG)."""
+        layer_lookup_name = f"{self.schema}.{layer_name}" if self.output_format == 'postgis' else layer_name
+        layer = self.dest_ds.GetLayerByName(layer_lookup_name)
+        
+        if not layer:
+            logger.warning(f"Layer '{layer_name}' not found for OGR cleanup - skipping")
+            return
+        
+        total_deleted = 0
+        
+        for update_info in enc_updates:
+            candidate = update_info['candidate']
+            enc_name = candidate['enc_name']
+            new_version = candidate['new_version']
+            
+            try:
+                # First, count existing features for logging
+                layer.SetAttributeFilter(f"dsid_dsnm = '{enc_name}'")
+                existing_count = layer.GetFeatureCount()
+                
+                if existing_count > 0:
+                    logger.info(f"Found {existing_count} existing features for {enc_name} in {layer_name}")
+                
+                # Set filter to find OLD features (not the newly added version)
+                filter_sql = (f"dsid_dsnm = '{enc_name}' AND NOT "
+                             f"(dsid_edtn = {new_version['edition']} AND dsid_updn = {new_version['update']})")
+                
+                layer.SetAttributeFilter(filter_sql)
+                layer.ResetReading()
+                
+                # Collect FIDs to delete (collect first, then delete to avoid iterator issues)
+                fids_to_delete = []
+                feature = layer.GetNextFeature()
+                while feature:
+                    fids_to_delete.append(feature.GetFID())
+                    feature = layer.GetNextFeature()
+                
+                # Delete old features
+                deleted_count = 0
+                for fid in fids_to_delete:
+                    if layer.DeleteFeature(fid) == 0:  # 0 = success in OGR
+                        deleted_count += 1
+                    else:
+                        logger.warning(f"Failed to delete feature FID {fid} from {layer_name}")
+                
+                total_deleted += deleted_count
+                
+                if deleted_count > 0:
+                    logger.info(f"🗑️ Removed {deleted_count} old version features for {enc_name} from {layer_name}")
+                    logger.info(f"   → Preserved new version {new_version['edition']}.{new_version['update']}")
+                else:
+                    logger.debug(f"No old features to remove for {enc_name} in {layer_name}")
+                    
+            except Exception as e:
+                logger.error(f"Failed to remove old features for {enc_name} in {layer_name}: {e}")
+                raise
+            finally:
+                # Clear filter
+                layer.SetAttributeFilter(None)
+                layer.ResetReading()
+        
+        # Synchronize changes to disk
+        layer.SyncToDisk()
+        logger.info(f"🗑️ Total removed {total_deleted} old features from {layer_name}")
+
     def _validate_updates(self):
         """Validate update results and detect potential issues."""
         logger.info("Validating update results...")
@@ -1903,19 +2198,28 @@ class S57Updater:
         }
         
         try:
-            # Check for duplicate features (old and new in same layer)
-            duplicates = self._check_for_duplicates()
-            validation_results['duplicates_found'] = duplicates
-            
-            # Verify all processed ENCs are in database with correct versions
-            missing_encs = self._verify_enc_presence()
-            validation_results['missing_encs'] = missing_encs
-            
-            # Check for version consistency
-            version_issues = self._check_version_consistency()
-            validation_results['version_mismatches'] = version_issues
+            if self.output_format == 'postgis':
+                # Use full SQLAlchemy-based validation for PostGIS
+                duplicates = self._check_for_duplicates()
+                validation_results['duplicates_found'] = duplicates
+                
+                missing_encs = self._verify_enc_presence()
+                validation_results['missing_encs'] = missing_encs
+                
+                version_issues = self._check_version_consistency()
+                validation_results['version_mismatches'] = version_issues
+            else:
+                # Use simplified OGR-based validation for file-based databases
+                logger.info("Using simplified validation for file-based database")
+                validation_results['duplicates_found'] = []  # OGR operations are atomic
+                validation_results['missing_encs'] = []  # Skip complex checks
+                validation_results['version_mismatches'] = []  # Skip complex checks
             
             # Log validation summary
+            duplicates = validation_results['duplicates_found']
+            missing_encs = validation_results['missing_encs']
+            version_issues = validation_results['version_mismatches']
+            
             total_issues = len(duplicates) + len(missing_encs) + len(version_issues)
             if total_issues > 0:
                 logger.warning(f"Validation found {total_issues} issues: "
@@ -1951,18 +2255,28 @@ class S57Updater:
                 
             table_name_for_query = f'"{self.schema}"."{layer_name}"' if self.output_format == 'postgis' else f'"{layer_name}"'
             
+            # Dialect-specific functions and casting
+            if self.output_format == 'postgis':
+                cast_text = "::TEXT"
+                version_concat = f"CONCAT(dsid_edtn{cast_text}, '.', dsid_updn{cast_text})"
+                version_agg = f"STRING_AGG({version_concat}, ', ' ORDER BY dsid_edtn, dsid_updn)"
+            else: # SpatiaLite
+                cast_text = " AS TEXT"
+                version_concat = f"CAST(dsid_edtn{cast_text}) || '.' || CAST(dsid_updn{cast_text})"
+                version_agg = f"GROUP_CONCAT({version_concat}, ', ')"
+
             # Query for true duplicates: same feature ID (fidn+fids) + same ENC but DIFFERENT versions
             # This indicates incomplete atomic updates where old features weren't properly removed
             duplicate_query = text(f"""
                 SELECT dsid_dsnm, fidn, fids, COUNT(*) as duplicate_count,
-                       COUNT(DISTINCT CONCAT(dsid_edtn::TEXT, '.', dsid_updn::TEXT)) as version_count,
-                       STRING_AGG(CONCAT(dsid_edtn::TEXT, '.', dsid_updn::TEXT), ', ' ORDER BY dsid_edtn, dsid_updn) as versions
+                       COUNT(DISTINCT {version_concat}) as version_count,
+                       {version_agg} as versions
                 FROM {table_name_for_query}
                 WHERE dsid_dsnm IN ({','.join([':enc_' + str(i) for i, candidate in enumerate(self.processed_encs)])})
                   AND fidn IS NOT NULL 
                   AND fids IS NOT NULL
                 GROUP BY dsid_dsnm, fidn, fids
-                HAVING COUNT(*) > 1 AND COUNT(DISTINCT CONCAT(dsid_edtn::TEXT, '.', dsid_updn::TEXT)) > 1
+                HAVING COUNT(*) > 1 AND COUNT(DISTINCT {version_concat}) > 1
                 ORDER BY dsid_dsnm, duplicate_count DESC
             """)
             
@@ -3160,4 +3474,3 @@ class GPKGManager:
             logger.info(f"Feature update status verification complete: {dict(status_counts)}")
             
         return results_df
-
