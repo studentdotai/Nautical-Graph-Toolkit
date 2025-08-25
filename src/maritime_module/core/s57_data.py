@@ -1547,7 +1547,8 @@ class S57Updater:
         ''')
         
         with self.Session() as session:
-            result = session.execute(query).fetchall()
+            with session.begin():
+                result = session.execute(query).fetchall()
             
         # Build version dictionary, normalizing ENC names to clean format (without .000)
         versions = {}
@@ -2508,22 +2509,23 @@ class S57Updater:
             params = {f'enc_{i}': candidate['enc_name'] for i, candidate in enumerate(self.processed_encs)}
             
             with self.Session() as session:
-                try:
-                    result = session.execute(duplicate_query, params).fetchall()
-                    for row in result:
-                        duplicates.append({
-                            'layer': layer_name,
-                            'enc_name': row[0],
-                            'fidn': row[1],
-                            'fids': row[2],
-                            'duplicate_count': row[3],
-                            'versions': row[4],
-                            'issue': f'Feature ID {row[1]}:{row[2]} appears {row[3]} times'
-                        })
-                except Exception as e:
-                    # Some layers might not have fidn/fids columns, skip gracefully
-                    logger.debug(f"Could not check duplicates in layer {layer_name}: {e}")
-                    continue
+                with session.begin():
+                    try:
+                        result = session.execute(duplicate_query, params).fetchall()
+                        for row in result:
+                            duplicates.append({
+                                'layer': layer_name,
+                                'enc_name': row[0],
+                                'fidn': row[1],
+                                'fids': row[2],
+                                'duplicate_count': row[3],
+                                'versions': row[4],
+                                'issue': f'Feature ID {row[1]}:{row[2]} appears {row[3]} times'
+                            })
+                    except Exception as e:
+                        # Some layers might not have fidn/fids columns, skip gracefully
+                        logger.debug(f"Could not check duplicates in layer {layer_name}: {e}")
+                        continue
         
         return duplicates
 
@@ -2583,18 +2585,19 @@ class S57Updater:
                 """)
                 
                 with self.Session() as session:
-                    result = session.execute(version_query, {'enc_name': enc_name}).fetchall()
-                    
-                    for row in result:
-                        if (row[0] != expected_version['edition'] or 
-                            row[1] != expected_version['update']):
-                            inconsistent_layers.append({
-                                'layer': layer_name,
-                                'found_edition': row[0],
-                                'found_update': row[1],
-                                'expected_edition': expected_version['edition'],
-                                'expected_update': expected_version['update']
-                            })
+                    with session.begin():
+                        result = session.execute(version_query, {'enc_name': enc_name}).fetchall()
+                        
+                        for row in result:
+                            if (row[0] != expected_version['edition'] or 
+                                row[1] != expected_version['update']):
+                                inconsistent_layers.append({
+                                    'layer': layer_name,
+                                    'found_edition': row[0],
+                                    'found_update': row[1],
+                                    'expected_edition': expected_version['edition'],
+                                    'expected_update': expected_version['update']
+                                })
             
             if inconsistent_layers:
                 version_issues.append({
@@ -3173,7 +3176,7 @@ class SpatiaLiteManager:
             where_clause = f"dsid_dsnm IN ({enc_list_str})"
 
         # Use gpd.read_file, which is the correct, high-level function for reading file-based sources.
-        return gpd.read_file(self.db_path, layer=safe_layer_name, where=where_clause)
+        return gpd.read_file(self.db_path, layer=safe_layer_name, where=where_clause, engine='pyogrio')
 
     def get_enc_summary(self, check_noaa: bool = False) -> pd.DataFrame:
         """
@@ -3439,7 +3442,7 @@ class GPKGManager:
             where_clause = f"DSID_DSNM IN ({enc_list_str})"
 
         # Use gpd.read_file, which is the correct, high-level function for reading file-based sources.
-        return gpd.read_file(self.gpkg_path, layer=safe_layer_name, where=where_clause)
+        return gpd.read_file(self.gpkg_path, layer=safe_layer_name, where=where_clause, engine='pyogrio')
 
     def get_enc_summary(self, check_noaa: bool = False) -> pd.DataFrame:
         """

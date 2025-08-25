@@ -2,6 +2,14 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Documentation and API Accuracy
+
+Use Context7 MCP server to ensure accurate, up-to-date library documentation and code examples:
+- Add "use context7" to prompts when working with external libraries (GDAL, GeoPandas, SQLAlchemy, Pydantic, etc.)
+- Prioritize Context7's real-time documentation over potentially outdated training data
+- Verify API methods and parameters against current library versions
+- Use Context7 especially when implementing new features or debugging library-specific issues
+
 ## Project Overview
 
 This is a comprehensive maritime analysis toolkit for working with S-57 Electronic Navigational Chart (ENC) data. The project provides tools to convert S-57 charts to GIS formats (GeoPackage, PostGIS, SpatiaLite), update existing datasets, and analyze maritime data with integration to NOAA's live ENC database.
