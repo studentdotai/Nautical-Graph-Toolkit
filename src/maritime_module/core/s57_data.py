@@ -157,7 +157,7 @@ class S57Base:
                     'UPDATES=APPLY',
                     'LNAM_REFS=ON',
                     'RECODE_BY_DSSI=ON',
-                    'LIST_AS_STRING=ON'
+                    'LIST_AS_STRING=OFF'  # Let GDAL handle as proper lists, then use mapFieldType for GPKG
                 ]
 
                 # Open the source dataset with the specified options. This is the most reliable
@@ -191,12 +191,21 @@ class S57Base:
                     }
 
                 # Create the options object for the destination, with special handling for GPKG.
+                # Note: srcOpenOptions not supported in GDAL 3.11.3, source dataset already opened with correct options
                 opt_params = {**options, 'dstSRS': 'EPSG:4326'}
                 if self.output_format == 'gpkg':
-                    # For GPKG, explicitly map list types to a wide string. This prevents
-                    # warnings and data truncation by overriding the default conversion
-                    # to JSON in a column with insufficient width.
-                    opt_params['mapFieldType'] = {'StringList': "String(4096)", "IntegerList": "String(4096)"}
+                    # GPKG natively supports JSON field subtypes for StringList/IntegerList
+                    # Only map specific long text fields to prevent truncation
+                    opt_params['mapFieldType'] = {
+                        "LNAM_REFS": "String(4096)",
+                        "FFPT_RIND": "String(4096)",
+                        "INFORM": "String(2048)",
+                        "TXTDSC": "String(2048)",
+                        "OBJNAM": "String(1024)"
+                    }
+                # Debug: Log the options being used for GPKG
+                if self.output_format == 'gpkg':
+                    logger.debug(f"GPKG options for {s57_file.name}: {opt_params}")
 
                 opt = gdal.VectorTranslateOptions(**opt_params)
 
@@ -765,7 +774,7 @@ class S57Advanced:
                     field_defn = layer_defn.GetFieldDefn(field_idx)
                     field_name = field_defn.GetName()
                     ogr_type = field_defn.GetType()
-                    schema_info['fields'][field_name] = self._ogr_type_to_fiona(ogr_type)
+                    schema_info['fields'][field_name] = self._ogr_type_to_fiona(field_defn)
                 
                 file_info['layers'][layer_name] = schema_info
             
@@ -855,27 +864,38 @@ class S57Advanced:
                     else:
                         logger.warning(f"Could not process layer '{layer_name}' from {s57_file.name}: {e}")
                     # Clean up failed memory dataset
+                    if mem_ds: mem_ds.Destroy() # Explicitly destroy
                     mem_ds = None
                     continue
             
             # Merge batch into destination
             for i, mem_ds in enumerate(temp_datasets):
                 access_mode = 'overwrite' if (is_first_batch and i == 0) else 'append'
-                
+
+                # --- FIX: Add mapFieldType for GPKG to prevent truncation ---
+                translate_options = {
+                    'layerName': layer_name.lower(),
+                    'accessMode': access_mode,
+                    'dstSRS': 'EPSG:4326'
+                }
+                if self.base_converter.output_format == 'gpkg':
+                    # Explicitly map list-like fields to a very wide string for GPKG.
+                    # This prevents truncation warnings and data loss for fields like LNAM_REFS.
+                    translate_options['mapFieldType'] = {
+                        "StringList": "String(4096)",
+                        "IntegerList": "String(4096)"
+                    }
+
                 gdal.VectorTranslate(
                     destNameOrDestDS=dest_path,
                     srcDS=mem_ds,
-                    options=gdal.VectorTranslateOptions(
-                        layerName=layer_name.lower(),
-                        accessMode=access_mode,
-                        dstSRS='EPSG:4326'
-                    )
+                    options=gdal.VectorTranslateOptions(**translate_options)
                 )
         
         finally:
             # Clean up temporary datasets
             for mem_ds in temp_datasets:
-                mem_ds = None
+                if mem_ds: mem_ds.Destroy() # Explicitly destroy
 
     def _build_unified_schema(self) -> Dict[str, Dict]:
         """Build unified schemas from cached file information."""
@@ -893,11 +913,11 @@ class S57Advanced:
                     # Use format-specific field naming: uppercase for GPKG, lowercase for others
                     if layer_name != 'DSID':
                         if self.base_converter.output_format == 'gpkg':
-                            unified_schemas[layer_name]['properties']['DSID_DSNM'] = 'str'
+                            unified_schemas[layer_name]['properties']['DSID_DSNM'] = 'str:255'
                             unified_schemas[layer_name]['properties']['DSID_EDTN'] = 'int'
                             unified_schemas[layer_name]['properties']['DSID_UPDN'] = 'int'
                         else:
-                            unified_schemas[layer_name]['properties']['dsid_dsnm'] = 'str'
+                            unified_schemas[layer_name]['properties']['dsid_dsnm'] = 'str:255'
                             unified_schemas[layer_name]['properties']['dsid_edtn'] = 'int'
                             unified_schemas[layer_name]['properties']['dsid_updn'] = 'int'
                 else:
@@ -986,19 +1006,27 @@ class S57Advanced:
             logger.debug("Cleaned up file cache and freed memory")
 
     # Helper methods
-    def _ogr_type_to_fiona(self, ogr_type: int) -> str:
-        """Convert OGR field type to Fiona type."""
+    def _ogr_type_to_fiona(self, field_defn: ogr.FieldDefn) -> str:
+        """Convert OGR field definition to a more specific Fiona type string."""
+        ogr_type = field_defn.GetType()
+        field_name = field_defn.GetName()
+
+        # Handle list-like fields that become long strings to prevent truncation.
+        # LNAM_REFS and FFPT_RIND are common culprits.
+        if field_name.upper() in ['LNAM_REFS', 'FFPT_RIND']:
+            return 'str:4096'  # Allocate a large string to prevent truncation
+
         mapping = {
-            ogr.OFTString: 'str', 
+            ogr.OFTString: f'str:{field_defn.GetWidth()}' if field_defn.GetWidth() > 0 else 'str:255',
             ogr.OFTInteger: 'int', 
             ogr.OFTInteger64: 'int',
             ogr.OFTReal: 'float', 
             ogr.OFTDate: 'date', 
             ogr.OFTTime: 'str',
             ogr.OFTDateTime: 'datetime',
-            ogr.OFTStringList: 'str', 
-            ogr.OFTIntegerList: 'str', 
-            ogr.OFTRealList: 'str'
+            ogr.OFTStringList: 'str:4096',
+            ogr.OFTIntegerList: 'str:4096',
+            ogr.OFTRealList: 'str:4096'
         }
         return mapping.get(ogr_type, 'str')
 
@@ -1571,7 +1599,7 @@ class S57Updater:
         """Extract ENC metadata from S-57 file."""
         s57_open_options = [
             'RETURN_PRIMITIVES=OFF', 'SPLIT_MULTIPOINT=ON', 'ADD_SOUNDG_DEPTH=ON',
-            'UPDATES=APPLY', 'LNAM_REFS=ON', 'RECODE_BY_DSSI=ON', 'LIST_AS_STRING=ON'
+            'UPDATES=APPLY', 'LNAM_REFS=ON', 'RECODE_BY_DSSI=ON', 'LIST_AS_STRING=OFF'
         ]
         
         src_ds = gdal.OpenEx(str(s57_file), gdal.OF_VECTOR, open_options=s57_open_options)

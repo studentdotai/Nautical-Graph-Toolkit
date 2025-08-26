@@ -548,18 +548,34 @@ class S57DeepTester:
         }
 
     def _test_update_workflows(self):
-        """Test update and force update workflows."""
-        logger.info("Testing update workflows...")
+        """Test update and force update workflows for all successfully imported formats."""
+        logger.info("Testing update workflows across all supported formats...")
 
-        # Only test if we have successful PostGIS import (updates only supported for PostGIS)
-        if 'postgis' not in self.test_results or self.test_results['postgis']['status'] != 'success':
-            logger.warning("PostGIS import not successful, skipping update tests")
+        # Get all successful formats for update testing
+        successful_formats = [fmt for fmt, result in self.test_results.items() 
+                            if result.get('status') == 'success' and fmt in ['postgis', 'gpkg', 'spatialite']]
+        
+        if not successful_formats:
+            logger.warning("No successful format imports found, skipping update tests")
             return
 
+        logger.info(f"Testing updates for formats: {successful_formats}")
+
+        # Test updates for each successful format
+        for format_name in successful_formats:
+            logger.info(f"Testing {format_name.upper()} update workflows...")
+            
+            if format_name == 'postgis':
+                self._test_postgis_updates()
+            elif format_name in ['gpkg', 'spatialite']:
+                self._test_file_based_updates(format_name)
+
+    def _test_postgis_updates(self):
+        """Test PostGIS update workflows (normal and force)."""
         schema_name = self.test_results['postgis']['schema_name']
 
-        # Test 1: Normal update using separate update directory
-        logger.info(f"Testing normal update workflow using update data from: {self.config.s57_update_root}")
+        # Test 1: Normal PostGIS update
+        logger.info(f"Testing PostGIS normal update using: {self.config.s57_update_root}")
         try:
             updater = S57Updater(
                 output_format='postgis',
@@ -574,24 +590,26 @@ class S57DeepTester:
             )
             duration = datetime.now() - start_time
 
-            self.test_results['update_normal'] = {
+            self.test_results['update_postgis_normal'] = {
                 'status': 'success',
                 'duration': duration.total_seconds(),
                 'updates_applied': len(update_result.get('processed_files', [])),
-                'type': 'normal_update'
+                'type': 'normal_update',
+                'format': 'postgis'
             }
-            logger.info(f"✅ Normal update completed in {duration}")
+            logger.info(f"✅ PostGIS normal update completed in {duration}")
 
         except Exception as e:
-            self.test_results['update_normal'] = {
+            self.test_results['update_postgis_normal'] = {
                 'status': 'failed',
                 'error': str(e),
-                'type': 'normal_update'
+                'type': 'normal_update',
+                'format': 'postgis'
             }
-            logger.error(f"❌ Normal update failed: {e}")
+            logger.error(f"❌ PostGIS normal update failed: {e}")
 
-        # Test 2: Force clean install using update directory
-        logger.info(f"Testing force clean install workflow using: {self.config.s57_update_root}")
+        # Test 2: PostGIS force clean install
+        logger.info(f"Testing PostGIS force clean install using: {self.config.s57_data_root}")
         try:
             updater = S57Updater(
                 output_format='postgis',
@@ -601,26 +619,100 @@ class S57DeepTester:
 
             start_time = datetime.now()
             force_result = updater.update_from_location(
-                str(self.config.s57_update_root),
+                str(self.config.s57_data_root),
                 force_clean_install=True
             )
             duration = datetime.now() - start_time
 
-            self.test_results['update_force'] = {
+            self.test_results['update_postgis_force'] = {
                 'status': 'success',
                 'duration': duration.total_seconds(),
                 'files_processed': len(force_result.get('processed_files', [])),
-                'type': 'force_clean_install'
+                'type': 'force_clean_install',
+                'format': 'postgis'
             }
-            logger.info(f"✅ Force clean install completed in {duration}")
+            logger.info(f"✅ PostGIS force clean install completed in {duration}")
 
         except Exception as e:
-            self.test_results['update_force'] = {
+            self.test_results['update_postgis_force'] = {
                 'status': 'failed',
                 'error': str(e),
-                'type': 'force_clean_install'
+                'type': 'force_clean_install',
+                'format': 'postgis'
             }
-            logger.error(f"❌ Force clean install failed: {e}")
+            logger.error(f"❌ PostGIS force clean install failed: {e}")
+
+    def _test_file_based_updates(self, format_name: str):
+        """Test file-based format updates (GPKG/SpatiaLite) using OGR-only operations."""
+        original_file_path = self.test_results[format_name]['output_path']
+        
+        # Test 1: Normal file-based update
+        logger.info(f"Testing {format_name.upper()} normal update using: {self.config.s57_update_root}")
+        try:
+            updater = S57Updater(
+                output_format=format_name,
+                dest_conn=original_file_path  # File path for file-based formats
+            )
+
+            start_time = datetime.now()
+            update_result = updater.update_from_location(
+                str(self.config.s57_update_root),
+                force_clean_install=False
+            )
+            duration = datetime.now() - start_time
+
+            self.test_results[f'update_{format_name}_normal'] = {
+                'status': 'success',
+                'duration': duration.total_seconds(),
+                'updates_applied': len(update_result.get('processed_files', [])),
+                'type': 'normal_update',
+                'format': format_name,
+                'output_path': original_file_path
+            }
+            logger.info(f"✅ {format_name.upper()} normal update completed in {duration}")
+
+        except Exception as e:
+            self.test_results[f'update_{format_name}_normal'] = {
+                'status': 'failed',
+                'error': str(e),
+                'type': 'normal_update',
+                'format': format_name
+            }
+            logger.error(f"❌ {format_name.upper()} normal update failed: {e}")
+
+        # Test 2: File-based force clean install
+        logger.info(f"Testing {format_name.upper()} force clean install using: {self.config.s57_data_root}")
+        try:
+            updater = S57Updater(
+                output_format=format_name,
+                dest_conn=original_file_path
+            )
+
+            start_time = datetime.now()
+            force_result = updater.update_from_location(
+                str(self.config.s57_data_root),
+                force_clean_install=True
+            )
+            duration = datetime.now() - start_time
+
+            self.test_results[f'update_{format_name}_force'] = {
+                'status': 'success',
+                'duration': duration.total_seconds(),
+                'files_processed': len(force_result.get('processed_files', [])),
+                'type': 'force_clean_install',
+                'format': format_name,
+                'output_path': original_file_path
+            }
+            logger.info(f"✅ {format_name.upper()} force clean install completed in {duration}")
+
+        except Exception as e:
+            self.test_results[f'update_{format_name}_force'] = {
+                'status': 'failed',
+                'error': str(e),
+                'type': 'force_clean_install',
+                'format': format_name
+            }
+            logger.error(f"❌ {format_name.upper()} force clean install failed: {e}")
 
     def _extract_and_compare_data(self):
         """Extract data from all successful imports and perform side-by-side comparisons."""
@@ -691,10 +783,22 @@ class S57DeepTester:
         """Extract data from file-based format (GPKG/SpatiaLite)."""
         file_data = {}
         output_path = result['output_path']
+        # Determine if the source is GPKG to handle case-sensitive column names on import
+        is_gpkg = Path(output_path).suffix.lower() == '.gpkg'
 
         for layer_name in result['layer_names']:
             try:
                 gdf = gpd.read_file(output_path, layer=layer_name, engine='pyogrio')
+
+                # For GPKG, convert column names to lowercase for consistent comparison
+                if is_gpkg:
+                    original_geom_col = gdf.geometry.name
+                    gdf.columns = [col.lower() for col in gdf.columns]
+                    # Ensure the geometry column is still correctly identified after lowercasing
+                    new_geom_col = original_geom_col.lower()
+                    if new_geom_col in gdf.columns:
+                        gdf = gdf.set_geometry(new_geom_col)
+
                 file_data[layer_name] = gdf
                 logger.debug(f"Extracted {len(gdf)} features from file layer {layer_name}")
             except Exception as e:
@@ -1065,8 +1169,17 @@ class S57DeepTester:
                 # The `pd.isna` check above handles the (NaN == NaN) case.
                 if val_a != val_b:
                     comparison['is_consistent'] = False
+
+                    # --- ENHANCEMENT: Add specific check for truncation ---
+                    issue_type = 'content_mismatch'
+                    if col.lower() in ['lnam_refs', 'ffpt_rind'] and isinstance(val_a, str) and isinstance(val_b, str):
+                        if (len(val_a) < len(val_b) and val_b.startswith(val_a)) or \
+                           (len(val_b) < len(val_a) and val_a.startswith(val_b)):
+                            issue_type = 'potential_truncation'
+
                     comparison['attribute_diffs'].append({
                         'layer': layer_name, 'feature_id': dict(zip(merge_cols, idx)), 'column': col,
+                        'issue': issue_type, # Use the new issue type
                         f'value_{format_a}': str(val_a), f'value_{format_b}': str(val_b)
                     })
         return comparison
@@ -1077,16 +1190,35 @@ class S57DeepTester:
         """Generate comprehensive analysis report."""
         logger.info("Generating comprehensive DeepTest report...")
         
+        # Separate import and update results
+        import_results = {}
+        update_results = {}
+        
+        for key, result in self.test_results.items():
+            if key.startswith('update_'):
+                update_results[key] = result
+            else:
+                import_results[key] = result
+        
         report = {
             'test_summary': {
-                'total_formats_tested': len(self.test_results),
-                'successful_imports': len([r for r in self.test_results.values() 
-                                         if r.get('status') == 'success']),
-                'failed_imports': len([r for r in self.test_results.values() 
-                                     if r.get('status') == 'failed']),
+                'total_tests_performed': len(self.test_results),
+                'initial_imports': {
+                    'total_tested': len(import_results),
+                    'successful': len([r for r in import_results.values() if r.get('status') == 'success']),
+                    'failed': len([r for r in import_results.values() if r.get('status') == 'failed']),
+                    'formats': list(import_results.keys())
+                },
+                'update_workflows': {
+                    'total_tested': len(update_results),
+                    'successful': len([r for r in update_results.values() if r.get('status') == 'success']),
+                    'failed': len([r for r in update_results.values() if r.get('status') == 'failed']),
+                    'formats_tested': len(set(r.get('format', 'unknown') for r in update_results.values()))
+                },
                 'comparisons_performed': len(self.comparison_results)
             },
-            'format_results': self.test_results,
+            'import_results': import_results,
+            'update_results': update_results,
             'comparison_results': [
                 {
                     'format_pair': comp.format_pair,
@@ -1122,19 +1254,36 @@ class S57DeepTester:
         """Generate optimization recommendations based on test results."""
         recommendations = []
         
-        # Performance recommendations
-        successful_formats = {fmt: result for fmt, result in self.test_results.items() 
-                            if result.get('status') == 'success'}
+        # Separate import and update results for analysis
+        import_results = {fmt: result for fmt, result in self.test_results.items() 
+                         if not fmt.startswith('update_') and result.get('status') == 'success'}
+        update_results = {fmt: result for fmt, result in self.test_results.items() 
+                         if fmt.startswith('update_') and result.get('status') == 'success'}
         
-        if len(successful_formats) > 1:
-            durations = {fmt: result['duration'] for fmt, result in successful_formats.items()}
-            fastest = min(durations, key=durations.get)
-            slowest = max(durations, key=durations.get)
-            
-            recommendations.append(
-                f"Performance: {fastest.upper()} is fastest ({durations[fastest]:.1f}s), "
-                f"{slowest.upper()} is slowest ({durations[slowest]:.1f}s)"
-            )
+        # Import performance recommendations
+        if len(import_results) > 1:
+            durations = {fmt: result['duration'] for fmt, result in import_results.items() if 'duration' in result}
+            if durations:
+                fastest = min(durations, key=durations.get)
+                slowest = max(durations, key=durations.get)
+                
+                recommendations.append(
+                    f"Import Performance: {fastest.upper()} is fastest ({durations[fastest]:.1f}s), "
+                    f"{slowest.upper()} is slowest ({durations[slowest]:.1f}s)"
+                )
+        
+        # Update performance recommendations
+        if len(update_results) > 1:
+            update_durations = {fmt: result['duration'] for fmt, result in update_results.items() if 'duration' in result}
+            if update_durations:
+                fastest_update = min(update_durations, key=update_durations.get)
+                slowest_update = max(update_durations, key=update_durations.get)
+                
+                recommendations.append(
+                    f"Update Performance: {fastest_update.replace('update_', '').upper()} updates fastest "
+                    f"({update_durations[fastest_update]:.1f}s), {slowest_update.replace('update_', '').upper()} slowest "
+                    f"({update_durations[slowest_update]:.1f}s)"
+                )
             
         # Consistency recommendations  
         if self.comparison_results:
@@ -1149,9 +1298,9 @@ class S57DeepTester:
                     f"Data Consistency Good: Average consistency is {avg_consistency:.1f}%"
                 )
                 
-        # Feature count recommendations
+        # Feature count recommendations  
         feature_counts = {}
-        for fmt, result in successful_formats.items():
+        for fmt, result in import_results.items():
             if 'total_features' in result:
                 feature_counts[fmt] = result['total_features']
                 
@@ -1160,6 +1309,19 @@ class S57DeepTester:
                 "Feature Count Variance: Different formats produced different feature counts. "
                 "Investigate format-specific filtering or processing differences."
             )
+        
+        # Update workflow recommendations
+        if update_results:
+            successful_update_count = len(update_results)
+            total_formats = len(import_results)
+            if successful_update_count == total_formats * 2:  # normal + force for each format
+                recommendations.append(
+                    "Update Coverage: All formats successfully tested for both normal and force updates"
+                )
+            else:
+                recommendations.append(
+                    f"Update Coverage: Only {successful_update_count} out of {total_formats * 2} possible update tests succeeded"
+                )
             
         return recommendations
         
@@ -1189,25 +1351,50 @@ class S57DeepTester:
         # Test Summary
         summary = report['test_summary']
         print(f"\n📊 TEST SUMMARY:")
-        print(f"   • Formats Tested: {summary['total_formats_tested']}")
-        print(f"   • Successful Imports: {summary['successful_imports']}")
-        print(f"   • Failed Imports: {summary['failed_imports']}")
-        print(f"   • Comparisons Performed: {summary['comparisons_performed']}")
+        print(f"   • Total Tests: {summary['total_tests_performed']}")
         
-        # Format Results
-        print(f"\n🗃️  FORMAT RESULTS:")
-        for fmt, result in report['format_results'].items():
+        import_summary = summary['initial_imports']
+        print(f"   • Initial Imports: {import_summary['successful']}/{import_summary['total_tested']} successful")
+        print(f"     Formats: {', '.join(import_summary['formats'])}")
+        
+        update_summary = summary['update_workflows']
+        if update_summary['total_tested'] > 0:
+            print(f"   • Update Tests: {update_summary['successful']}/{update_summary['total_tested']} successful")
+            print(f"     Formats Tested: {update_summary['formats_tested']}")
+        else:
+            print(f"   • Update Tests: None performed")
+            
+        print(f"   • Comparisons: {summary['comparisons_performed']}")
+        
+        # Import Results
+        print(f"\n🗃️  IMPORT RESULTS:")
+        for fmt, result in report['import_results'].items():
             status_icon = "✅" if result['status'] == 'success' else "❌"
             print(f"   {status_icon} {fmt.upper()}: {result['status']}")
             if result['status'] == 'success':
-                print(f"      Duration: {result['duration']:.1f}s")
+                print(f"      Duration: {result.get('duration', 0):.1f}s")
                 print(f"      Features: {result.get('total_features', 'N/A')}")
             else:
                 print(f"      Error: {result.get('error', 'Unknown')}")
+        
+        # Update Results  
+        if report['update_results']:
+            print(f"\n🔄 UPDATE RESULTS:")
+            for fmt, result in report['update_results'].items():
+                status_icon = "✅" if result['status'] == 'success' else "❌"
+                update_type = result.get('type', 'unknown').replace('_', ' ').title()
+                format_name = result.get('format', 'unknown').upper()
+                print(f"   {status_icon} {format_name} {update_type}: {result['status']}")
+                if result['status'] == 'success':
+                    print(f"      Duration: {result.get('duration', 0):.1f}s")
+                    files_key = 'updates_applied' if 'updates_applied' in result else 'files_processed'
+                    print(f"      Files: {result.get(files_key, 'N/A')}")
+                else:
+                    print(f"      Error: {result.get('error', 'Unknown')}")
                 
         # Comparison Results
         if report['comparison_results']:
-            print(f"\n🔄 COMPARISON RESULTS:")
+            print(f"\n📊 DATA COMPARISON RESULTS:")
             for comp in report['comparison_results']:
                 print(f"   • {comp['format_pair']}: {comp['consistency_score']:.1f}% consistent")
                 print(f"     Layers: {comp['layers_compared']}, Differences: {comp['total_differences']}")
