@@ -66,14 +66,14 @@ logger = logging.getLogger(__name__)
 # --- Module-level GDAL Configuration ---
 # Use gdal.SetConfigOption for reliability, as it affects the current session
 # regardless of when the library was imported.
-gdal.SetConfigOption('OGR_S57_RETURN_PRIMITIVES', 'OFF')
-gdal.SetConfigOption('OGR_S57_SPLIT_MULTIPOINT', 'ON')
-gdal.SetConfigOption('OGR_S57_ADD_SOUNDG_DEPTH', 'ON')
-gdal.SetConfigOption('OGR_S57_RETURN_LINKAGES', 'ON')
-gdal.SetConfigOption('OGR_S57_UPDATES', 'APPLY')
-gdal.SetConfigOption('OGR_S57_LNAM_REFS', 'ON')
-gdal.SetConfigOption('OGR_S57_RECODE_BY_DSSI', 'ON')
-gdal.SetConfigOption('OGR_S57_LIST_AS_STRING', 'OFF')
+# gdal.SetConfigOption('OGR_S57_RETURN_PRIMITIVES', 'OFF')
+# gdal.SetConfigOption('OGR_S57_SPLIT_MULTIPOINT', 'ON')
+# gdal.SetConfigOption('OGR_S57_ADD_SOUNDG_DEPTH', 'ON')
+# gdal.SetConfigOption('OGR_S57_RETURN_LINKAGES', 'ON')
+# gdal.SetConfigOption('OGR_S57_UPDATES', 'APPLY')
+# gdal.SetConfigOption('OGR_S57_LNAM_REFS', 'ON')
+# gdal.SetConfigOption('OGR_S57_RECODE_BY_DSSI', 'ON')
+# gdal.SetConfigOption('OGR_S57_LIST_AS_STRING', 'ON')
 
 
 
@@ -126,102 +126,115 @@ class S57Base:
         Converts each S-57 file to a separate destination file or schema.
         This is the primary method for this class.
         """
-        self.find_s57_files()
-        logger.info(f"--- Starting 'by_enc' conversion to format '{self.output_format}' ---")
+        # Temporarily set LIST_AS_STRING to OFF. This ensures the S-57 driver
+        # provides list-like fields as their native OGR types (e.g., StringList),
+        # which we will then explicitly map to a JSON string in the destination,
+        # preserving the data structure.
+        # Get the original setting (or None if unset) to ensure we can restore it perfectly.
+        # Providing a default to GetConfigOption can unintentionally change the global state.
+        original_list_as_string = gdal.GetConfigOption('OGR_S57_LIST_AS_STRING')
+        gdal.SetConfigOption('OGR_S57_LIST_AS_STRING', 'OFF')
 
-        # Use a connector for database operations to ensure consistency
-        pg_connector = None
-        if self.output_format == 'postgis':
-            if not isinstance(self.output_dest, dict):
-                raise TypeError("For PostGIS conversion, 'output_dest' must be a dictionary.")
-            pg_connector = PostGISConnector(self.output_dest)
-        elif self.output_format in ['gpkg', 'spatialite']:
-            # For file-based, the output_dest is the directory path
-            Path(self.output_dest).mkdir(parents=True, exist_ok=True)
+        try:
+            self.find_s57_files()
+            logger.info(f"--- Starting 'by_enc' conversion to format '{self.output_format}' ---")
 
-        for s57_file in self.s57_files:
-            logger.info(f"Processing: {s57_file.name}")
-            # Use uppercase for GPKG filenames as requested, lowercase for others (safer for schemas).
-            if self.output_format == 'gpkg':
-                base_name = s57_file.stem.upper()
-            else:
-                base_name = s57_file.stem.lower()
+            # Use a connector for database operations to ensure consistency
+            pg_connector = None
+            if self.output_format == 'postgis':
+                if not isinstance(self.output_dest, dict):
+                    raise TypeError("For PostGIS conversion, 'output_dest' must be a dictionary.")
+                pg_connector = PostGISConnector(self.output_dest)
+            elif self.output_format in ['gpkg', 'spatialite']:
+                # For file-based, the output_dest is the directory path
+                Path(self.output_dest).mkdir(parents=True, exist_ok=True)
 
-            src_ds = None
-            try:
-                # Define a complete, self-contained set of open options for the source file.
-                s57_open_options = [
-                    'RETURN_PRIMITIVES=OFF',
-                    'SPLIT_MULTIPOINT=ON',
-                    'ADD_SOUNDG_DEPTH=ON',
-                    'UPDATES=APPLY',
-                    'LNAM_REFS=ON',
-                    'RECODE_BY_DSSI=ON',
-                    'LIST_AS_STRING=OFF'  # Let GDAL handle as proper lists, then use mapFieldType for GPKG
-                ]
-
-                # Open the source dataset with the specified options. This is the most reliable
-                # way to ensure the S57 driver is configured correctly for the read operation.
-                src_ds = gdal.OpenEx(str(s57_file), gdal.OF_VECTOR, open_options=s57_open_options)
-
-                if not src_ds:
-                    raise IOError(f"Could not open source file {s57_file.name} with specified options.")
-
-                dest_ds_path = ""
-                options = {}
-
+            for s57_file in self.s57_files:
+                logger.info(f"Processing: {s57_file.name}")
+                # Use uppercase for GPKG filenames as requested, lowercase for others (safer for schemas).
                 if self.output_format == 'gpkg':
-                    dest_ds_path = str(Path(self.output_dest) / f"{base_name}.gpkg")
-                    options = {'format': 'GPKG', 'accessMode': 'overwrite'}
-                elif self.output_format == 'spatialite':
-                    dest_ds_path = str(Path(self.output_dest) / f"{base_name}.sqlite")
-                    options = {'format': 'SQLite', 'datasetCreationOptions': ['SPATIALITE=YES'], 'accessMode': 'overwrite'}
-                elif self.output_format == 'postgis':
-                    pg_connector.schema = base_name
-                    pg_connector.check_and_prepare(overwrite=self.overwrite)
-                    db_params = self.output_dest
-                    dest_ds_path = (f"PG:dbname='{db_params['dbname']}' host='{db_params['host']}' "
-                                   f"port='{db_params['port']}' user='{db_params['user']}' "
-                                   f"password='{db_params['password']}'")
-                    # Add OVERWRITE=YES to layerCreationOptions to handle existing tables, as suggested by the error.
-                    options = {
-                        'format': 'PostgreSQL',
-                        'layerCreationOptions': [f'SCHEMA={base_name}', 'OVERWRITE=YES'],
-                        'accessMode': 'overwrite'
-                    }
+                    base_name = s57_file.stem.upper()
+                else:
+                    base_name = s57_file.stem.lower()
 
-                # Create the options object for the destination, with special handling for GPKG.
-                # Note: srcOpenOptions not supported in GDAL 3.11.3, source dataset already opened with correct options
-                opt_params = {**options, 'dstSRS': 'EPSG:4326'}
-                if self.output_format == 'gpkg':
-                    # GPKG natively supports JSON field subtypes for StringList/IntegerList
-                    # Only map specific long text fields to prevent truncation
-                    opt_params['mapFieldType'] = {
-                        "LNAM_REFS": "String(4096)",
-                        "FFPT_RIND": "String(4096)",
-                        "INFORM": "String(2048)",
-                        "TXTDSC": "String(2048)",
-                        "OBJNAM": "String(1024)"
-                    }
-                # Debug: Log the options being used for GPKG
-                if self.output_format == 'gpkg':
-                    logger.debug(f"GPKG options for {s57_file.name}: {opt_params}")
-
-                opt = gdal.VectorTranslateOptions(**opt_params)
-
-                gdal.VectorTranslate(
-                    destNameOrDestDS=dest_ds_path,
-                    srcDS=src_ds,  # Pass the opened and configured dataset object
-                    options=opt
-                )
-                logger.info(f"-> Successfully converted {s57_file.name} to target '{base_name}'")
-            except Exception as e:
-                logger.error(f"!! ERROR converting {s57_file.name}: {e}", exc_info=True)
-            finally:
-                # Ensure the source dataset is closed to release the file handle
                 src_ds = None
+                try:
+                    # Define open options. We explicitly set LIST_AS_STRING=OFF to get
+                    # native OGR list types from the S-57 driver.
+                    s57_open_options = [
+                        'RETURN_PRIMITIVES=OFF',
+                        'SPLIT_MULTIPOINT=ON',
+                        'ADD_SOUNDG_DEPTH=ON',
+                        'UPDATES=APPLY',
+                        'LNAM_REFS=ON',
+                        'RECODE_BY_DSSI=ON',
+                        'LIST_AS_STRING=OFF'
+                    ]
 
-        logger.info(f"--- Finished 'by_enc' conversion ---")
+                    # Open the source dataset with the specified options.
+                    src_ds = gdal.OpenEx(str(s57_file), gdal.OF_VECTOR, open_options=s57_open_options)
+
+                    if not src_ds:
+                        raise IOError(f"Could not open source file {s57_file.name} with specified options.")
+
+                    dest_ds_path = ""
+                    options = {}
+
+                    if self.output_format == 'gpkg':
+                        dest_ds_path = str(Path(self.output_dest) / f"{base_name}.gpkg")
+                        options = {'format': 'GPKG', 'accessMode': 'overwrite'}
+                    elif self.output_format == 'spatialite':
+                        dest_ds_path = str(Path(self.output_dest) / f"{base_name}.sqlite")
+                        options = {'format': 'SQLite', 'datasetCreationOptions': ['SPATIALITE=YES'], 'accessMode': 'overwrite'}
+                    elif self.output_format == 'postgis':
+                        pg_connector.schema = base_name
+                        pg_connector.check_and_prepare(overwrite=self.overwrite)
+                        db_params = self.output_dest
+                        dest_ds_path = (f"PG:dbname='{db_params['dbname']}' host='{db_params['host']}' "
+                                       f"port='{db_params['port']}' user='{db_params['user']}' "
+                                       f"password='{db_params['password']}'")
+                        options = {
+                            'format': 'PostgreSQL',
+                            'layerCreationOptions': [f'SCHEMA={base_name}', 'OVERWRITE=YES'],
+                            'accessMode': 'overwrite'
+                        }
+
+                    # Create the options object for the destination, with special handling for GPKG.
+                    opt_params = {**options, 'dstSRS': 'EPSG:4326'}
+                    if self.output_format in ['gpkg', 'spatialite']:
+                        # Explicitly tell the GPKG/SpatiaLite driver to convert OGR list types
+                        # to a TEXT column with a JSON subtype. This preserves the data structure.
+                        # We also map other potentially long text fields by name to prevent truncation.
+                        opt_params['mapFieldType'] = {
+                            "StringList": "String(JSON)",
+                            "IntegerList": "String(JSON)", 
+                            "RealList": "String(JSON)",
+                            "INFORM": "String(2048)",
+                            "TXTDSC": "String(2048)",
+                            "OBJNAM": "String(1024)"
+                        }
+
+                    if self.output_format == 'gpkg':
+                        logger.debug(f"GPKG options for {s57_file.name}: {opt_params}")
+
+                    opt = gdal.VectorTranslateOptions(**opt_params)
+
+                    gdal.VectorTranslate(
+                        destNameOrDestDS=dest_ds_path,
+                        srcDS=src_ds,
+                        options=opt
+                    )
+                    logger.info(f"-> Successfully converted {s57_file.name} to target '{base_name}'")
+                except Exception as e:
+                    logger.error(f"!! ERROR converting {s57_file.name}: {e}", exc_info=True)
+                finally:
+                    # Ensure the source dataset is closed to release the file handle
+                    src_ds = None
+
+            logger.info(f"--- Finished 'by_enc' conversion ---")
+        finally:
+            # Restore the original GDAL config option to avoid side effects
+            gdal.SetConfigOption('OGR_S57_LIST_AS_STRING', original_list_as_string)
 
 
 class S57AdvancedConfig:
@@ -649,8 +662,12 @@ class S57Advanced:
         
     def convert_to_layers(self):
         """Optimized layer conversion with auto-tuning and adaptive batching."""
-        original_list_as_string = gdal.GetConfigOption('OGR_S57_LIST_AS_STRING', 'OFF')
-        gdal.SetConfigOption('OGR_S57_LIST_AS_STRING', 'ON')
+        # Temporarily set LIST_AS_STRING to OFF. This ensures the S-57 driver
+        # provides list-like fields as their native OGR types (e.g., StringList), which
+        # we will then explicitly map to a JSON string in the destination.
+        # Get the original setting (or None if unset) to ensure we can restore it perfectly.
+        original_list_as_string = gdal.GetConfigOption('OGR_S57_LIST_AS_STRING')
+        gdal.SetConfigOption('OGR_S57_LIST_AS_STRING', 'OFF')
 
         try:
             # Use parallel file discovery if enabled
@@ -720,7 +737,7 @@ class S57Advanced:
         """Extract all needed information from a file in one pass."""
         s57_open_options = [
             'RETURN_PRIMITIVES=OFF', 'SPLIT_MULTIPOINT=ON', 'ADD_SOUNDG_DEPTH=ON',
-            'UPDATES=APPLY', 'LNAM_REFS=ON', 'RECODE_BY_DSSI=ON', 'LIST_AS_STRING=ON'
+            'UPDATES=APPLY', 'LNAM_REFS=ON', 'RECODE_BY_DSSI=ON', 'LIST_AS_STRING=OFF'
         ]
         
         src_ds = gdal.OpenEx(str(s57_file), gdal.OF_VECTOR, open_options=s57_open_options)
@@ -878,12 +895,17 @@ class S57Advanced:
                     'accessMode': access_mode,
                     'dstSRS': 'EPSG:4326'
                 }
-                if self.base_converter.output_format == 'gpkg':
-                    # Explicitly map list-like fields to a very wide string for GPKG.
-                    # This prevents truncation warnings and data loss for fields like LNAM_REFS.
+                if self.base_converter.output_format in ['gpkg', 'spatialite']:
+                    # Explicitly map list-like fields to JSON format to prevent warnings.
+                    # This preserves the JSON array structure. We also map other potentially
+                    # long text fields by name to prevent data truncation.
                     translate_options['mapFieldType'] = {
-                        "StringList": "String(4096)",
-                        "IntegerList": "String(4096)"
+                        "StringList": "String(JSON)",
+                        "IntegerList": "String(JSON)",
+                        "RealList": "String(JSON)",
+                        "INFORM": "String(2048)",
+                        "TXTDSC": "String(2048)",
+                        "OBJNAM": "String(1024)"
                     }
 
                 gdal.VectorTranslate(
@@ -1009,13 +1031,10 @@ class S57Advanced:
     def _ogr_type_to_fiona(self, field_defn: ogr.FieldDefn) -> str:
         """Convert OGR field definition to a more specific Fiona type string."""
         ogr_type = field_defn.GetType()
-        field_name = field_defn.GetName()
 
-        # Handle list-like fields that become long strings to prevent truncation.
-        # LNAM_REFS and FFPT_RIND are common culprits.
-        if field_name.upper() in ['LNAM_REFS', 'FFPT_RIND']:
-            return 'str:4096'  # Allocate a large string to prevent truncation
-
+        # With LIST_AS_STRING=OFF, we map list types to a generic string.
+        # The `mapFieldType` option in VectorTranslate will handle the String(JSON) creation
+        # in the destination database, which is stored as a TEXT type.
         mapping = {
             ogr.OFTString: f'str:{field_defn.GetWidth()}' if field_defn.GetWidth() > 0 else 'str:255',
             ogr.OFTInteger: 'int', 
@@ -1024,9 +1043,9 @@ class S57Advanced:
             ogr.OFTDate: 'date', 
             ogr.OFTTime: 'str',
             ogr.OFTDateTime: 'datetime',
-            ogr.OFTStringList: 'str:4096',
-            ogr.OFTIntegerList: 'str:4096',
-            ogr.OFTRealList: 'str:4096'
+            ogr.OFTStringList: 'str',
+            ogr.OFTIntegerList: 'str',
+            ogr.OFTRealList: 'str'
         }
         return mapping.get(ogr_type, 'str')
 
@@ -2638,32 +2657,34 @@ class S57Updater:
     def _finalize_change_report(self):
         """Generate comprehensive change report with before/after version information."""
         logger.info("Generating change report...")
-        
+
+        # Determine global operation type. If any candidate is a force_clean_install, the whole operation is 'Forced'.
+        is_forced_install = any(c.get('force_clean_install', False) for c in self.update_candidates)
+        operation_type = 'Forced' if is_forced_install else 'Normal'
+
         # Add detailed information about successful updates
         for candidate in self.processed_encs:
-            # Determine operation type
-            operation_type = 'force_clean_install' if candidate.get('force_clean_install', False) else 'update'
-            
             update_info = {
                 'enc_name': candidate['enc_name'],
                 'file_path': str(candidate['file_path']),
                 'old_version': candidate.get('existing_version'),
                 'new_version': candidate['new_version'],
                 'timestamp': pd.Timestamp.now(),
-                'operation_type': operation_type,
                 'layers_updated': []
             }
-            
+
             # Get list of layers that were updated
             src_ds = candidate['file_info']['dataset']
             for layer_idx in range(src_ds.GetLayerCount()):
                 layer_name = src_ds.GetLayerByIndex(layer_idx).GetName().lower()
                 update_info['layers_updated'].append(layer_name)
-            
+
             self.change_report['updated'].append(update_info)
-        
+
         # Add summary statistics
         self.change_report['summary'] = {
+            'operation_type': operation_type,
+            'output_format': self.output_format,
             'total_candidates': len(self.update_candidates),
             'successfully_updated': len(self.processed_encs),
             'skipped': len(self.change_report['skipped']),
@@ -2738,10 +2759,12 @@ class S57Updater:
             summary = self.change_report.get('summary', {})
             f.write("SUMMARY\n")
             f.write("-" * 40 + "\n")
+            f.write(f"Database Format:       {summary.get('output_format', 'Unknown').upper()}\n")
+            f.write(f"Operation Mode:        {summary.get('operation_type', 'Unknown')}\n")
             f.write(f"Total candidates:      {summary.get('total_candidates', 0)}\n")
             f.write(f"Successfully updated:  {summary.get('successfully_updated', 0)}\n")
             f.write(f"Skipped (no change):   {summary.get('skipped', 0)}\n")
-            f.write(f"Errors:               {summary.get('errors', 0)}\n")
+            f.write(f"Errors:                {summary.get('errors', 0)}\n")
             f.write(f"Validation issues:     {summary.get('validation_issues', 0)}\n\n")
 
             # Updated ENCs section
@@ -3183,18 +3206,14 @@ class SpatiaLiteManager:
 
     def get_layer(self, layer_name: str, filter_by_enc: Optional[List[str]] = None) -> gpd.GeoDataFrame:
         """Retrieves a full layer from the database as a GeoDataFrame."""
-        # Use fiona to check for layer existence, as it's more direct and robust for file-based sources.
-        try:
-            import fiona
-            layers = fiona.listlayers(self.db_path)
-        except Exception as e:
-            logger.error(f"Could not read layers from SpatiaLite DB '{self.db_path}': {e}")
-            return gpd.GeoDataFrame()
-
+        # --- Hardening Step: Validate table name against database metadata ---
+        # This prevents SQL injection via the layer_name parameter by ensuring
+        # it corresponds to an actual, existing table before being used in a query.
+        inspector = inspect(self.engine)
         safe_layer_name = layer_name.lower()
-        if safe_layer_name not in layers:
+        if not inspector.has_table(safe_layer_name):
             logger.warning(f"Layer '{layer_name}' not found in database.")
-            return gpd.GeoDataFrame()
+            return gpd.GeoDataFrame()  # Return empty dataframe if table doesn't exist
 
         where_clause = None
         if filter_by_enc:
@@ -3449,18 +3468,14 @@ class GPKGManager:
 
     def get_layer(self, layer_name: str, filter_by_enc: Optional[List[str]] = None) -> gpd.GeoDataFrame:
         """Retrieves a full layer from the GeoPackage as a GeoDataFrame."""
-        # Use fiona to check for layer existence, as it's more direct and robust for file-based sources.
-        try:
-            import fiona
-            layers = fiona.listlayers(self.gpkg_path)
-        except Exception as e:
-            logger.error(f"Could not read layers from GeoPackage '{self.gpkg_path}': {e}")
-            return gpd.GeoDataFrame()
-
+        # --- Hardening Step: Validate table name against database metadata ---
+        # This prevents SQL injection via the layer_name parameter by ensuring
+        # it corresponds to an actual, existing table before being used in a query.
+        inspector = inspect(self.engine)
         safe_layer_name = layer_name.lower()
-        if safe_layer_name not in layers:
+        if not inspector.has_table(safe_layer_name):
             logger.warning(f"Layer '{layer_name}' not found in GeoPackage.")
-            return gpd.GeoDataFrame()
+            return gpd.GeoDataFrame()  # Return empty dataframe if table doesn't exist
 
         where_clause = None
         if filter_by_enc:

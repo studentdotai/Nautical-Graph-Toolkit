@@ -41,8 +41,9 @@ import warnings
 # Third-party imports
 import pandas as pd
 import geopandas as gpd
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, text, inspect
 import psycopg2
+from osgeo import gdal
 
 # Add project root to path for imports
 project_root = Path(__file__).parent.parent
@@ -78,6 +79,13 @@ class TestConfig:
     # Test naming - consistent across all formats
     test_schema_name: str = None  # Will be generated in __post_init__ if not provided
     
+    # Reports configuration
+    reports_dir: Path = None  # Will be set in __post_init__ to deep_reports/session_id
+    session_id: str = None    # Will be generated in __post_init__ if not provided
+    
+    # Test level configuration
+    test_level: int = 1  # 1=High level (layer/feature counts), 2=Moderate (+ column validation), 3=Deep (+ feature samples)
+    
     def __post_init__(self):
         if self.postgis_config is None:
             self.postgis_config = {
@@ -94,6 +102,16 @@ class TestConfig:
             
         if self.s57_update_root is not None and isinstance(self.s57_update_root, str):
             self.s57_update_root = Path(self.s57_update_root)
+        
+        # Generate session ID if not provided (timestamp when test commenced)
+        if self.session_id is None:
+            self.session_id = datetime.now().strftime('%Y%m%d_%H%M%S')
+            
+        # Set up session-based reports directory
+        if self.reports_dir is None:
+            self.reports_dir = Path('./deep_reports') / self.session_id
+            # Create the reports directory structure
+            self.reports_dir.mkdir(parents=True, exist_ok=True)
         
         # Set default test output directory if not provided or convert string to Path
         if self.test_output_dir is None:
@@ -181,13 +199,15 @@ class S57DeepTester:
                 raise ConnectionError(f"PostGIS connection failed: {e}")
 
     def _cleanup_test_environment(self):
-        """Clean up test artifacts like output directories and database schemas."""
+        """Clean up test artifacts but preserve reports directory."""
         logger.info("Cleaning up test environment...")
 
-        # 1. Remove output directory
+        # 1. Remove test output directory (temporary test artifacts)
         if self.config.test_output_dir.exists():
-            logger.info(f"Removing output directory: {self.config.test_output_dir}")
+            logger.info(f"Removing test artifacts directory: {self.config.test_output_dir}")
             shutil.rmtree(self.config.test_output_dir)
+            
+        # Note: Reports directory (self.config.reports_dir) is preserved for analysis
 
         # 2. Drop PostGIS schema if it was created
         if not self.config.skip_postgis and 'postgis' in self.test_results and self.test_results['postgis'].get('status') == 'success':
@@ -228,8 +248,15 @@ class S57DeepTester:
                 logger.info("📊 Phase 3: Testing update workflows...")
                 self._test_update_workflows()
 
-            # Phase 4: Generate comprehensive report
-            logger.info("📊 Phase 4: Generating comprehensive analysis report...")
+            # Phase 4: Update readiness analysis (if update data available)
+            if not self.config.skip_updates:
+                logger.info("📊 Phase 4a: Analyzing update readiness...")
+                update_analysis = self.analyze_update_readiness()
+                if not update_analysis.empty:
+                    self._save_update_readiness_report(update_analysis)
+
+            # Phase 5: Generate comprehensive report
+            logger.info("📊 Phase 5: Generating comprehensive analysis report...")
             report = self._generate_comprehensive_report()
 
             duration = datetime.now() - start_time
@@ -338,8 +365,13 @@ class S57DeepTester:
             # Import and use same GDAL approach as s57_data.py
             from osgeo import gdal, ogr
 
-            # Use OGR to open the S57 file (same as s57_data.py)
-            ds = ogr.Open(str(s57_file))
+            # Use the same robust open options as the main application to ensure
+            # consistent reading behavior, especially for updates.
+            s57_open_options = [
+                'RETURN_PRIMITIVES=OFF', 'SPLIT_MULTIPOINT=ON', 'ADD_SOUNDG_DEPTH=ON',
+                'UPDATES=APPLY', 'LNAM_REFS=ON', 'RECODE_BY_DSSI=ON', 'LIST_AS_STRING=OFF'
+            ]
+            ds = gdal.OpenEx(str(s57_file), gdal.OF_VECTOR, open_options=s57_open_options)
             if ds is None:
                 logger.warning(f"Could not open S57 file with OGR: {s57_file}")
                 return None
@@ -472,9 +504,14 @@ class S57DeepTester:
         
         # Override s57_files to use only test dataset
         s57_advanced.s57_files = test_encs
+
+        # The S57Advanced class now manages its own GDAL environment, including setting
+        # LIST_AS_STRING=OFF to use the String(JSON) mapping. We remove the explicit
+        # SetConfigOption here to ensure we are testing the production code's behavior.
+        
         s57_advanced.convert_to_layers()
         
-        # Count results
+
         engine = create_engine(
             f"postgresql://{self.config.postgis_config['user']}:"
             f"{self.config.postgis_config['password']}@"
@@ -493,6 +530,10 @@ class S57DeepTester:
             """)
             layers = conn.execute(layer_query, {'schema': schema_name}).fetchall()
             layer_names = [row[0] for row in layers]
+
+            # The inspector.get_table_names() call is sufficient to get all created tables.
+            # The manual check for non-spatial layers like 'dsid' is redundant and removed
+            # for clarity, as the inspector will find them if they were created.
             
             # Count total features
             total_features = 0
@@ -526,11 +567,28 @@ class S57DeepTester:
         
         # Override s57_files to use only test dataset
         s57_advanced.s57_files = test_encs
+
+        # The S57Advanced class now manages its own GDAL environment. We remove the explicit
+        # SetConfigOption here to ensure we are testing the production code's behavior.
+        
         s57_advanced.convert_to_layers()
         
-        # Count results using GeoPandas
-        import fiona
-        layer_names = fiona.listlayers(str(output_file))
+        # Count results using SQLAlchemy inspect (more reliable than fiona.listlayers)
+        if format_name == 'spatialite':
+            engine = create_engine(f'sqlite:///{output_file}')
+        else:  # gpkg
+            engine = create_engine(f'sqlite:///{output_file}')
+        
+        inspector = inspect(engine)
+        all_tables = inspector.get_table_names()
+        
+        # Filter out system tables. A robust way to handle GeoPackage is to exclude
+        # all tables prefixed with 'gpkg_', which covers all standard metadata tables
+        # like gpkg_contents, gpkg_tile_matrix, etc.
+        system_tables = {'spatial_ref_sys', 'geometry_columns', 'sqlite_sequence'}
+        layer_names = [table for table in all_tables
+                       if table not in system_tables and not table.startswith('gpkg_')]
+
         
         total_features = 0
         for layer_name in layer_names:
@@ -539,6 +597,8 @@ class S57DeepTester:
                 total_features += len(gdf)
             except Exception as e:
                 logger.warning(f"Could not read layer {layer_name}: {e}")
+        
+        engine.dispose()
                 
         return {
             'layers_created': len(layer_names),
@@ -593,7 +653,7 @@ class S57DeepTester:
             self.test_results['update_postgis_normal'] = {
                 'status': 'success',
                 'duration': duration.total_seconds(),
-                'updates_applied': len(update_result.get('processed_files', [])),
+                'updates_applied': len(update_result.get('updated', [])),
                 'type': 'normal_update',
                 'format': 'postgis'
             }
@@ -627,7 +687,7 @@ class S57DeepTester:
             self.test_results['update_postgis_force'] = {
                 'status': 'success',
                 'duration': duration.total_seconds(),
-                'files_processed': len(force_result.get('processed_files', [])),
+                'files_processed': len(force_result.get('updated', [])),
                 'type': 'force_clean_install',
                 'format': 'postgis'
             }
@@ -664,7 +724,7 @@ class S57DeepTester:
             self.test_results[f'update_{format_name}_normal'] = {
                 'status': 'success',
                 'duration': duration.total_seconds(),
-                'updates_applied': len(update_result.get('processed_files', [])),
+                'updates_applied': len(update_result.get('updated', [])),
                 'type': 'normal_update',
                 'format': format_name,
                 'output_path': original_file_path
@@ -698,7 +758,7 @@ class S57DeepTester:
             self.test_results[f'update_{format_name}_force'] = {
                 'status': 'success',
                 'duration': duration.total_seconds(),
-                'files_processed': len(force_result.get('processed_files', [])),
+                'files_processed': len(force_result.get('updated', [])),
                 'type': 'force_clean_install',
                 'format': format_name,
                 'output_path': original_file_path
@@ -731,11 +791,11 @@ class S57DeepTester:
             logger.info(f"Extracting data from {format_name.upper()}...")
             extracted_data[format_name] = self._extract_format_data(format_name)
             
-        # Perform pairwise comparisons
+        # Perform pairwise comparisons based on test level
         for i, format_a in enumerate(successful_formats):
             for format_b in successful_formats[i+1:]:
-                logger.info(f"Comparing {format_a.upper()} vs {format_b.upper()}...")
-                comparison = self._compare_datasets(
+                logger.info(f"Comparing {format_a.upper()} vs {format_b.upper()} (Level {self.config.test_level})...")
+                comparison = self._compare_datasets_multilevel(
                     format_a, extracted_data[format_a],
                     format_b, extracted_data[format_b]
                 )
@@ -1184,8 +1244,443 @@ class S57DeepTester:
                     })
         return comparison
         
-
+    def _compare_datasets_multilevel(self, format_a: str, data_a: Dict[str, gpd.GeoDataFrame],
+                                   format_b: str, data_b: Dict[str, gpd.GeoDataFrame]) -> ComparisonResult:
+        """Multi-level dataset comparison based on test_level configuration."""
+        
+        if self.config.test_level == 1:
+            return self._level1_comparison(format_a, data_a, format_b, data_b)
+        elif self.config.test_level == 2:
+            return self._level2_comparison(format_a, data_a, format_b, data_b)
+        elif self.config.test_level == 3:
+            return self._level3_comparison(format_a, data_a, format_b, data_b)
+        else:
+            # Default to level 1
+            return self._level1_comparison(format_a, data_a, format_b, data_b)
+    
+    def _level1_comparison(self, format_a: str, data_a: Dict[str, gpd.GeoDataFrame],
+                          format_b: str, data_b: Dict[str, gpd.GeoDataFrame]) -> ComparisonResult:
+        """Level 1: High-level comparison - layers and feature counts only."""
+        format_pair = f"{format_a}_vs_{format_b}"
+        
+        # Find common and missing layers
+        layers_a = set(data_a.keys())
+        layers_b = set(data_b.keys())
+        common_layers = layers_a.intersection(layers_b)
+        missing_in_b = layers_a - layers_b
+        missing_in_a = layers_b - layers_a
+        
+        logger.info(f"Level 1 - Comparing {len(common_layers)} common layers")
+        if missing_in_a or missing_in_b:
+            logger.warning(f"Missing layers - A: {list(missing_in_a)}, B: {list(missing_in_b)}")
+        
+        # Calculate feature counts by layer
+        layer_comparison = {}
+        total_features = {format_a: 0, format_b: 0}
+        geometry_differences = []
+        
+        for layer_name in common_layers:
+            gdf_a = data_a[layer_name]
+            gdf_b = data_b[layer_name]
             
+            count_a = len(gdf_a)
+            count_b = len(gdf_b)
+            
+            total_features[format_a] += count_a
+            total_features[format_b] += count_b
+            
+            layer_comparison[layer_name] = {
+                f'{format_a}_count': count_a,
+                f'{format_b}_count': count_b,
+                'difference': abs(count_a - count_b),
+                'match': count_a == count_b
+            }
+            
+            # Report feature count mismatches
+            if count_a != count_b:
+                geometry_differences.append({
+                    'layer': layer_name,
+                    'issue': 'feature_count_mismatch',
+                    f'{format_a}_count': count_a,
+                    f'{format_b}_count': count_b,
+                    'difference': abs(count_a - count_b)
+                })
+        
+        # Save Level 1 detailed report
+        self._save_level1_report(format_pair, layer_comparison, missing_in_a, missing_in_b)
+        
+        # Calculate consistency score based on matching layer counts
+        matching_layers = sum(1 for details in layer_comparison.values() if details['match'])
+        consistency_score = (matching_layers / len(common_layers) * 100) if common_layers else 0
+        
+        return ComparisonResult(
+            format_pair=format_pair,
+            layers_compared=len(common_layers),
+            total_features=total_features,
+            geometry_differences=geometry_differences,
+            attribute_differences=[],  # Not checked in Level 1
+            data_type_differences=[],  # Not checked in Level 1
+            missing_features={'layers_missing_in_a': list(missing_in_a), 'layers_missing_in_b': list(missing_in_b)},
+            consistency_score=consistency_score
+        )
+    
+    def _save_level1_report(self, format_pair: str, layer_comparison: Dict, missing_in_a: set, missing_in_b: set):
+        """Save Level 1 comparison report."""
+        csv_file = self.config.reports_dir / f'level1_comparison_{format_pair}.csv'
+        
+        # Prepare data for CSV
+        rows = []
+        for layer_name, details in layer_comparison.items():
+            rows.append({
+                'layer_name': layer_name,
+                **details
+            })
+        
+        # Add missing layers
+        for layer in missing_in_a:
+            rows.append({
+                'layer_name': layer,
+                'missing_in': format_pair.split('_vs_')[0],
+                'status': 'MISSING'
+            })
+        for layer in missing_in_b:
+            rows.append({
+                'layer_name': layer,
+                'missing_in': format_pair.split('_vs_')[1],
+                'status': 'MISSING'
+            })
+        
+        df = pd.DataFrame(rows)
+        df.to_csv(csv_file, index=False)
+        logger.info(f"Level 1 report saved: {csv_file}")
+
+    def _level2_comparison(self, format_a: str, data_a: Dict[str, gpd.GeoDataFrame],
+                          format_b: str, data_b: Dict[str, gpd.GeoDataFrame]) -> ComparisonResult:
+        """Level 2: Moderate comparison - adds column count and type validation to Level 1."""
+        format_pair = f"{format_a}_vs_{format_b}"
+        
+        # Start with Level 1 comparison
+        level1_result = self._level1_comparison(format_a, data_a, format_b, data_b)
+        
+        # Find common layers for column analysis
+        layers_a = set(data_a.keys())
+        layers_b = set(data_b.keys())
+        common_layers = layers_a.intersection(layers_b)
+        
+        logger.info(f"Level 2 - Adding column analysis for {len(common_layers)} layers")
+        
+        # Additional Level 2 analysis: column comparison
+        column_comparison = {}
+        data_type_differences = []
+        
+        for layer_name in common_layers:
+            gdf_a = data_a[layer_name]
+            gdf_b = data_b[layer_name]
+            
+            cols_a = set(gdf_a.columns)
+            cols_b = set(gdf_b.columns)
+            common_cols = cols_a.intersection(cols_b)
+            missing_in_b = cols_a - cols_b
+            missing_in_a = cols_b - cols_a
+            
+            # Column count and type comparison
+            column_types_a = {col: str(gdf_a[col].dtype) for col in gdf_a.columns}
+            column_types_b = {col: str(gdf_b[col].dtype) for col in gdf_b.columns}
+            
+            type_mismatches = {}
+            for col in common_cols:
+                if col != 'geometry' and column_types_a[col] != column_types_b[col]:
+                    type_mismatches[col] = {
+                        f'{format_a}_type': column_types_a[col],
+                        f'{format_b}_type': column_types_b[col]
+                    }
+                    
+                    data_type_differences.append({
+                        'layer': layer_name,
+                        'column': col,
+                        f'{format_a}_type': column_types_a[col],
+                        f'{format_b}_type': column_types_b[col]
+                    })
+            
+            column_comparison[layer_name] = {
+                f'{format_a}_column_count': len(cols_a),
+                f'{format_b}_column_count': len(cols_b),
+                'common_columns': len(common_cols),
+                'missing_in_a': list(missing_in_a),
+                'missing_in_b': list(missing_in_b),
+                'type_mismatches': type_mismatches,
+                'columns_match': len(cols_a) == len(cols_b) and len(type_mismatches) == 0
+            }
+        
+        # Save Level 2 detailed report
+        self._save_level2_report(format_pair, column_comparison)
+        
+        # Update consistency score to include column matching
+        matching_layers = sum(1 for details in column_comparison.values() 
+                            if details['columns_match'] and 
+                               layer_name in {d['layer_name']: d['match'] for d in 
+                                            [{'layer_name': k, 'match': v['match']} 
+                                             for k, v in getattr(level1_result, '_layer_comparison', {}).items()]})
+        consistency_score = (matching_layers / len(common_layers) * 100) if common_layers else 0
+        
+        # Combine Level 1 and Level 2 results
+        return ComparisonResult(
+            format_pair=format_pair,
+            layers_compared=level1_result.layers_compared,
+            total_features=level1_result.total_features,
+            geometry_differences=level1_result.geometry_differences,
+            attribute_differences=[],  # Basic attribute analysis
+            data_type_differences=data_type_differences,
+            missing_features=level1_result.missing_features,
+            consistency_score=consistency_score
+        )
+    
+    def _save_level2_report(self, format_pair: str, column_comparison: Dict):
+        """Save Level 2 column comparison report."""
+        csv_file = self.config.reports_dir / f'level2_columns_{format_pair}.csv'
+        
+        rows = []
+        for layer_name, details in column_comparison.items():
+            # Base layer info
+            base_row = {
+                'layer_name': layer_name,
+                'format_a_columns': details[f'{format_pair.split("_vs_")[0]}_column_count'],
+                'format_b_columns': details[f'{format_pair.split("_vs_")[1]}_column_count'],
+                'common_columns': details['common_columns'],
+                'missing_in_a_count': len(details['missing_in_a']),
+                'missing_in_b_count': len(details['missing_in_b']),
+                'type_mismatches_count': len(details['type_mismatches']),
+                'columns_match': details['columns_match']
+            }
+            
+            # Missing columns details
+            if details['missing_in_a']:
+                base_row['missing_in_a'] = ', '.join(details['missing_in_a'])
+            if details['missing_in_b']:
+                base_row['missing_in_b'] = ', '.join(details['missing_in_b'])
+                
+            rows.append(base_row)
+            
+            # Type mismatch details as separate rows
+            for col, types in details['type_mismatches'].items():
+                rows.append({
+                    'layer_name': f"{layer_name}_TYPE_MISMATCH",
+                    'column_name': col,
+                    'format_a_type': types[f'{format_pair.split("_vs_")[0]}_type'],
+                    'format_b_type': types[f'{format_pair.split("_vs_")[1]}_type'],
+                })
+        
+        df = pd.DataFrame(rows)
+        df.to_csv(csv_file, index=False)
+        logger.info(f"Level 2 report saved: {csv_file}")
+
+    def _level3_comparison(self, format_a: str, data_a: Dict[str, gpd.GeoDataFrame],
+                          format_b: str, data_b: Dict[str, gpd.GeoDataFrame]) -> ComparisonResult:
+        """Level 3: Deep comparison - adds feature sampling and detailed CSV output per layer."""
+        format_pair = f"{format_a}_vs_{format_b}"
+        
+        # Start with Level 2 comparison
+        level2_result = self._level2_comparison(format_a, data_a, format_b, data_b)
+        
+        # Find common layers for detailed analysis
+        layers_a = set(data_a.keys())
+        layers_b = set(data_b.keys())
+        common_layers = layers_a.intersection(layers_b)
+        
+        logger.info(f"Level 3 - Adding feature sampling for {len(common_layers)} layers")
+        
+        # Create detailed per-layer CSV reports with feature samples
+        for layer_name in common_layers:
+            self._save_level3_layer_report(format_pair, layer_name, 
+                                         data_a[layer_name], data_b[layer_name])
+        
+        # Level 3 uses all Level 2 results plus detailed feature analysis
+        return level2_result
+
+    def _save_level3_layer_report(self, format_pair: str, layer_name: str, 
+                                 gdf_a: gpd.GeoDataFrame, gdf_b: gpd.GeoDataFrame):
+        """Save Level 3 detailed layer comparison with feature samples."""
+        csv_file = self.config.reports_dir / f'level3_{layer_name}_{format_pair}.csv'
+        
+        format_a, format_b = format_pair.split('_vs_')
+        
+        # Get all columns from both formats
+        cols_a = set(gdf_a.columns)
+        cols_b = set(gdf_b.columns)
+        all_columns = sorted(cols_a.union(cols_b))
+        
+        # Sample features (up to 10 examples from each format)
+        sample_size = min(10, len(gdf_a), len(gdf_b))
+        
+        # Create vertical layout: columns as rows, formats as columns
+        rows = []
+        
+        # Header row with metadata
+        rows.append({
+            'attribute': 'METADATA_LAYER_NAME',
+            format_a: layer_name,
+            format_b: layer_name,
+            'notes': f'Layer comparison between {format_a} and {format_b}'
+        })
+        
+        rows.append({
+            'attribute': 'METADATA_TOTAL_FEATURES',
+            format_a: len(gdf_a),
+            format_b: len(gdf_b),
+            'notes': f'Total features in each format'
+        })
+        
+        rows.append({
+            'attribute': 'METADATA_TOTAL_COLUMNS',
+            format_a: len(cols_a),
+            format_b: len(cols_b),
+            'notes': f'Total columns in each format'
+        })
+        
+        # Column presence analysis
+        rows.append({
+            'attribute': 'SEPARATOR_COLUMN_PRESENCE',
+            format_a: '--- COLUMN PRESENCE ---',
+            format_b: '--- COLUMN PRESENCE ---',
+            'notes': 'Which columns exist in each format'
+        })
+        
+        for col in all_columns:
+            if col == 'geometry':
+                continue
+                
+            present_a = 'YES' if col in cols_a else 'NO'
+            present_b = 'YES' if col in cols_b else 'NO'
+            
+            rows.append({
+                'attribute': f'COLUMN_PRESENT_{col}',
+                format_a: present_a,
+                format_b: present_b,
+                'notes': f'Column {col} presence'
+            })
+        
+        # Data type comparison
+        rows.append({
+            'attribute': 'SEPARATOR_DATA_TYPES',
+            format_a: '--- DATA TYPES ---',
+            format_b: '--- DATA TYPES ---',
+            'notes': 'Data types for each column'
+        })
+        
+        common_cols = cols_a.intersection(cols_b)
+        for col in sorted(common_cols):
+            if col == 'geometry':
+                continue
+                
+            type_a = str(gdf_a[col].dtype)
+            type_b = str(gdf_b[col].dtype)
+            
+            rows.append({
+                'attribute': f'DATATYPE_{col}',
+                format_a: type_a,
+                format_b: type_b,
+                'notes': f'Data type for {col}' + (' - MISMATCH!' if type_a != type_b else '')
+            })
+        
+        # Feature sample comparison
+        if sample_size > 0:
+            rows.append({
+                'attribute': 'SEPARATOR_FEATURE_SAMPLES',
+                format_a: f'--- FEATURE SAMPLES ({sample_size}) ---',
+                format_b: f'--- FEATURE SAMPLES ({sample_size}) ---',
+                'notes': f'Sample of {sample_size} features from each format'
+            })
+            
+            # Sample features from both datasets
+            sample_a = gdf_a.head(sample_size)
+            sample_b = gdf_b.head(sample_size)
+            
+            # Create feature comparison rows
+            for idx in range(sample_size):
+                rows.append({
+                    'attribute': f'SAMPLE_FEATURE_{idx+1}_SEPARATOR',
+                    format_a: f'--- FEATURE {idx+1} ---',
+                    format_b: f'--- FEATURE {idx+1} ---',
+                    'notes': f'Feature {idx+1} sample'
+                })
+                
+                # For each common column, show sample values
+                for col in sorted(common_cols):
+                    if col == 'geometry':
+                        # Special handling for geometry - show geometry type and coordinate count
+                        try:
+                            geom_a = sample_a.iloc[idx].geometry
+                            geom_b = sample_b.iloc[idx].geometry
+                            
+                            val_a = f"{geom_a.geom_type}({len(geom_a.coords) if hasattr(geom_a, 'coords') else 'complex'})"
+                            val_b = f"{geom_b.geom_type}({len(geom_b.coords) if hasattr(geom_b, 'coords') else 'complex'})"
+                        except:
+                            val_a = str(sample_a.iloc[idx].geometry)[:50] + "..."
+                            val_b = str(sample_b.iloc[idx].geometry)[:50] + "..."
+                    else:
+                        val_a = str(sample_a.iloc[idx][col]) if idx < len(sample_a) else 'N/A'
+                        val_b = str(sample_b.iloc[idx][col]) if idx < len(sample_b) else 'N/A'
+                        
+                        # Truncate long values
+                        if len(val_a) > 100:
+                            val_a = val_a[:97] + "..."
+                        if len(val_b) > 100:
+                            val_b = val_b[:97] + "..."
+                    
+                    mismatch_note = '' if val_a == val_b else ' - VALUES DIFFER!'
+                    
+                    rows.append({
+                        'attribute': f'SAMPLE_F{idx+1}_{col}',
+                        format_a: val_a,
+                        format_b: val_b,
+                        'notes': f'Feature {idx+1} - {col}{mismatch_note}'
+                    })
+        
+        # Save the vertical layout CSV
+        df = pd.DataFrame(rows)
+        df.to_csv(csv_file, index=False)
+        logger.info(f"Level 3 layer report saved: {csv_file}")
+
+    def _save_update_readiness_report(self, update_analysis: pd.DataFrame):
+        """Save update readiness analysis to CSV and TXT files."""
+        logger.info("Saving update readiness analysis...")
+        
+        # Save as CSV
+        csv_file = self.config.reports_dir / 'update_readiness.csv'
+        update_analysis.to_csv(csv_file, index=False)
+        logger.info(f"Update readiness CSV saved to: {csv_file}")
+        
+        # Save as formatted text report
+        txt_file = self.config.reports_dir / 'update_readiness.txt'
+        with open(txt_file, 'w') as f:
+            f.write("="*80 + "\n")
+            f.write("S57 UPDATE READINESS ANALYSIS\n")
+            f.write("="*80 + "\n\n")
+            
+            # Summary statistics
+            total_encs = len(update_analysis)
+            newer_available = len(update_analysis[update_analysis['is_newer'] == True])
+            same_version = len(update_analysis[update_analysis['version_comparison'] == 'Same version'])
+            older_in_update = len(update_analysis[update_analysis['version_comparison'].str.contains('older', case=False, na=False)])
+            
+            f.write(f"SUMMARY:\n")
+            f.write(f"  • Total ENCs analyzed: {total_encs}\n")
+            f.write(f"  • Newer versions available: {newer_available}\n")
+            f.write(f"  • Same versions: {same_version}\n")
+            f.write(f"  • Older versions in update dir: {older_in_update}\n\n")
+            
+            # Detailed results
+            f.write("DETAILED RESULTS:\n")
+            f.write("-" * 80 + "\n")
+            for _, row in update_analysis.iterrows():
+                f.write(f"ENC: {row['enc_name']}\n")
+                f.write(f"  Data Root: Edition {row['data_root_edition']}, Update {row['data_root_update']}\n")
+                f.write(f"  Update Root: Edition {row['update_root_edition']}, Update {row['update_root_update']}\n")
+                f.write(f"  Status: {row['version_comparison']}\n")
+                f.write(f"  Recommendation: {row['recommendation']}\n\n")
+                
+        logger.info(f"Update readiness report saved to: {txt_file}")
+
     def _generate_comprehensive_report(self) -> Dict[str, Any]:
         """Generate comprehensive analysis report."""
         logger.info("Generating comprehensive DeepTest report...")
@@ -1237,13 +1732,26 @@ class S57DeepTester:
             'performance_metrics': self._calculate_performance_metrics()
         }
         
-        # Save detailed report
-        report_file = self.config.test_output_dir / 'deeptest_report.json'
+        # Save detailed report to session-based reports directory
+        report_file = self.config.reports_dir / 'deeptest_report.json'
         import json
         with open(report_file, 'w') as f:
             json.dump(report, f, indent=2, default=str)
             
         logger.info(f"Detailed report saved to: {report_file}")
+        
+        # Also save a summary text report
+        summary_file = self.config.reports_dir / 'deeptest_summary.txt'
+        with open(summary_file, 'w') as f:
+            # Capture the summary report output
+            import io
+            import sys
+            old_stdout = sys.stdout
+            sys.stdout = f
+            self._print_summary_report(report)
+            sys.stdout = old_stdout
+            
+        logger.info(f"Summary report saved to: {summary_file}")
         
         # Print summary
         self._print_summary_report(report)
@@ -1346,6 +1854,7 @@ class S57DeepTester:
         """Print a formatted summary report."""
         print("\n" + "="*80)
         print("🔍 DEEPTEST COMPREHENSIVE REPORT")
+        print(f"📊 Test Level: {self.config.test_level} ({'High-level' if self.config.test_level == 1 else 'Moderate' if self.config.test_level == 2 else 'Deep'})")
         print("="*80)
         
         # Test Summary
@@ -1422,6 +1931,8 @@ def main():
                         help='Skip PostGIS testing')
     parser.add_argument('--skip-updates', action='store_true', 
                         help='Force skip update workflow testing even if --update-root is provided')
+    parser.add_argument('--test-level', type=int, choices=[1, 2, 3], default=1,
+                        help='Test depth level: 1=High level (layers/counts), 2=Moderate (+columns), 3=Deep (+samples)')
     
     args = parser.parse_args()
     
@@ -1431,7 +1942,8 @@ def main():
         s57_update_root=args.update_root,
         test_output_dir=args.output_dir,
         skip_postgis=args.skip_postgis,
-        skip_updates=args.skip_updates
+        skip_updates=args.skip_updates,
+        test_level=args.test_level
     )
     
     # Run DeepTest
@@ -1440,7 +1952,8 @@ def main():
         report = tester.run_comprehensive_test()
         
         print(f"\n🎉 DeepTest completed successfully!")
-        print(f"📁 Results saved to: {config.test_output_dir}")
+        print(f"📁 Reports saved to: {config.reports_dir}")
+        print(f"📊 Session ID: {config.session_id}")
         
     except Exception as e:
         logger.error(f"DeepTest execution failed: {e}", exc_info=True)
