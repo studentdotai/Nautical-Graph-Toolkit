@@ -1883,6 +1883,232 @@ class S57DeepTester:
                 
         logger.info(f"Update readiness report saved to: {txt_file}")
 
+    def _validate_property_completeness(self, import_results: Dict[str, Any]) -> None:
+        """Cross-validate properties across formats using GPKG as baseline with actual database verification."""
+        successful_results = {fmt: result for fmt, result in import_results.items() 
+                             if result.get('status') == 'success' and 'property_summary' in result}
+        
+        if len(successful_results) < 2:
+            return  # Need at least 2 formats to compare
+        
+        # Use GPKG as baseline if available, otherwise use first format
+        baseline_format = 'gpkg' if 'gpkg' in successful_results else list(successful_results.keys())[0]
+        baseline_properties = set(successful_results[baseline_format]['property_summary'].keys())
+        
+        print(f"\n🔍 PROPERTY VALIDATION (baseline: {baseline_format.upper()}):")
+        
+        # Export detailed comparison to debug file
+        validation_file = self.config.reports_dir / "property_validation.txt"
+        with open(validation_file, 'w') as f:
+            f.write("Property Validation Analysis (with Database Verification)\n")
+            f.write("========================================================\n\n")
+            f.write(f"Baseline format: {baseline_format.upper()} ({len(baseline_properties)} properties)\n\n")
+        
+        for fmt, result in successful_results.items():
+            if fmt == baseline_format:
+                continue
+                
+            fmt_properties = set(result['property_summary'].keys())
+            
+            # Calculate differences from processing
+            missing_in_format = baseline_properties - fmt_properties
+            extra_in_format = fmt_properties - baseline_properties
+            common_properties = baseline_properties & fmt_properties
+            
+            # Verify missing properties by actual database query
+            verified_missing, verified_present = self._verify_missing_properties(
+                fmt, missing_in_format, result.get('output_path')
+            )
+            
+            # Property coverage percentage based on actual verification
+            actual_properties = fmt_properties | verified_present
+            actual_missing = baseline_properties - actual_properties
+            coverage_pct = (len(actual_properties & baseline_properties) / len(baseline_properties)) * 100 if baseline_properties else 0
+            
+            print(f"   {fmt.upper()}: {coverage_pct:.1f}% coverage ({len(actual_properties & baseline_properties)}/{len(baseline_properties)} properties)")
+            
+            if verified_missing:
+                print(f"      Confirmed missing: {len(verified_missing)} properties")
+            if verified_present:
+                print(f"      Processing artifacts: {len(verified_present)} properties (found in DB)")
+            if extra_in_format:
+                print(f"      Extra: {len(extra_in_format)} properties")
+            
+            # Export detailed analysis
+            with open(validation_file, 'a') as f:
+                f.write(f"=== {fmt.upper()} vs {baseline_format.upper()} ===\n")
+                f.write(f"Processing coverage: {(len(common_properties) / len(baseline_properties)) * 100:.1f}%\n")
+                f.write(f"Actual coverage: {coverage_pct:.1f}%\n")
+                f.write(f"Common properties: {len(common_properties)}\n")
+                f.write(f"Properties missing from processing: {len(missing_in_format)}\n")
+                f.write(f"Verified missing from DB: {len(verified_missing)}\n")
+                f.write(f"Processing artifacts (found in DB): {len(verified_present)}\n")
+                f.write(f"Extra in {fmt}: {len(extra_in_format)}\n\n")
+                
+                if verified_missing:
+                    f.write(f"CONFIRMED MISSING properties in {fmt.upper()} (not in database):\n")
+                    for prop in sorted(verified_missing):
+                        f.write(f"  - {prop}\n")
+                    f.write("\n")
+                
+                if verified_present:
+                    f.write(f"PROCESSING ARTIFACTS (properties found in {fmt.upper()} database but not in processing):\n")
+                    for prop in sorted(verified_present):
+                        f.write(f"  - {prop}\n")
+                    f.write("\n")
+                
+                if extra_in_format:
+                    f.write(f"Extra properties in {fmt.upper()}:\n")
+                    for prop in sorted(extra_in_format):
+                        f.write(f"  - {prop}\n")
+                    f.write("\n")
+    
+    def _verify_missing_properties(self, format_name: str, missing_props: set, data_source: str) -> Tuple[set, set]:
+        """Verify if 'missing' properties actually exist in the database by direct query."""
+        if not missing_props:
+            return set(), set()
+        
+        verified_missing = set()
+        verified_present = set()
+        
+        try:
+            if format_name == 'postgis':
+                # PostGIS verification - CHECK ALL TABLES IN SCHEMA
+                engine = create_engine(
+                    f"postgresql://{self.config.postgis_config['user']}:"
+                    f"{self.config.postgis_config['password']}@"
+                    f"{self.config.postgis_config['host']}:"
+                    f"{self.config.postgis_config['port']}/"
+                    f"{self.config.postgis_config['dbname']}"
+                )
+                
+                # Extract schema name from data_source (format: "postgis://schema_name")
+                schema_name = data_source.replace('postgis://', '') if data_source.startswith('postgis://') else data_source
+                
+                # Get ALL tables in the schema
+                with engine.connect() as conn:
+                    tables_query = f"""
+                    SELECT table_name 
+                    FROM information_schema.tables 
+                    WHERE table_schema = '{schema_name}' 
+                    AND table_type = 'BASE TABLE'
+                    """
+                    result = conn.execute(text(tables_query))
+                    all_tables = [row[0] for row in result.fetchall()]
+                
+                # Collect all columns from ALL tables in schema
+                all_columns_found = set()
+                table_columns = {}
+                
+                for table in all_tables:
+                    try:
+                        query = f"""
+                        SELECT column_name 
+                        FROM information_schema.columns 
+                        WHERE table_schema = '{schema_name}' 
+                        AND table_name = '{table}'
+                        """
+                        with engine.connect() as conn:
+                            result = conn.execute(text(query))
+                            table_cols = {row[0] for row in result.fetchall()}
+                            table_columns[table] = table_cols
+                            all_columns_found.update(table_cols)
+                    except Exception as e:
+                        logger.warning(f"Could not inspect table {table}: {e}")
+                        continue
+                
+                # Check which 'missing' properties are actually present in ANY table
+                properties_by_table = {}
+                for prop in missing_props:
+                    found_in_tables = []
+                    for table, cols in table_columns.items():
+                        if prop in cols:
+                            found_in_tables.append(table)
+                    
+                    if found_in_tables:
+                        verified_present.add(prop)
+                        properties_by_table[prop] = found_in_tables
+                    else:
+                        verified_missing.add(prop)
+                
+                # Export detailed table analysis for debugging
+                debug_file = self.config.reports_dir / f"table_columns_{format_name}.txt"
+                with open(debug_file, 'w') as f:
+                    f.write(f"Detailed Table Column Analysis for {format_name.upper()}\n")
+                    f.write("=" * 50 + "\n\n")
+                    f.write(f"Schema: {schema_name}\n\n")
+                    
+                    for table, cols in table_columns.items():
+                        f.write(f"Table: {table} ({len(cols)} columns)\n")
+                        f.write(f"Columns: {sorted(cols)}\n\n")
+                    
+                    f.write(f"\nProperties found in tables:\n")
+                    for prop, tables in properties_by_table.items():
+                        f.write(f"  {prop}: {tables}\n")
+                        
+                engine.dispose()
+                
+            else:
+                # File-based formats (GPKG, SpatiaLite) verification - CHECK ALL TABLES
+                engine = create_engine(f'sqlite:///{data_source}')
+                
+                # Get ALL relevant tables (not just one sample)
+                inspector = inspect(engine)
+                all_tables = inspector.get_table_names()
+                relevant_tables = [t for t in all_tables if not t.startswith('gpkg_') and not t.startswith('rtree_') 
+                                 and not t.startswith('spatial_ref_sys') and not t.startswith('geometry_columns')]
+                
+                # Collect all columns from ALL tables
+                all_columns_found = set()
+                table_columns = {}
+                
+                for table in relevant_tables:
+                    try:
+                        columns_info = inspector.get_columns(table)
+                        table_cols = {col['name'] for col in columns_info}
+                        table_columns[table] = table_cols
+                        all_columns_found.update(table_cols)
+                    except Exception as e:
+                        logger.warning(f"Could not inspect table {table}: {e}")
+                        continue
+                
+                # Check which 'missing' properties are actually present in ANY table
+                properties_by_table = {}
+                for prop in missing_props:
+                    found_in_tables = []
+                    for table, cols in table_columns.items():
+                        if prop in cols:
+                            found_in_tables.append(table)
+                    
+                    if found_in_tables:
+                        verified_present.add(prop)
+                        properties_by_table[prop] = found_in_tables
+                    else:
+                        verified_missing.add(prop)
+                
+                # Export detailed table analysis for debugging
+                debug_file = self.config.reports_dir / f"table_columns_{format_name}.txt"
+                with open(debug_file, 'w') as f:
+                    f.write(f"Detailed Table Column Analysis for {format_name.upper()}\n")
+                    f.write("=" * 50 + "\n\n")
+                    
+                    for table, cols in table_columns.items():
+                        f.write(f"Table: {table} ({len(cols)} columns)\n")
+                        f.write(f"Columns: {sorted(cols)}\n\n")
+                    
+                    f.write(f"\nProperties found in tables:\n")
+                    for prop, tables in properties_by_table.items():
+                        f.write(f"  {prop}: {tables}\n")
+                            
+                engine.dispose()
+                
+        except Exception as e:
+            logger.warning(f"Could not verify properties for {format_name}: {e}")
+            # If verification fails, assume processing results are correct
+            verified_missing = missing_props
+            
+        return verified_missing, verified_present
+
     def _generate_comprehensive_report(self) -> Dict[str, Any]:
         """Generate comprehensive analysis report."""
         logger.info("Generating comprehensive DeepTest report...")
@@ -2107,6 +2333,9 @@ class S57DeepTester:
                         print(f"      Completeness: {filled_property_fields:,} filled / {total_property_fields:,} total ({empty_property_fields:,} empty)")
             else:
                 print(f"      Error: {result.get('error', 'Unknown')}")
+        
+        # Cross-format property validation
+        self._validate_property_completeness(report['import_results'])
         
         # Update Results  
         if report['update_results']:
