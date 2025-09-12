@@ -20,9 +20,14 @@ Usage:
     
     # Skip PostGIS if database not available
     python tests/deep_test_s57_workflow.py --data-root /path/to/ENC_ROOT --skip-postgis
+    
+    # Preserve outputs for manual verification (unanimous conversion validation)
+    python tests/deep_test_s57_workflow.py --data-root /path/to/ENC_ROOT --no-clean-output
 
 Note: User should provide appropriately sized datasets in both ENC_ROOT and ENC_ROOT_UPDATE directories.
       Update tests are automatically skipped if --update-root is not provided.
+      Use --no-clean-output to preserve test outputs for manual verification of unanimous conversion.
+      When run again, existing outputs with same names are automatically cleaned before new tests.
 """
 
 import os
@@ -72,6 +77,7 @@ class TestConfig:
     skip_postgis: bool = False
     skip_updates: bool = False  # Will be auto-set to True if s57_update_root not provided
     cleanup_on_success: bool = True
+    clean_output: bool = True  # Clean test outputs after completion (False preserves for manual verification)
     
     # Database configuration
     postgis_config: Dict[str, str] = None
@@ -175,9 +181,46 @@ class S57DeepTester:
             shutil.rmtree(self.config.test_output_dir)
         self.config.test_output_dir.mkdir(parents=True, exist_ok=True)
         
+        # Clean existing outputs with same names before starting
+        self._cleanup_existing_outputs()
+        
         # Test PostGIS connectivity if not skipped
         if not self.config.skip_postgis:
             self._test_postgis_connectivity()
+    
+    def _cleanup_existing_outputs(self):
+        """Remove any existing outputs with the same names before starting new test."""
+        logger.info("Cleaning existing outputs with same names...")
+        
+        # 1. Remove PostGIS schema if it exists
+        if not self.config.skip_postgis:
+            try:
+                engine = create_engine(
+                    f"postgresql://{self.config.postgis_config['user']}:"
+                    f"{self.config.postgis_config['password']}@"
+                    f"{self.config.postgis_config['host']}:"
+                    f"{self.config.postgis_config['port']}/"
+                    f"{self.config.postgis_config['dbname']}"
+                )
+                with engine.connect() as conn:
+                    # Check if schema exists
+                    result = conn.execute(text(
+                        f"SELECT schema_name FROM information_schema.schemata WHERE schema_name = '{self.config.test_schema_name}'"
+                    ))
+                    if result.fetchone():
+                        logger.info(f"Dropping existing PostGIS schema: {self.config.test_schema_name}")
+                        with conn.begin():
+                            conn.execute(text(f'DROP SCHEMA IF EXISTS "{self.config.test_schema_name}" CASCADE'))
+            except Exception as e:
+                logger.warning(f"Could not clean PostGIS schema: {e}")
+        
+        # 2. Remove GPKG and SpatiaLite files with same names
+        for format_name in ['gpkg', 'spatialite']:
+            extension = 'sqlite' if format_name == 'spatialite' else format_name
+            test_file = self.config.test_output_dir / f"{self.config.test_schema_name}.{extension}"
+            if test_file.exists():
+                logger.info(f"Removing existing {format_name.upper()} file: {test_file}")
+                test_file.unlink()
             
     def _test_postgis_connectivity(self):
         """Test PostGIS database connectivity."""
@@ -200,6 +243,15 @@ class S57DeepTester:
 
     def _cleanup_test_environment(self):
         """Clean up test artifacts but preserve reports directory."""
+        if not self.config.clean_output:
+            logger.info("Preserving test outputs for manual verification (clean_output=False)")
+            logger.info(f"Test outputs preserved in: {self.config.test_output_dir}")
+            if not self.config.skip_postgis and 'postgis' in self.test_results:
+                schema_name = self.test_results['postgis'].get('schema_name')
+                if schema_name:
+                    logger.info(f"PostGIS schema preserved: {schema_name}")
+            return
+            
         logger.info("Cleaning up test environment...")
 
         # 1. Remove test output directory (temporary test artifacts)
@@ -1933,6 +1985,8 @@ def main():
                         help='Force skip update workflow testing even if --update-root is provided')
     parser.add_argument('--test-level', type=int, choices=[1, 2, 3], default=1,
                         help='Test depth level: 1=High level (layers/counts), 2=Moderate (+columns), 3=Deep (+samples)')
+    parser.add_argument('--no-clean-output', action='store_true',
+                        help='Preserve test outputs for manual verification (do not clean)')
     
     args = parser.parse_args()
     
@@ -1943,7 +1997,8 @@ def main():
         test_output_dir=args.output_dir,
         skip_postgis=args.skip_postgis,
         skip_updates=args.skip_updates,
-        test_level=args.test_level
+        test_level=args.test_level,
+        clean_output=not args.no_clean_output
     )
     
     # Run DeepTest

@@ -202,9 +202,8 @@ class S57Base:
                     # Create the options object for the destination, with special handling for GPKG.
                     opt_params = {**options, 'dstSRS': 'EPSG:4326'}
                     if self.output_format in ['gpkg', 'spatialite']:
-                        # Explicitly tell the GPKG/SpatiaLite driver to convert OGR list types
-                        # to a TEXT column with a JSON subtype. This preserves the data structure.
-                        # We also map other potentially long text fields by name to prevent truncation.
+                        # Enhanced list field mapping for better GPKG compatibility
+                        # Based on GDAL docs: GPKG driver supports JSON field subtypes
                         opt_params['mapFieldType'] = {
                             "StringList": "String(JSON)",
                             "IntegerList": "String(JSON)", 
@@ -213,6 +212,12 @@ class S57Base:
                             "TXTDSC": "String(2048)",
                             "OBJNAM": "String(1024)"
                         }
+                        
+                        # Add layer creation options for better list field handling
+                        if self.output_format == 'gpkg':
+                            opt_params['layerCreationOptions'] = [
+                                'FID=OGC_FID'
+                            ]
 
                     if self.output_format == 'gpkg':
                         logger.debug(f"GPKG options for {s57_file.name}: {opt_params}")
@@ -735,9 +740,12 @@ class S57Advanced:
     
     def _extract_file_info(self, s57_file: Path) -> Dict:
         """Extract all needed information from a file in one pass."""
+        # Enhanced S-57 open options for better list field handling
         s57_open_options = [
             'RETURN_PRIMITIVES=OFF', 'SPLIT_MULTIPOINT=ON', 'ADD_SOUNDG_DEPTH=ON',
-            'UPDATES=APPLY', 'LNAM_REFS=ON', 'RECODE_BY_DSSI=ON', 'LIST_AS_STRING=OFF'
+            'UPDATES=APPLY', 'LNAM_REFS=ON', 'RECODE_BY_DSSI=ON', 
+            'LIST_AS_STRING=OFF',  # Critical: ensures list fields come as native OGR types
+            'RETURN_LINKAGES=ON'   # Helps preserve S-57 relationships and attributes
         ]
         
         src_ds = gdal.OpenEx(str(s57_file), gdal.OF_VECTOR, open_options=s57_open_options)
@@ -896,9 +904,9 @@ class S57Advanced:
                     'dstSRS': 'EPSG:4326'
                 }
                 if self.base_converter.output_format in ['gpkg', 'spatialite']:
-                    # Explicitly map list-like fields to JSON format to prevent warnings.
-                    # This preserves the JSON array structure. We also map other potentially
-                    # long text fields by name to prevent data truncation.
+                    # Enhanced list field mapping for better GPKG compatibility
+                    # Based on GDAL docs: GPKG driver supports JSON field subtypes 
+                    # and should handle list fields when LIST_AS_STRING=OFF is set
                     translate_options['mapFieldType'] = {
                         "StringList": "String(JSON)",
                         "IntegerList": "String(JSON)",
@@ -907,6 +915,13 @@ class S57Advanced:
                         "TXTDSC": "String(2048)",
                         "OBJNAM": "String(1024)"
                     }
+                    
+                    # Add specific configuration for GPKG to ensure list fields work
+                    if self.base_converter.output_format == 'gpkg':
+                        # Ensure GDAL config options that help with list field handling
+                        translate_options['layerCreationOptions'] = [
+                            'FID=OGC_FID'
+                        ]
 
                 gdal.VectorTranslate(
                     destNameOrDestDS=dest_path,
@@ -1616,9 +1631,12 @@ class S57Updater:
 
     def _extract_enc_info(self, s57_file: Path) -> Dict[str, Any]:
         """Extract ENC metadata from S-57 file."""
+        # Enhanced S-57 open options for better list field handling
         s57_open_options = [
             'RETURN_PRIMITIVES=OFF', 'SPLIT_MULTIPOINT=ON', 'ADD_SOUNDG_DEPTH=ON',
-            'UPDATES=APPLY', 'LNAM_REFS=ON', 'RECODE_BY_DSSI=ON', 'LIST_AS_STRING=OFF'
+            'UPDATES=APPLY', 'LNAM_REFS=ON', 'RECODE_BY_DSSI=ON', 
+            'LIST_AS_STRING=OFF',  # Critical: ensures list fields come as native OGR types
+            'RETURN_LINKAGES=ON'   # Helps preserve S-57 relationships and attributes
         ]
         
         src_ds = gdal.OpenEx(str(s57_file), gdal.OF_VECTOR, open_options=s57_open_options)
