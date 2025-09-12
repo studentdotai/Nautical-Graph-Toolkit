@@ -118,6 +118,16 @@ class TestConfig:
             self.reports_dir = Path('./deep_reports') / self.session_id
             # Create the reports directory structure
             self.reports_dir.mkdir(parents=True, exist_ok=True)
+
+            # Initialize debug files inside the session-specific reports directory
+            layer_debug_file = self.reports_dir / "layer_debug.txt"
+            with open(layer_debug_file, 'w') as f:
+                f.write("Layer Debug Analysis\n")
+                f.write("===================\n\n")
+            property_debug_file = self.reports_dir / "property_debug.txt"
+            with open(property_debug_file, 'w') as f:
+                f.write("Property Debug Analysis\n")
+                f.write("======================\n\n")
         
         # Set default test output directory if not provided or convert string to Path
         if self.test_output_dir is None:
@@ -175,7 +185,7 @@ class S57DeepTester:
             raise FileNotFoundError(f"No S57 files found in {self.config.s57_data_root}")
             
         logger.info(f"Found {len(s57_files)} S57 files for testing")
-        
+
         # Create test output directory
         if self.config.test_output_dir.exists():
             shutil.rmtree(self.config.test_output_dir)
@@ -505,7 +515,9 @@ class S57DeepTester:
                     'layers_created': result['layers_created'],
                     'total_features': result['total_features'],
                     'output_path': result['output_path'],
-                    'layer_names': result['layer_names']
+                    'layer_names': result['layer_names'],
+                    'layer_statistics': result.get('layer_statistics', []),
+                    'property_summary': result.get('property_summary', {})
                 }
                 # Add PostGIS-specific schema_name if available
                 if 'schema_name' in result:
@@ -594,12 +606,26 @@ class S57DeepTester:
                 count = conn.execute(count_query).scalar()
                 total_features += count
                 
+        # Analyze import completeness with enhanced statistics
+        completeness_stats = self._analyze_import_completeness('postgis', schema_name, layer_names, engine)
+        
+        # Debug: Export property analysis to file
+        debug_file = self.config.reports_dir / "property_debug.txt"
+        with open(debug_file, 'a') as f:
+            f.write(f"=== POSTGIS PROPERTY DEBUG ===\n")
+            f.write(f"Unique properties: {len(completeness_stats['property_summary'])}\n")
+            total_instances = sum(v.get('total_values', 0) for v in completeness_stats['property_summary'].values())
+            f.write(f"Total property instances: {total_instances}\n")
+            f.write(f"Properties: {sorted(completeness_stats['property_summary'].keys())}\n\n")
+
         return {
             'layers_created': len(layer_names),
             'total_features': total_features,
             'output_path': f"postgis://{schema_name}",
             'schema_name': schema_name,
-            'layer_names': layer_names
+            'layer_names': layer_names,
+            'layer_statistics': completeness_stats['layer_stats'],
+            'property_summary': completeness_stats['property_summary']
         }
         
     def _test_file_format_import(self, format_name: str, test_encs: List[Path]) -> Dict[str, Any]:
@@ -636,10 +662,31 @@ class S57DeepTester:
         
         # Filter out system tables. A robust way to handle GeoPackage is to exclude
         # all tables prefixed with 'gpkg_', which covers all standard metadata tables
-        # like gpkg_contents, gpkg_tile_matrix, etc.
+        # like gpkg_contents, gpkg_tile_matrix, etc. Also exclude R-tree spatial index tables
         system_tables = {'spatial_ref_sys', 'geometry_columns', 'sqlite_sequence'}
         layer_names = [table for table in all_tables
-                       if table not in system_tables and not table.startswith('gpkg_')]
+                       if table not in system_tables 
+                       and not table.startswith('gpkg_')
+                       and not table.startswith('rtree_')]
+        
+        # Debug: Export table counts to file for investigation
+        debug_file = self.config.reports_dir / "layer_debug.txt"
+        if format_name == 'gpkg':
+            with open(debug_file, 'a') as f:
+                f.write(f"=== GPKG DEBUG ===\n")
+                f.write(f"Total tables: {len(all_tables)}\n")
+                f.write(f"Filtered layers: {len(layer_names)}\n")
+                gpkg_system = [t for t in all_tables if t in system_tables or t.startswith('gpkg_')]
+                f.write(f"System tables ({len(gpkg_system)}): {gpkg_system}\n")
+                f.write(f"All layer names: {layer_names}\n\n")
+        elif format_name == 'spatialite':
+            with open(debug_file, 'a') as f:
+                f.write(f"=== SpatiaLite DEBUG ===\n")
+                f.write(f"Total tables: {len(all_tables)}\n")
+                f.write(f"Filtered layers: {len(layer_names)}\n")
+                sl_system = [t for t in all_tables if t in system_tables or t.startswith('gpkg_')]
+                f.write(f"System tables ({len(sl_system)}): {sl_system}\n")
+                f.write(f"All layer names: {layer_names}\n\n")
 
         
         total_features = 0
@@ -652,11 +699,114 @@ class S57DeepTester:
         
         engine.dispose()
                 
+        # Analyze import completeness with enhanced statistics
+        completeness_stats = self._analyze_import_completeness(format_name, output_file, layer_names)
+        
+        # Debug: Export property analysis to file
+        debug_file = self.config.reports_dir / "property_debug.txt"
+        with open(debug_file, 'a') as f:
+            f.write(f"=== {format_name.upper()} PROPERTY DEBUG ===\n")
+            f.write(f"Unique properties: {len(completeness_stats['property_summary'])}\n")
+            total_instances = sum(v.get('total_values', 0) for v in completeness_stats['property_summary'].values())
+            f.write(f"Total property instances: {total_instances}\n")
+            f.write(f"Properties: {sorted(completeness_stats['property_summary'].keys())}\n\n")
+        
         return {
             'layers_created': len(layer_names),
             'total_features': total_features,
             'output_path': str(output_file),
-            'layer_names': layer_names
+            'layer_names': layer_names,
+            'layer_statistics': completeness_stats['layer_stats'],
+            'property_summary': completeness_stats['property_summary']
+        }
+
+    def _analyze_import_completeness(self, format_name: str, data_source, layer_names: List[str], engine=None) -> Dict[str, Any]:
+        """Analyze import completeness with detailed layer and property statistics."""
+        layer_stats = []
+        all_properties = set()
+        property_completeness = {}
+        
+        for layer_name in layer_names:
+            try:
+                # Read data based on format
+                if format_name == 'postgis':
+                    schema_name = data_source
+                    sql_query = f'SELECT * FROM "{schema_name}"."{layer_name}" LIMIT 1000'  # Sample for analysis
+                    gdf = gpd.read_postgis(sql_query, engine, geom_col='wkb_geometry')
+                else:
+                    # File-based formats (GPKG, SpatiaLite)
+                    file_path = data_source
+                    gdf = gpd.read_file(file_path, layer=layer_name, engine='pyogrio')
+                
+                # For GPKG, convert column names to lowercase for consistent analysis
+                # This mirrors the logic in _extract_file_data for apples-to-apples debug reporting.
+                if format_name == 'gpkg':
+                    gdf.columns = [col.lower() for col in gdf.columns]
+
+                # Analyze layer properties
+                layer_info = {
+                    'layer_name': layer_name,
+                    'feature_count': len(gdf),
+                    'column_count': len(gdf.columns),
+                    'columns': list(gdf.columns)
+                }
+                
+                # Analyze property completeness for this layer
+                property_stats = {}
+                for col in gdf.columns:
+                    if col == 'geometry':
+                        continue
+                    all_properties.add(col)
+                    
+                    total_values = len(gdf)
+                    non_null_values = gdf[col].notna().sum()
+                    non_empty_values = (gdf[col].notna() & (gdf[col] != '')).sum()
+                    
+                    property_stats[col] = {
+                        'total': total_values,
+                        'non_null': int(non_null_values),
+                        'non_empty': int(non_empty_values),
+                        'null_count': int(total_values - non_null_values),
+                        'empty_count': int(non_null_values - non_empty_values),
+                        'completeness_pct': round((non_empty_values / total_values) * 100, 1) if total_values > 0 else 0
+                    }
+                    
+                    # Update global property tracking
+                    if col not in property_completeness:
+                        property_completeness[col] = {'total': 0, 'non_empty': 0, 'layers': []}
+                    property_completeness[col]['total'] += total_values
+                    property_completeness[col]['non_empty'] += int(non_empty_values)
+                    property_completeness[col]['layers'].append(layer_name)
+                
+                layer_info['property_stats'] = property_stats
+                layer_stats.append(layer_info)
+                
+            except Exception as e:
+                logger.warning(f"Failed to analyze layer {layer_name}: {e}")
+                layer_stats.append({
+                    'layer_name': layer_name,
+                    'feature_count': 0,
+                    'column_count': 0,
+                    'columns': [],
+                    'property_stats': {},
+                    'error': str(e)
+                })
+        
+        # Calculate global property summary
+        property_summary = {}
+        for prop, stats in property_completeness.items():
+            property_summary[prop] = {
+                'total_values': stats['total'],
+                'non_empty_values': stats['non_empty'],
+                'layer_count': len(stats['layers']),
+                'global_completeness_pct': round((stats['non_empty'] / stats['total']) * 100, 1) if stats['total'] > 0 else 0
+            }
+        
+        return {
+            'layer_stats': layer_stats,
+            'property_summary': property_summary,
+            'total_properties': len(all_properties),
+            'total_layers': len(layer_names)
         }
 
     def _test_update_workflows(self):
@@ -1935,6 +2085,26 @@ class S57DeepTester:
             if result['status'] == 'success':
                 print(f"      Duration: {result.get('duration', 0):.1f}s")
                 print(f"      Features: {result.get('total_features', 'N/A')}")
+                print(f"      Layers: {result.get('layers_created', 'N/A')}")
+                
+                # Enhanced statistics display
+                if 'layer_statistics' in result and 'property_summary' in result:
+                    layer_stats = result['layer_statistics']
+                    prop_summary = result['property_summary']
+                    
+                    # Calculate summary statistics
+                    total_columns = sum(layer['column_count'] for layer in layer_stats)
+                    total_properties = len(prop_summary)
+                    
+                    if prop_summary:
+                        print(f"      Properties: {total_properties} unique ({total_columns} total)")
+                        
+                        # Calculate total values and filled values across all properties
+                        total_property_fields = sum(stats['total_values'] for stats in prop_summary.values())
+                        filled_property_fields = sum(stats['non_empty_values'] for stats in prop_summary.values())
+                        empty_property_fields = total_property_fields - filled_property_fields
+                        
+                        print(f"      Completeness: {filled_property_fields:,} filled / {total_property_fields:,} total ({empty_property_fields:,} empty)")
             else:
                 print(f"      Error: {result.get('error', 'Unknown')}")
         

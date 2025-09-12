@@ -68,6 +68,13 @@ ruff check
 ruff format
 ```
 
+## Code Style Guidelines
+
+### Import Organization
+- Imports should be placed at the top of files
+- Avoid importing libraries inside functions
+- Group imports in standard order: standard library, third-party, local imports
+
 ## Key Dependencies
 
 - **GDAL 3.11.3**: Core geospatial data processing (exact version pinned)

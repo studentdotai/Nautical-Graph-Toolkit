@@ -745,7 +745,7 @@ class S57Advanced:
             'RETURN_PRIMITIVES=OFF', 'SPLIT_MULTIPOINT=ON', 'ADD_SOUNDG_DEPTH=ON',
             'UPDATES=APPLY', 'LNAM_REFS=ON', 'RECODE_BY_DSSI=ON', 
             'LIST_AS_STRING=OFF',  # Critical: ensures list fields come as native OGR types
-            'RETURN_LINKAGES=ON'   # Helps preserve S-57 relationships and attributes
+            'RETURN_LINKAGES=OFF'   # Helps preserve S-57 relationships and attributes
         ]
         
         src_ds = gdal.OpenEx(str(s57_file), gdal.OF_VECTOR, open_options=s57_open_options)
