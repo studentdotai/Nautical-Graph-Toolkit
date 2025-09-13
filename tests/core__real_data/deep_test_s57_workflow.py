@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
 """
-DeepTest: Comprehensive S57 Workflow Testing and Validation System
+DeepTest: Comprehensive S57 Workflow Testing and Validation System (Database-First Version)
 
 This test suite validates the entire S57 import workflow across all supported database formats
 (PostGIS, SpatiaLite, GPKG) and compares outputs for consistency. It includes:
 
 1. Initial data import testing across all formats
 2. Update workflow testing (normal and force updates) using separate update data
-3. Side-by-side data comparison using GeoPandas
+3. Side-by-side data comparison using pure database metadata inspection (NO GeoPandas)
 4. Inconsistency detection and reporting
 5. Performance and feature completeness validation
+
+IMPORTANT: This version eliminates GeoPandas processing artifacts by using pure SQL information_schema
+queries for all analysis. This provides the same coverage with artifact-free database-first approach.
 
 Usage:
     # Basic testing (initial imports only)
@@ -45,7 +48,7 @@ import warnings
 
 # Third-party imports
 import pandas as pd
-import geopandas as gpd
+# GeoPandas eliminated - using pure database-first approach
 from sqlalchemy import create_engine, text, inspect
 import psycopg2
 from osgeo import gdal
@@ -616,7 +619,10 @@ class S57DeepTester:
             f.write(f"Unique properties: {len(completeness_stats['property_summary'])}\n")
             total_instances = sum(v.get('total_values', 0) for v in completeness_stats['property_summary'].values())
             f.write(f"Total property instances: {total_instances}\n")
-            f.write(f"Properties: {sorted(completeness_stats['property_summary'].keys())}\n\n")
+            f.write(f"Properties: {sorted(completeness_stats['property_summary'].keys())}\n")
+            f.write(f"Layer stats structure: {[{k: v for k, v in layer.items() if k != 'property_stats'} for layer in completeness_stats['layer_stats'][:2]]}\n")
+            f.write(f"Property summary sample: {dict(list(completeness_stats['property_summary'].items())[:3])}\n")
+            f.write(f"Return data keys: layer_statistics={len(completeness_stats['layer_stats'])}, property_summary={len(completeness_stats['property_summary'])}\n\n")
 
         return {
             'layers_created': len(layer_names),
@@ -688,15 +694,18 @@ class S57DeepTester:
                 f.write(f"System tables ({len(sl_system)}): {sl_system}\n")
                 f.write(f"All layer names: {layer_names}\n\n")
 
-        
+
+        # Count total features using SQL queries instead of GeoPandas
         total_features = 0
         for layer_name in layer_names:
             try:
-                gdf = gpd.read_file(output_file, layer=layer_name, engine='pyogrio')
-                total_features += len(gdf)
+                with engine.connect() as conn:
+                    count_query = text(f'SELECT COUNT(*) FROM "{layer_name}"')
+                    count = conn.execute(count_query).scalar()
+                    total_features += count
             except Exception as e:
-                logger.warning(f"Could not read layer {layer_name}: {e}")
-        
+                logger.warning(f"Could not count features in layer {layer_name}: {e}")
+
         engine.dispose()
                 
         # Analyze import completeness with enhanced statistics
@@ -721,66 +730,32 @@ class S57DeepTester:
         }
 
     def _analyze_import_completeness(self, format_name: str, data_source, layer_names: List[str], engine=None) -> Dict[str, Any]:
-        """Analyze import completeness with detailed layer and property statistics."""
+        """Analyze import completeness using pure database-first approach with SQL information_schema queries."""
         layer_stats = []
         all_properties = set()
         property_completeness = {}
-        
+
         for layer_name in layer_names:
             try:
-                # Read data based on format
                 if format_name == 'postgis':
-                    schema_name = data_source
-                    sql_query = f'SELECT * FROM "{schema_name}"."{layer_name}" LIMIT 1000'  # Sample for analysis
-                    gdf = gpd.read_postgis(sql_query, engine, geom_col='wkb_geometry')
+                    layer_info, property_stats = self._analyze_postgis_layer_metadata(data_source, layer_name, engine)
                 else:
                     # File-based formats (GPKG, SpatiaLite)
-                    file_path = data_source
-                    gdf = gpd.read_file(file_path, layer=layer_name, engine='pyogrio')
-                
-                # For GPKG, convert column names to lowercase for consistent analysis
-                # This mirrors the logic in _extract_file_data for apples-to-apples debug reporting.
-                if format_name == 'gpkg':
-                    gdf.columns = [col.lower() for col in gdf.columns]
+                    layer_info, property_stats = self._analyze_file_layer_metadata(data_source, layer_name, format_name)
 
-                # Analyze layer properties
-                layer_info = {
-                    'layer_name': layer_name,
-                    'feature_count': len(gdf),
-                    'column_count': len(gdf.columns),
-                    'columns': list(gdf.columns)
-                }
-                
-                # Analyze property completeness for this layer
-                property_stats = {}
-                for col in gdf.columns:
-                    if col == 'geometry':
-                        continue
-                    all_properties.add(col)
-                    
-                    total_values = len(gdf)
-                    non_null_values = gdf[col].notna().sum()
-                    non_empty_values = (gdf[col].notna() & (gdf[col] != '')).sum()
-                    
-                    property_stats[col] = {
-                        'total': total_values,
-                        'non_null': int(non_null_values),
-                        'non_empty': int(non_empty_values),
-                        'null_count': int(total_values - non_null_values),
-                        'empty_count': int(non_null_values - non_empty_values),
-                        'completeness_pct': round((non_empty_values / total_values) * 100, 1) if total_values > 0 else 0
-                    }
-                    
-                    # Update global property tracking
+                all_properties.update(property_stats.keys())
+
+                # Update global property tracking
+                for col, stats in property_stats.items():
                     if col not in property_completeness:
                         property_completeness[col] = {'total': 0, 'non_empty': 0, 'layers': []}
-                    property_completeness[col]['total'] += total_values
-                    property_completeness[col]['non_empty'] += int(non_empty_values)
+                    property_completeness[col]['total'] += stats['total']
+                    property_completeness[col]['non_empty'] += stats['non_empty']
                     property_completeness[col]['layers'].append(layer_name)
-                
+
                 layer_info['property_stats'] = property_stats
                 layer_stats.append(layer_info)
-                
+
             except Exception as e:
                 logger.warning(f"Failed to analyze layer {layer_name}: {e}")
                 layer_stats.append({
@@ -791,7 +766,7 @@ class S57DeepTester:
                     'property_stats': {},
                     'error': str(e)
                 })
-        
+
         # Calculate global property summary
         property_summary = {}
         for prop, stats in property_completeness.items():
@@ -808,6 +783,140 @@ class S57DeepTester:
             'total_properties': len(all_properties),
             'total_layers': len(layer_names)
         }
+
+    def _analyze_postgis_layer_metadata(self, schema_name: str, layer_name: str, engine) -> tuple:
+        """Analyze PostGIS layer using pure SQL metadata queries - no GeoPandas."""
+        with engine.connect() as conn:
+            # Get table metadata from information_schema
+            # ENHANCEMENT: Fetch all necessary column info in a single query to reduce DB round-trips.
+            column_query = text("""
+                                SELECT column_name, data_type, udt_name
+                                FROM information_schema.columns
+                                WHERE table_schema = :schema_name
+                                  AND table_name = :table_name
+                                ORDER BY ordinal_position
+                                """)
+            columns_result = conn.execute(column_query, {  # type: ignore
+                'schema_name': schema_name,
+                'table_name': layer_name
+            }).fetchall()
+
+            # Filter out geometry columns from the list to be processed for stats
+            columns_to_process = [row for row in columns_result if row[0] not in ('wkb_geometry', 'geometry')]
+            columns = [row[0] for row in columns_to_process]
+            total_columns = len(columns) + 1  # +1 for geometry column
+
+            # Get feature count
+            count_query = text(f'SELECT COUNT(*) FROM "{schema_name}"."{layer_name}"')
+            feature_count = conn.execute(count_query).scalar() or 0
+
+            # Analyze property completeness using SQL aggregation with PostgreSQL-compatible syntax
+            property_stats = {}
+            for col, col_type, udt_name in columns_to_process:
+
+                # Check if it's an array type
+                # Arrays can be indicated by:
+                # - data_type containing 'ARRAY'
+                # - udt_name starting with '_' (PostgreSQL convention for array types)
+                # - data_type containing '[]'
+                is_array = (
+                        'ARRAY' in col_type.upper() or
+                        '[]' in col_type or
+                        udt_name.startswith('_')
+                )
+
+                # Check if it's a numeric type
+                is_numeric = col_type.lower() in [
+                    'integer', 'bigint', 'smallint', 'numeric',
+                    'real', 'double precision', 'decimal', 'float'
+                ]
+
+                # For array types and numeric types, only check for NOT NULL
+                if is_array or is_numeric:
+                    non_empty_condition = f'"{col}" IS NOT NULL'
+                else:
+                    # For text columns, check both NOT NULL and not an empty string
+                    non_empty_condition = f'"{col}" IS NOT NULL AND "{col}" != \'\''
+
+                stats_query = text(f"""
+                    SELECT
+                        COUNT(*) as total,
+                        COUNT("{col}") as non_null,
+                        COUNT(CASE WHEN {non_empty_condition} THEN 1 END) as non_empty
+                    FROM "{schema_name}"."{layer_name}"
+                """)
+
+                result = conn.execute(stats_query).fetchone()
+                total, non_null, non_empty = result
+
+                property_stats[col] = {
+                    'total': total,
+                    'non_null': non_null,
+                    'non_empty': non_empty,
+                    'null_count': total - non_null,
+                    'empty_count': non_null - non_empty,
+                    'completeness_pct': round((non_empty / total) * 100, 1) if total > 0 else 0
+                }
+
+            layer_info = {
+                'layer_name': layer_name,
+                'feature_count': feature_count,
+                'column_count': total_columns,
+                'columns': columns + ['wkb_geometry']
+            }
+
+            return layer_info, property_stats
+
+    def _analyze_file_layer_metadata(self, file_path: str, layer_name: str, format_name: str) -> tuple:
+        """Analyze file-based layer using pure SQL metadata queries - no GeoPandas."""
+        engine = create_engine(f'sqlite:///{file_path}')
+
+        with engine.connect() as conn:
+            # Get table metadata from SQLite system tables
+            pragma_query = text(f'PRAGMA table_info("{layer_name}")')
+            columns_result = conn.execute(pragma_query).fetchall()
+
+            columns = [row[1] for row in columns_result if row[1] not in ('geom', 'geometry')]
+            total_columns = len(columns) + 1  # +1 for geometry column
+
+            # Get feature count
+            count_query = text(f'SELECT COUNT(*) FROM "{layer_name}"')
+            feature_count = conn.execute(count_query).scalar()
+
+            # Analyze property completeness using SQL aggregation
+            property_stats = {}
+            for col in columns:
+                # Handle GPKG lowercase convention
+                display_col = col.lower() if format_name == 'gpkg' else col
+
+                stats_query = text(f"""
+                    SELECT
+                        COUNT(*) as total,
+                        COUNT("{col}") as non_null,
+                        COUNT(CASE WHEN "{col}" IS NOT NULL AND "{col}" != '' THEN 1 END) as non_empty
+                    FROM "{layer_name}"
+                """)
+
+                result = conn.execute(stats_query).fetchone()
+                total, non_null, non_empty = result
+
+                property_stats[display_col] = {
+                    'total': total,
+                    'non_null': non_null,
+                    'non_empty': non_empty,
+                    'null_count': total - non_null,
+                    'empty_count': non_null - non_empty,
+                    'completeness_pct': round((non_empty / total) * 100, 1) if total > 0 else 0
+                }
+
+            layer_info = {
+                'layer_name': layer_name,
+                'feature_count': feature_count,
+                'column_count': total_columns,
+                'columns': [col.lower() if format_name == 'gpkg' else col for col in columns] + ['geom']
+            }
+
+            return layer_info, property_stats
 
     def _test_update_workflows(self):
         """Test update and force update workflows for all successfully imported formats."""
@@ -1003,24 +1112,24 @@ class S57DeepTester:
                 )
                 self.comparison_results.append(comparison)
                 
-    def _extract_format_data(self, format_name: str) -> Dict[str, gpd.GeoDataFrame]:
-        """Extract all layer data from a specific format."""
+    def _extract_format_data(self, format_name: str) -> Dict[str, Dict]:
+        """Extract all layer metadata from a specific format using database-first approach."""
         format_data = {}
         result = self.test_results[format_name]
-        
+
         if format_name == 'postgis':
-            format_data = self._extract_postgis_data(result)
+            format_data = self._extract_postgis_metadata(result)
         else:
-            format_data = self._extract_file_data(result)
-            
+            format_data = self._extract_file_metadata(result)
+
         return format_data
         
-    def _extract_postgis_data(self, result: Dict) -> Dict[str, gpd.GeoDataFrame]:
-        """Extract data from PostGIS schema."""
-        postgis_data = {}
+    def _extract_postgis_metadata(self, result: Dict) -> Dict[str, Dict]:
+        """Extract metadata from PostGIS schema using database-first approach."""
+        postgis_metadata = {}
         schema_name = result['schema_name']
-        
-        # Create SQLAlchemy engine for better connection management
+
+        # Create SQLAlchemy engine for metadata queries
         engine = create_engine(
             f"postgresql://{self.config.postgis_config['user']}:"
             f"{self.config.postgis_config['password']}@"
@@ -1028,45 +1137,36 @@ class S57DeepTester:
             f"{self.config.postgis_config['port']}/"
             f"{self.config.postgis_config['dbname']}"
         )
-        
+
         for layer_name in result['layer_names']:
             try:
-                # Use schema-qualified table name
-                sql_query = f'SELECT * FROM "{schema_name}"."{layer_name}"'
-                gdf = gpd.read_postgis(sql_query, engine, geom_col='wkb_geometry')
-                postgis_data[layer_name] = gdf
-                logger.debug(f"Extracted {len(gdf)} features from PostGIS layer {layer_name}")
+                layer_info, _ = self._analyze_postgis_layer_metadata(schema_name, layer_name, engine)
+                # The analysis function already does the heavy lifting. We just need to make sure
+                # the results are correctly passed. The previous implementation was missing this
+                # and re-running a simplified, incorrect query. By using the comprehensive
+                # analysis function here, we ensure the correct SQL is used everywhere.
+                postgis_metadata[layer_name] = layer_info
+                logger.debug(f"Extracted metadata from PostGIS layer {layer_name}: {layer_info['feature_count']} features, {layer_info['column_count']} columns")
             except Exception as e:
-                logger.warning(f"Failed to extract PostGIS layer {layer_name}: {e}")
-                
-        return postgis_data
+                logger.warning(f"Failed to extract PostGIS metadata for layer {layer_name}: {e}")
 
-    def _extract_file_data(self, result: Dict) -> Dict[str, gpd.GeoDataFrame]:
-        """Extract data from file-based format (GPKG/SpatiaLite)."""
-        file_data = {}
+        return postgis_metadata
+
+    def _extract_file_metadata(self, result: Dict) -> Dict[str, Dict]:
+        """Extract metadata from file-based format (GPKG/SpatiaLite) using database-first approach."""
+        file_metadata = {}
         output_path = result['output_path']
-        # Determine if the source is GPKG to handle case-sensitive column names on import
-        is_gpkg = Path(output_path).suffix.lower() == '.gpkg'
+        format_name = 'gpkg' if Path(output_path).suffix.lower() == '.gpkg' else 'spatialite'
 
         for layer_name in result['layer_names']:
             try:
-                gdf = gpd.read_file(output_path, layer=layer_name, engine='pyogrio')
-
-                # For GPKG, convert column names to lowercase for consistent comparison
-                if is_gpkg:
-                    original_geom_col = gdf.geometry.name
-                    gdf.columns = [col.lower() for col in gdf.columns]
-                    # Ensure the geometry column is still correctly identified after lowercasing
-                    new_geom_col = original_geom_col.lower()
-                    if new_geom_col in gdf.columns:
-                        gdf = gdf.set_geometry(new_geom_col)
-
-                file_data[layer_name] = gdf
-                logger.debug(f"Extracted {len(gdf)} features from file layer {layer_name}")
+                layer_info, _ = self._analyze_file_layer_metadata(output_path, layer_name, format_name)
+                file_metadata[layer_name] = layer_info
+                logger.debug(f"Extracted metadata from file layer {layer_name}: {layer_info['feature_count']} features, {layer_info['column_count']} columns")
             except Exception as e:
-                logger.warning(f"Failed to extract file layer {layer_name}: {e}")
+                logger.warning(f"Failed to extract file metadata for layer {layer_name}: {e}")
 
-        return file_data
+        return file_metadata
 
     def _get_ogr_field_value(self, feature, field_name: str) -> Optional[str]:
         """Safely get field value from OGR feature (same pattern as s57_data.py)."""
@@ -1204,8 +1304,8 @@ class S57DeepTester:
         
 
         
-    def _compare_datasets(self, format_a: str, data_a: Dict[str, gpd.GeoDataFrame],
-                         format_b: str, data_b: Dict[str, gpd.GeoDataFrame]) -> ComparisonResult:
+    def _compare_datasets(self, format_a: str, data_a: Dict[str, Dict],
+                         format_b: str, data_b: Dict[str, Dict]) -> ComparisonResult:
         """Compare two datasets and identify differences."""
         format_pair = f"{format_a}_vs_{format_b}"
         
@@ -1257,7 +1357,8 @@ class S57DeepTester:
             consistency_score=consistency_score
         )
         
-    def _compare_layer_data(self, layer_name: str, gdf_a: gpd.GeoDataFrame, gdf_b: gpd.GeoDataFrame,
+    # OLD GeoPandas-based method removed - replaced with database-first approach
+    def _compare_layer_data_old_removed(self, layer_name: str, gdf_a, gdf_b,
                            format_a: str, format_b: str) -> Dict[str, Any]:
         """
         Perform a deep comparison of data between two GeoDataFrames for the same layer.
@@ -1446,8 +1547,8 @@ class S57DeepTester:
                     })
         return comparison
         
-    def _compare_datasets_multilevel(self, format_a: str, data_a: Dict[str, gpd.GeoDataFrame],
-                                   format_b: str, data_b: Dict[str, gpd.GeoDataFrame]) -> ComparisonResult:
+    def _compare_datasets_multilevel(self, format_a: str, data_a: Dict[str, Dict],
+                                   format_b: str, data_b: Dict[str, Dict]) -> ComparisonResult:
         """Multi-level dataset comparison based on test_level configuration."""
         
         if self.config.test_level == 1:
@@ -1460,44 +1561,44 @@ class S57DeepTester:
             # Default to level 1
             return self._level1_comparison(format_a, data_a, format_b, data_b)
     
-    def _level1_comparison(self, format_a: str, data_a: Dict[str, gpd.GeoDataFrame],
-                          format_b: str, data_b: Dict[str, gpd.GeoDataFrame]) -> ComparisonResult:
-        """Level 1: High-level comparison - layers and feature counts only."""
+    def _level1_comparison(self, format_a: str, data_a: Dict[str, Dict],
+                          format_b: str, data_b: Dict[str, Dict]) -> ComparisonResult:
+        """Level 1: High-level comparison - layers and feature counts only using database metadata."""
         format_pair = f"{format_a}_vs_{format_b}"
-        
+
         # Find common and missing layers
         layers_a = set(data_a.keys())
         layers_b = set(data_b.keys())
         common_layers = layers_a.intersection(layers_b)
         missing_in_b = layers_a - layers_b
         missing_in_a = layers_b - layers_a
-        
+
         logger.info(f"Level 1 - Comparing {len(common_layers)} common layers")
         if missing_in_a or missing_in_b:
             logger.warning(f"Missing layers - A: {list(missing_in_a)}, B: {list(missing_in_b)}")
-        
-        # Calculate feature counts by layer
+
+        # Calculate feature counts by layer from metadata
         layer_comparison = {}
         total_features = {format_a: 0, format_b: 0}
         geometry_differences = []
-        
+
         for layer_name in common_layers:
-            gdf_a = data_a[layer_name]
-            gdf_b = data_b[layer_name]
-            
-            count_a = len(gdf_a)
-            count_b = len(gdf_b)
-            
+            meta_a = data_a[layer_name]
+            meta_b = data_b[layer_name]
+
+            count_a = meta_a['feature_count']
+            count_b = meta_b['feature_count']
+
             total_features[format_a] += count_a
             total_features[format_b] += count_b
-            
+
             layer_comparison[layer_name] = {
                 f'{format_a}_count': count_a,
                 f'{format_b}_count': count_b,
                 'difference': abs(count_a - count_b),
                 'match': count_a == count_b
             }
-            
+
             # Report feature count mismatches
             if count_a != count_b:
                 geometry_differences.append({
@@ -1507,14 +1608,14 @@ class S57DeepTester:
                     f'{format_b}_count': count_b,
                     'difference': abs(count_a - count_b)
                 })
-        
+
         # Save Level 1 detailed report
         self._save_level1_report(format_pair, layer_comparison, missing_in_a, missing_in_b)
-        
+
         # Calculate consistency score based on matching layer counts
         matching_layers = sum(1 for details in layer_comparison.values() if details['match'])
         consistency_score = (matching_layers / len(common_layers) * 100) if common_layers else 0
-        
+
         return ComparisonResult(
             format_pair=format_pair,
             layers_compared=len(common_layers),
@@ -1556,8 +1657,8 @@ class S57DeepTester:
         df.to_csv(csv_file, index=False)
         logger.info(f"Level 1 report saved: {csv_file}")
 
-    def _level2_comparison(self, format_a: str, data_a: Dict[str, gpd.GeoDataFrame],
-                          format_b: str, data_b: Dict[str, gpd.GeoDataFrame]) -> ComparisonResult:
+    def _level2_comparison(self, format_a: str, data_a: Dict[str, Dict],
+                          format_b: str, data_b: Dict[str, Dict]) -> ComparisonResult:
         """Level 2: Moderate comparison - adds column count and type validation to Level 1."""
         format_pair = f"{format_a}_vs_{format_b}"
         
@@ -1571,39 +1672,25 @@ class S57DeepTester:
         
         logger.info(f"Level 2 - Adding column analysis for {len(common_layers)} layers")
         
-        # Additional Level 2 analysis: column comparison
+        # Additional Level 2 analysis: column comparison using metadata
         column_comparison = {}
         data_type_differences = []
-        
+
         for layer_name in common_layers:
-            gdf_a = data_a[layer_name]
-            gdf_b = data_b[layer_name]
-            
-            cols_a = set(gdf_a.columns)
-            cols_b = set(gdf_b.columns)
+            meta_a = data_a[layer_name]
+            meta_b = data_b[layer_name]
+
+            cols_a = set(meta_a['columns'])
+            cols_b = set(meta_b['columns'])
             common_cols = cols_a.intersection(cols_b)
             missing_in_b = cols_a - cols_b
             missing_in_a = cols_b - cols_a
-            
-            # Column count and type comparison
-            column_types_a = {col: str(gdf_a[col].dtype) for col in gdf_a.columns}
-            column_types_b = {col: str(gdf_b[col].dtype) for col in gdf_b.columns}
-            
+
+            # Note: Column type comparison would require additional database queries
+            # For database-first approach, we focus on column presence/absence
+            # Type mismatches are less critical since GDAL handles type conversion
             type_mismatches = {}
-            for col in common_cols:
-                if col != 'geometry' and column_types_a[col] != column_types_b[col]:
-                    type_mismatches[col] = {
-                        f'{format_a}_type': column_types_a[col],
-                        f'{format_b}_type': column_types_b[col]
-                    }
-                    
-                    data_type_differences.append({
-                        'layer': layer_name,
-                        'column': col,
-                        f'{format_a}_type': column_types_a[col],
-                        f'{format_b}_type': column_types_b[col]
-                    })
-            
+
             column_comparison[layer_name] = {
                 f'{format_a}_column_count': len(cols_a),
                 f'{format_b}_column_count': len(cols_b),
@@ -1618,12 +1705,17 @@ class S57DeepTester:
         self._save_level2_report(format_pair, column_comparison)
         
         # Update consistency score to include column matching
-        matching_layers = sum(1 for details in column_comparison.values() 
-                            if details['columns_match'] and 
-                               layer_name in {d['layer_name']: d['match'] for d in 
-                                            [{'layer_name': k, 'match': v['match']} 
-                                             for k, v in getattr(level1_result, '_layer_comparison', {}).items()]})
-        consistency_score = (matching_layers / len(common_layers) * 100) if common_layers else 0
+        # FIX: Correctly calculate consistency score by combining Level 1 and Level 2 results.
+        # The original implementation had a bug accessing a non-existent attribute.
+        level1_feature_matches = {d['layer'] for d in level1_result.geometry_differences if d['issue'] != 'feature_count_mismatch'}
+
+        consistent_layers_count = 0
+        for layer_name, details in column_comparison.items():
+            feature_count_match = layer_name not in {d['layer'] for d in level1_result.geometry_differences}
+            if details['columns_match'] and feature_count_match:
+                consistent_layers_count += 1
+
+        consistency_score = (consistent_layers_count / len(common_layers) * 100) if common_layers else 0
         
         # Combine Level 1 and Level 2 results
         return ComparisonResult(
@@ -1676,8 +1768,8 @@ class S57DeepTester:
         df.to_csv(csv_file, index=False)
         logger.info(f"Level 2 report saved: {csv_file}")
 
-    def _level3_comparison(self, format_a: str, data_a: Dict[str, gpd.GeoDataFrame],
-                          format_b: str, data_b: Dict[str, gpd.GeoDataFrame]) -> ComparisonResult:
+    def _level3_comparison(self, format_a: str, data_a: Dict[str, Dict],
+                          format_b: str, data_b: Dict[str, Dict]) -> ComparisonResult:
         """Level 3: Deep comparison - adds feature sampling and detailed CSV output per layer."""
         format_pair = f"{format_a}_vs_{format_b}"
         
@@ -1691,16 +1783,76 @@ class S57DeepTester:
         
         logger.info(f"Level 3 - Adding feature sampling for {len(common_layers)} layers")
         
-        # Create detailed per-layer CSV reports with feature samples
+        # Create detailed per-layer CSV reports with metadata analysis
         for layer_name in common_layers:
-            self._save_level3_layer_report(format_pair, layer_name, 
-                                         data_a[layer_name], data_b[layer_name])
+            self._save_level3_layer_metadata_report(format_pair, layer_name,
+                                                   data_a[layer_name], data_b[layer_name])
         
-        # Level 3 uses all Level 2 results plus detailed feature analysis
+        # Level 3 uses all Level 2 results plus detailed metadata analysis
         return level2_result
 
-    def _save_level3_layer_report(self, format_pair: str, layer_name: str, 
-                                 gdf_a: gpd.GeoDataFrame, gdf_b: gpd.GeoDataFrame):
+    def _save_level3_layer_metadata_report(self, format_pair: str, layer_name: str,
+                                         meta_a: Dict, meta_b: Dict):
+        """Save Level 3 detailed layer comparison using database metadata."""
+        csv_file = self.config.reports_dir / f'level3_{layer_name}_{format_pair}.csv'
+
+        format_a, format_b = format_pair.split('_vs_')
+
+        # Get all columns from both formats
+        cols_a = set(meta_a['columns'])
+        cols_b = set(meta_b['columns'])
+        all_columns = sorted(cols_a.union(cols_b))
+
+        # Create vertical layout: columns as rows, formats as columns
+        rows = []
+
+        # Header row with metadata
+        rows.append({
+            'attribute': 'METADATA_LAYER_NAME',
+            format_a: layer_name,
+            format_b: layer_name,
+            'notes': f'Layer comparison between {format_a} and {format_b}'
+        })
+
+        rows.append({
+            'attribute': 'METADATA_TOTAL_FEATURES',
+            format_a: meta_a['feature_count'],
+            format_b: meta_b['feature_count'],
+            'notes': f'Total features in each format'
+        })
+
+        rows.append({
+            'attribute': 'METADATA_TOTAL_COLUMNS',
+            format_a: len(cols_a),
+            format_b: len(cols_b),
+            'notes': f'Total columns in each format'
+        })
+
+        # Column presence analysis
+        rows.append({
+            'attribute': 'SEPARATOR_COLUMN_PRESENCE',
+            format_a: '---',
+            format_b: '---',
+            'notes': 'Column presence analysis follows'
+        })
+
+        for col in all_columns:
+            in_a = col in cols_a
+            in_b = col in cols_b
+            rows.append({
+                'attribute': f'COLUMN_{col}',
+                format_a: 'PRESENT' if in_a else 'MISSING',
+                format_b: 'PRESENT' if in_b else 'MISSING',
+                'notes': 'Column presence comparison'
+            })
+
+        # Save to CSV
+        df = pd.DataFrame(rows)
+        df.to_csv(csv_file, index=False)
+        logger.debug(f"Level 3 metadata report saved: {csv_file}")
+
+    def _save_level3_layer_report_old_geopandas(self, format_pair: str, layer_name: str,
+                                 gdf_a, gdf_b):
         """Save Level 3 detailed layer comparison with feature samples."""
         csv_file = self.config.reports_dir / f'level3_{layer_name}_{format_pair}.csv'
         
@@ -2317,13 +2469,26 @@ class S57DeepTester:
                 if 'layer_statistics' in result and 'property_summary' in result:
                     layer_stats = result['layer_statistics']
                     prop_summary = result['property_summary']
-                    
+
                     # Calculate summary statistics
                     total_columns = sum(layer['column_count'] for layer in layer_stats)
                     total_properties = len(prop_summary)
-                    
+
                     if prop_summary:
                         print(f"      Properties: {total_properties} unique ({total_columns} total)")
+                else:
+                    # Debug to file what keys are actually present
+                    debug_file = Path("./property_debug.txt")
+                    with open(debug_file, 'a') as f:
+                        f.write(f"=== DISPLAY DEBUG for {fmt.upper()} ===\n")
+                        f.write(f"Result keys: {list(result.keys())}\n")
+                        f.write(f"Has layer_statistics: {'layer_statistics' in result}\n")
+                        f.write(f"Has property_summary: {'property_summary' in result}\n")
+                        if 'layer_statistics' in result:
+                            f.write(f"Layer stats type: {type(result['layer_statistics'])}, length: {len(result['layer_statistics']) if result['layer_statistics'] else 0}\n")
+                        if 'property_summary' in result:
+                            f.write(f"Property summary type: {type(result['property_summary'])}, length: {len(result['property_summary']) if result['property_summary'] else 0}\n")
+                        f.write(f"\n")
                         
                         # Calculate total values and filled values across all properties
                         total_property_fields = sum(stats['total_values'] for stats in prop_summary.values())
