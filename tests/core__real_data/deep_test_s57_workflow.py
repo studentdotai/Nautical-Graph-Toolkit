@@ -1,31 +1,31 @@
 #!/usr/bin/env python3
 """
-DeepTest: Comprehensive S57 Workflow Testing and Validation System (Database-First Version)
+DeepTest: Comprehensive S-57 Workflow Testing and Validation System.
 
 This test suite validates the entire S57 import workflow across all supported database formats
 (PostGIS, SpatiaLite, GPKG) and compares outputs for consistency. It includes:
 
-1. Initial data import testing across all formats
-2. Update workflow testing (normal and force updates) using separate update data
-3. Side-by-side data comparison using pure database metadata inspection (NO GeoPandas)
-4. Inconsistency detection and reporting
-5. Performance and feature completeness validation
+1.  Initial data import testing across all formats.
+2.  Update workflow testing (normal and force updates) using separate update data.
+3.  Side-by-side data comparison using a pure database-first approach (no GeoPandas for analysis).
+4.  Inconsistency detection and reporting across multiple levels (feature counts, schema, property completeness).
+5.  Performance and feature completeness validation.
 
 IMPORTANT: This version eliminates GeoPandas processing artifacts by using pure SQL information_schema
-queries for all analysis. This provides the same coverage with artifact-free database-first approach.
+queries for all analysis, providing an artifact-free, database-first approach.
 
 Usage:
     # Basic testing (initial imports only)
-    python tests/deep_test_s57_workflow.py --data-root /path/to/ENC_ROOT
-    
+    python tests/core__real_data/deep_test_s57_workflow.py --data-root /path/to/ENC_ROOT
+
     # Full testing with updates
-    python tests/deep_test_s57_workflow.py --data-root /path/to/ENC_ROOT --update-root /path/to/ENC_ROOT_UPDATE
-    
+    python tests/core__real_data/deep_test_s57_workflow.py --data-root /path/to/ENC_ROOT --update-root /path/to/ENC_ROOT_UPDATE
+
     # Skip PostGIS if database not available
-    python tests/deep_test_s57_workflow.py --data-root /path/to/ENC_ROOT --skip-postgis
-    
-    # Preserve outputs for manual verification (unanimous conversion validation)
-    python tests/deep_test_s57_workflow.py --data-root /path/to/ENC_ROOT --no-clean-output
+    python tests/core__real_data/deep_test_s57_workflow.py --data-root /path/to/ENC_ROOT --skip-postgis
+
+    # Preserve outputs for manual verification
+    python tests/core__real_data/deep_test_s57_workflow.py --data-root /path/to/ENC_ROOT --no-clean-output
 
 Note: User should provide appropriately sized datasets in both ENC_ROOT and ENC_ROOT_UPDATE directories.
       Update tests are automatically skipped if --update-root is not provided.
@@ -46,7 +46,6 @@ from datetime import datetime
 from collections import Counter
 import warnings
 
-# Third-party imports
 import pandas as pd
 # GeoPandas eliminated - using pure database-first approach
 from sqlalchemy import create_engine, text, inspect
@@ -263,6 +262,23 @@ class S57DeepTester:
             else:
                 raise ConnectionError(f"PostGIS connection failed: {e}")
 
+    def _get_engine(self, format_name: str, data_source: Optional[str] = None):
+        """Create and return a SQLAlchemy engine for a given format."""
+        if format_name == 'postgis':
+            return create_engine(
+                f"postgresql://{self.config.postgis_config['user']}:"
+                f"{self.config.postgis_config['password']}@"
+                f"{self.config.postgis_config['host']}:"
+                f"{self.config.postgis_config['port']}/"
+                f"{self.config.postgis_config['dbname']}"
+            )
+        elif format_name in ['gpkg', 'spatialite']:
+            if not data_source:
+                raise ValueError("data_source (file path) is required for file-based formats.")
+            return create_engine(f'sqlite:///{data_source}')
+        else:
+            raise ValueError(f"Unsupported format for engine creation: {format_name}")
+
     def _cleanup_test_environment(self):
         """Clean up test artifacts but preserve reports directory."""
         if not self.config.clean_output:
@@ -289,17 +305,12 @@ class S57DeepTester:
             if schema_name:
                 logger.info(f"Dropping PostGIS schema: {schema_name}")
                 try:
-                    engine = create_engine(
-                        f"postgresql://{self.config.postgis_config['user']}:"
-                        f"{self.config.postgis_config['password']}@"
-                        f"{self.config.postgis_config['host']}:"
-                        f"{self.config.postgis_config['port']}/"
-                        f"{self.config.postgis_config['dbname']}"
-                    )
+                    engine = self._get_engine('postgis')
                     with engine.connect() as conn:
                         with conn.begin(): # Start a transaction for DDL
                             conn.execute(text(f'DROP SCHEMA IF EXISTS "{schema_name}" CASCADE'))
                     logger.info(f"Successfully dropped schema {schema_name}")
+                    engine.dispose()
                 except Exception as e:
                     logger.error(f"Failed to drop PostGIS schema {schema_name}: {e}")
 
@@ -587,15 +598,8 @@ class S57DeepTester:
         
         s57_advanced.convert_to_layers()
         
+        engine = self._get_engine('postgis')
 
-        engine = create_engine(
-            f"postgresql://{self.config.postgis_config['user']}:"
-            f"{self.config.postgis_config['password']}@"
-            f"{self.config.postgis_config['host']}:"
-            f"{self.config.postgis_config['port']}/"
-            f"{self.config.postgis_config['dbname']}"
-        )
-        
         with engine.connect() as conn:
             # Get layer names
             layer_query = text("""
@@ -620,7 +624,8 @@ class S57DeepTester:
                 
         # Analyze import completeness with enhanced statistics
         completeness_stats = self._analyze_import_completeness('postgis', schema_name, layer_names, engine)
-        
+        engine.dispose()
+
         # Debug: Export property analysis to file
         debug_file = self.config.reports_dir / "property_debug.txt"
         with open(debug_file, 'a') as f:
@@ -665,12 +670,8 @@ class S57DeepTester:
         # SetConfigOption here to ensure we are testing the production code's behavior.
         
         s57_advanced.convert_to_layers()
-        
-        # Count results using SQLAlchemy inspect (more reliable than fiona.listlayers)
-        if format_name == 'spatialite':
-            engine = create_engine(f'sqlite:///{output_file}')
-        else:  # gpkg
-            engine = create_engine(f'sqlite:///{output_file}')
+
+        engine = self._get_engine(format_name, output_file)
         
         inspector = inspect(engine)
         all_tables = inspector.get_table_names()
@@ -715,11 +716,11 @@ class S57DeepTester:
             except Exception as e:
                 logger.warning(f"Could not count features in layer {layer_name}: {e}")
 
-        engine.dispose()
-                
         # Analyze import completeness with enhanced statistics
         completeness_stats = self._analyze_import_completeness(format_name, output_file, layer_names)
         
+        engine.dispose()
+
         # Debug: Export property analysis to file
         debug_file = self.config.reports_dir / "property_debug.txt"
         with open(debug_file, 'a') as f:
@@ -1782,12 +1783,12 @@ class S57DeepTester:
         # A layer is consistent if its feature count AND column schema match.
         consistent_layers_count = 0
         for layer_name, details in column_comparison.items():
-            # A layer has a feature count match if it's not in the list of layers with geometry differences.
+            # A layer has a feature count match if it's not in the list of layers with feature count differences.
             feature_count_match = not any(d['layer'] == layer_name for d in level1_result.geometry_differences)
             if details['columns_match'] and feature_count_match:
                 consistent_layers_count += 1
 
-        consistency_score = (consistent_layers_count / len(common_layers) * 100) if common_layers else 0.0
+        consistency_score = (consistent_layers_count / len(common_layers) * 100) if common_layers else 100.0
         
         # Combine Level 1 and Level 2 results
         return ComparisonResult(
@@ -2159,14 +2160,7 @@ class S57DeepTester:
         try:
             if format_name == 'postgis':
                 # PostGIS verification - CHECK ALL TABLES IN SCHEMA
-                engine = create_engine(
-                    f"postgresql://{self.config.postgis_config['user']}:"
-                    f"{self.config.postgis_config['password']}@"
-                    f"{self.config.postgis_config['host']}:"
-                    f"{self.config.postgis_config['port']}/"
-                    f"{self.config.postgis_config['dbname']}"
-                )
-                
+                engine = self._get_engine('postgis')
                 # Extract schema name from data_source (format: "postgis://schema_name")
                 schema_name = data_source.replace('postgis://', '') if data_source.startswith('postgis://') else data_source
                 
@@ -2235,8 +2229,7 @@ class S57DeepTester:
                 
             else:
                 # File-based formats (GPKG, SpatiaLite) verification - CHECK ALL TABLES
-                engine = create_engine(f'sqlite:///{data_source}')
-                
+                engine = self._get_engine(format_name, data_source)
                 # Get ALL relevant tables (not just one sample)
                 inspector = inspect(engine)
                 all_tables = inspector.get_table_names()
@@ -2508,7 +2501,7 @@ class S57DeepTester:
                     total_properties = len(prop_summary)
 
                     if prop_summary:
-                        print(f"      Properties: {total_properties} unique ({total_columns} total)")
+                        print(f"      Properties: {total_properties} unique")
                 else:
                     # Debug to file what keys are actually present
                     debug_file = Path("./property_debug.txt")
