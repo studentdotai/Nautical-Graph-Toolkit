@@ -94,7 +94,8 @@ class TestConfig:
     
     # Test level configuration
     test_level: int = 1  # 1=High level (layer/feature counts), 2=Moderate (+ column validation), 3=Deep (+ feature samples)
-    
+    exclude_extra_cols: List[str] = None # Optional filter to exclude common extra columns like 'geometry'
+
     def __post_init__(self):
         if self.postgis_config is None:
             self.postgis_config = {
@@ -105,6 +106,9 @@ class TestConfig:
                 'password': 'postgres'
             }
         
+        if self.exclude_extra_cols is None:
+            self.exclude_extra_cols = []
+
         # Ensure paths are Path objects, not strings
         if isinstance(self.s57_data_root, str):
             self.s57_data_root = Path(self.s57_data_root)
@@ -172,6 +176,11 @@ class S57DeepTester:
         self.comparison_results = []
         self.performance_metrics = {}
         
+        # A centralized set of columns to ignore during comparisons.
+        # This is populated based on the TestConfig.
+        self.ignore_columns_set = set(self.config.exclude_extra_cols)
+        if self.ignore_columns_set:
+            logger.info(f"Initializing DeepTest with columns to ignore during comparison: {self.ignore_columns_set}")
         # Initialize test environment
         self._setup_test_environment()
         
@@ -810,16 +819,19 @@ class S57DeepTester:
             count_query = text(f'SELECT COUNT(*) FROM "{schema_name}"."{layer_name}"')
             feature_count = conn.execute(count_query).scalar() or 0
 
-            # Determine geometry column name and count features with geometry
-            geom_col_name = 'wkb_geometry' # Default for PostGIS
-            geom_count_query = text(f'SELECT COUNT(*) FROM "{schema_name}"."{layer_name}" WHERE "{geom_col_name}" IS NOT NULL')
-            geometry_feature_count = conn.execute(geom_count_query).scalar() or 0
-            # Fallback if default name is not found in some edge cases
-            if geometry_feature_count == 0 and feature_count > 0:
-                if 'geometry' in [c[0] for c in columns_result]:
-                    geom_col_name = 'geometry'
-                    geom_count_query = text(f'SELECT COUNT(*) FROM "{schema_name}"."{layer_name}" WHERE "{geom_col_name}" IS NOT NULL')
-                    geometry_feature_count = conn.execute(geom_count_query).scalar() or 0
+            # Robustly determine geometry column name and count features with geometry
+            geom_col_name = None
+            geometry_feature_count = 0
+            all_col_names = [c[0] for c in columns_result]
+
+            if 'wkb_geometry' in all_col_names:
+                geom_col_name = 'wkb_geometry'
+            elif 'geometry' in all_col_names:
+                geom_col_name = 'geometry'
+
+            if geom_col_name:
+                geom_count_query = text(f'SELECT COUNT(*) FROM "{schema_name}"."{layer_name}" WHERE "{geom_col_name}" IS NOT NULL')
+                geometry_feature_count = conn.execute(geom_count_query).scalar() or 0
 
             # Analyze property completeness using SQL aggregation with PostgreSQL-compatible syntax
             property_stats = {}
@@ -873,7 +885,7 @@ class S57DeepTester:
                 'layer_name': layer_name,
                 'feature_count': feature_count,
                 'column_count': total_columns,
-                'columns': columns + [geom_col_name],
+                'columns': columns + ([geom_col_name] if geom_col_name else []),
                 'geometry_feature_count': geometry_feature_count
             }
 
@@ -1708,7 +1720,7 @@ class S57DeepTester:
                           format_b: str, data_b: Dict[str, Dict]) -> ComparisonResult:
         """Level 2: Moderate comparison - adds column count and type validation to Level 1."""
         format_pair = f"{format_a}_vs_{format_b}"
-        
+
         # Start with Level 1 comparison
         level1_result = self._level1_comparison(format_a, data_a, format_b, data_b)
         
@@ -1722,16 +1734,30 @@ class S57DeepTester:
         # Additional Level 2 analysis: column comparison using metadata
         column_comparison = {}
         data_type_differences = []
+        attribute_differences = []
 
         for layer_name in common_layers:
             meta_a = data_a[layer_name]
             meta_b = data_b[layer_name]
 
-            cols_a = set(meta_a['columns'])
-            cols_b = set(meta_b['columns'])
+            cols_a = set(meta_a.get('columns', [])) - self.ignore_columns_set
+            cols_b = set(meta_b.get('columns', [])) - self.ignore_columns_set
             common_cols = cols_a.intersection(cols_b)
             missing_in_b = cols_a - cols_b
             missing_in_a = cols_b - cols_a
+
+            # Populate attribute_differences for schema mismatches
+            if missing_in_a:
+                attribute_differences.append({
+                    'layer': layer_name, 'issue': 'missing_columns',
+                    'format': format_a, 'details': f"Missing columns: {', '.join(missing_in_a)}"
+                })
+            if missing_in_b:
+                attribute_differences.append({
+                    'layer': layer_name, 'issue': 'missing_columns',
+                    'format': format_b, 'details': f"Missing columns: {', '.join(missing_in_b)}"
+                })
+
 
             # Note: Column type comparison would require additional database queries
             # For database-first approach, we focus on column presence/absence
@@ -1756,11 +1782,12 @@ class S57DeepTester:
         # A layer is consistent if its feature count AND column schema match.
         consistent_layers_count = 0
         for layer_name, details in column_comparison.items():
-            feature_count_match = layer_name not in {d['layer'] for d in level1_result.geometry_differences}
+            # A layer has a feature count match if it's not in the list of layers with geometry differences.
+            feature_count_match = not any(d['layer'] == layer_name for d in level1_result.geometry_differences)
             if details['columns_match'] and feature_count_match:
                 consistent_layers_count += 1
 
-        consistency_score = (consistent_layers_count / len(common_layers) * 100) if common_layers else 100.0
+        consistency_score = (consistent_layers_count / len(common_layers) * 100) if common_layers else 0.0
         
         # Combine Level 1 and Level 2 results
         return ComparisonResult(
@@ -1768,7 +1795,7 @@ class S57DeepTester:
             layers_compared=level1_result.layers_compared,
             total_features=level1_result.total_features,
             geometry_differences=level1_result.geometry_differences,
-            attribute_differences=[],  # Basic attribute analysis
+            attribute_differences=attribute_differences,  # Now includes schema differences
             data_type_differences=data_type_differences,
             missing_features=level1_result.missing_features,
             consistency_score=consistency_score
@@ -1832,6 +1859,7 @@ class S57DeepTester:
         logger.info(f"Level 3 - Adding feature sampling and property completeness analysis for {len(common_layers)} layers")
 
         layer_consistency_scores = []
+        level3_attribute_differences = list(level2_result.attribute_differences) # Start with L2 diffs
 
         # Create detailed per-layer CSV reports with metadata and property analysis
         for layer_name in common_layers:
@@ -1839,9 +1867,16 @@ class S57DeepTester:
                 format_pair, layer_name,
                 data_a.get(layer_name, {}), data_b.get(layer_name, {}),
                 results_a, results_b
-            )
-            if layer_score is not None:
-                layer_consistency_scores.append(layer_score)
+            ) # layer_score is a tuple: (score, has_diff)
+            if layer_score:
+                score, has_diff = layer_score
+                if score is not None:
+                    layer_consistency_scores.append(score)
+                if has_diff:
+                    level3_attribute_differences.append({
+                        'layer': layer_name, 'issue': 'property_completeness_mismatch',
+                        'details': 'One or more properties have different completeness stats.'
+                    })
 
         # Calculate new consistency score based on property completeness
         if layer_consistency_scores:
@@ -1858,7 +1893,7 @@ class S57DeepTester:
             layers_compared=level2_result.layers_compared,
             total_features=level2_result.total_features,
             geometry_differences=level2_result.geometry_differences,
-            attribute_differences=level2_result.attribute_differences,
+            attribute_differences=level3_attribute_differences, # Use the enriched list
             data_type_differences=level2_result.data_type_differences,
             missing_features=level2_result.missing_features,
             consistency_score=new_consistency_score  # Use the new, more accurate score
@@ -1866,14 +1901,14 @@ class S57DeepTester:
 
     def _save_level3_layer_metadata_report(self, format_pair: str, layer_name: str,
                                          meta_a: Dict, meta_b: Dict, results_a: Dict, results_b: Dict) -> Optional[float]:
-        """Save Level 3 detailed layer comparison using database metadata and property statistics."""
+        """Save Level 3 detailed layer comparison and return (score, has_difference_flag)."""
         csv_file = self.config.reports_dir / f'level3_{layer_name}_{format_pair}.csv'
 
         format_a, format_b = format_pair.split('_vs_')
 
-        # Get all columns from both formats
-        cols_a = set(meta_a['columns'])
-        cols_b = set(meta_b['columns'])
+        # Get all columns from both formats, respecting the ignore list
+        cols_a = set(meta_a.get('columns', [])) - self.ignore_columns_set
+        cols_b = set(meta_b.get('columns', [])) - self.ignore_columns_set
         all_columns = sorted(cols_a.union(cols_b))
 
         # Extract property stats for the current layer from the full import results
@@ -1942,8 +1977,10 @@ class S57DeepTester:
 
         matching_props_count = 0
         total_props_compared = 0
+        has_completeness_mismatch = False
 
-        common_props = sorted(set(props_a.keys()) | set(props_b.keys()))
+        # Compare properties, respecting the ignore list
+        common_props = sorted((set(props_a.keys()) | set(props_b.keys())) - self.ignore_columns_set)
         for prop in common_props:
             stats_a = props_a.get(prop)
             stats_b = props_b.get(prop)
@@ -1967,6 +2004,7 @@ class S57DeepTester:
                     matching_props_count += 1
                 else:
                     notes = f"Values MISMATCH ({pct_a}% vs {pct_b}%)"
+                    has_completeness_mismatch = True
             else:
                 notes = 'Property completeness comparison'
                 # If one is missing, they don't match
@@ -1985,9 +2023,10 @@ class S57DeepTester:
 
         # Calculate and return layer-specific consistency score
         if total_props_compared > 0:
-            return (matching_props_count / total_props_compared) * 100
+            score = (matching_props_count / total_props_compared) * 100
+            return score, has_completeness_mismatch
         else:
-            return None
+            return None, False
 
     def _save_update_readiness_report(self, update_analysis: pd.DataFrame):
         """Save update readiness analysis to CSV and TXT files."""
@@ -2036,7 +2075,7 @@ class S57DeepTester:
         
         if len(successful_results) < 2:
             return  # Need at least 2 formats to compare
-        
+
         # Use GPKG as baseline if available, otherwise use first format
         baseline_format = 'gpkg' if 'gpkg' in successful_results else list(successful_results.keys())[0]
         baseline_properties = set(successful_results[baseline_format]['property_summary'].keys())
@@ -2054,7 +2093,7 @@ class S57DeepTester:
             if fmt == baseline_format:
                 continue
                 
-            fmt_properties = set(result['property_summary'].keys())
+            fmt_properties = set(result['property_summary'].keys()) - self.ignore_columns_set
             
             # Calculate differences from processing
             missing_in_format = baseline_properties - fmt_properties
@@ -2071,14 +2110,14 @@ class S57DeepTester:
             actual_missing = baseline_properties - actual_properties
             coverage_pct = (len(actual_properties & baseline_properties) / len(baseline_properties)) * 100 if baseline_properties else 0
             
-            print(f"   {fmt.upper()}: {coverage_pct:.1f}% coverage ({len(actual_properties & baseline_properties)}/{len(baseline_properties)} properties)")
+            print(f"\n   {fmt.upper()}: {coverage_pct:.1f}% coverage ({len(actual_properties & baseline_properties)}/{len(baseline_properties)} properties)")
             
             if verified_missing:
                 print(f"      Confirmed missing: {len(verified_missing)} properties")
             if verified_present:
                 print(f"      Processing artifacts: {len(verified_present)} properties (found in DB)")
             if extra_in_format:
-                print(f"      Extra: {len(extra_in_format)} properties")
+                print(f"      Extra in {fmt}: {len(extra_in_format)} properties")
             
             # Export detailed analysis
             with open(validation_file, 'a') as f:
@@ -2099,13 +2138,13 @@ class S57DeepTester:
                 
                 if verified_present:
                     f.write(f"PROCESSING ARTIFACTS (properties found in {fmt.upper()} database but not in processing):\n")
-                    for prop in sorted(verified_present):
+                    for prop in sorted(list(verified_present)):
                         f.write(f"  - {prop}\n")
                     f.write("\n")
                 
                 if extra_in_format:
                     f.write(f"Extra properties in {fmt.upper()}:\n")
-                    for prop in sorted(extra_in_format):
+                    for prop in sorted(list(extra_in_format)):
                         f.write(f"  - {prop}\n")
                     f.write("\n")
     
@@ -2483,13 +2522,13 @@ class S57DeepTester:
                         if 'property_summary' in result:
                             f.write(f"Property summary type: {type(result['property_summary'])}, length: {len(result['property_summary']) if result['property_summary'] else 0}\n")
                         f.write(f"\n")
-                        
-                        # Calculate total values and filled values across all properties
-                        total_property_fields = sum(stats['total_values'] for stats in prop_summary.values())
-                        filled_property_fields = sum(stats['non_empty_values'] for stats in prop_summary.values())
-                        empty_property_fields = total_property_fields - filled_property_fields
-                        
-                        print(f"      Completeness: {filled_property_fields:,} filled / {total_property_fields:,} total ({empty_property_fields:,} empty)")
+
+                        if prop_summary:
+                            # Calculate total values and filled values across all properties
+                            total_property_fields = sum(stats.get('total_values', 0) for stats in prop_summary.values())
+                            filled_property_fields = sum(stats.get('non_empty_values', 0) for stats in prop_summary.values())
+                            empty_property_fields = total_property_fields - filled_property_fields
+                            print(f"      Completeness: {filled_property_fields:,} filled / {total_property_fields:,} total ({empty_property_fields:,} empty)")
             else:
                 print(f"      Error: {result.get('error', 'Unknown')}")
         
@@ -2515,8 +2554,26 @@ class S57DeepTester:
         if report['comparison_results']:
             print(f"\n📊 DATA COMPARISON RESULTS:")
             for comp in report['comparison_results']:
+                # Find the full comparison object to get detailed differences
+                full_comp = next((c for c in report['detailed_comparisons'] if c.format_pair == comp['format_pair']), None)
+                
                 print(f"   • {comp['format_pair']}: {comp['consistency_score']:.1f}% consistent")
-                print(f"     Layers: {comp['layers_compared']}, Differences: {comp['total_differences']}")
+                
+                if comp['total_differences'] > 0 and full_comp:
+                    # Identify layers with any kind of difference (feature count, columns, etc.)
+                    diff_layers = set()
+                    if full_comp.geometry_differences:
+                        diff_layers.update(d['layer'] for d in full_comp.geometry_differences)
+                    
+                    # In Level 2+, attribute differences are based on column schema mismatches per layer
+                    if full_comp.attribute_differences:
+                         diff_layers.update(d['layer'] for d in full_comp.attribute_differences)
+
+                    print(f"     Layers: {comp['layers_compared']}, Differences found in {comp['total_differences']} layers.")
+                    if diff_layers:
+                        print(f"       ↳ Layers with differences: {', '.join(sorted(list(diff_layers)))}")
+                else:
+                    print(f"     Layers: {comp['layers_compared']}, Differences: {comp['total_differences']}")
                 
         # Recommendations
         if report['recommendations']:
@@ -2545,7 +2602,9 @@ def main():
                         help='Test depth level: 1=High level (layers/counts), 2=Moderate (+columns), 3=Deep (+samples)')
     parser.add_argument('--no-clean-output', action='store_true',
                         help='Preserve test outputs for manual verification (do not clean)')
-    
+    parser.add_argument('--exclude-extra-cols', nargs='+', default=['geometry'],
+                        help="Space-separated list of extra columns to exclude from comparisons (e.g., 'geometry').")
+
     args = parser.parse_args()
     
     # Configure test
@@ -2556,7 +2615,8 @@ def main():
         skip_postgis=args.skip_postgis,
         skip_updates=args.skip_updates,
         test_level=args.test_level,
-        clean_output=not args.no_clean_output
+        clean_output=not args.no_clean_output,
+        exclude_extra_cols=args.exclude_extra_cols
     )
     
     # Run DeepTest
