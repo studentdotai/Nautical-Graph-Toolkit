@@ -810,6 +810,17 @@ class S57DeepTester:
             count_query = text(f'SELECT COUNT(*) FROM "{schema_name}"."{layer_name}"')
             feature_count = conn.execute(count_query).scalar() or 0
 
+            # Determine geometry column name and count features with geometry
+            geom_col_name = 'wkb_geometry' # Default for PostGIS
+            geom_count_query = text(f'SELECT COUNT(*) FROM "{schema_name}"."{layer_name}" WHERE "{geom_col_name}" IS NOT NULL')
+            geometry_feature_count = conn.execute(geom_count_query).scalar() or 0
+            # Fallback if default name is not found in some edge cases
+            if geometry_feature_count == 0 and feature_count > 0:
+                if 'geometry' in [c[0] for c in columns_result]:
+                    geom_col_name = 'geometry'
+                    geom_count_query = text(f'SELECT COUNT(*) FROM "{schema_name}"."{layer_name}" WHERE "{geom_col_name}" IS NOT NULL')
+                    geometry_feature_count = conn.execute(geom_count_query).scalar() or 0
+
             # Analyze property completeness using SQL aggregation with PostgreSQL-compatible syntax
             property_stats = {}
             for col, col_type, udt_name in columns_to_process:
@@ -862,7 +873,8 @@ class S57DeepTester:
                 'layer_name': layer_name,
                 'feature_count': feature_count,
                 'column_count': total_columns,
-                'columns': columns + ['wkb_geometry']
+                'columns': columns + [geom_col_name],
+                'geometry_feature_count': geometry_feature_count
             }
 
             return layer_info, property_stats
@@ -883,11 +895,23 @@ class S57DeepTester:
             count_query = text(f'SELECT COUNT(*) FROM "{layer_name}"')
             feature_count = conn.execute(count_query).scalar()
 
+            # Determine geometry column name and count features with geometry
+            geom_col_name = 'geom' # Default for file-based
+            if 'geometry' in [row[1] for row in columns_result]:
+                geom_col_name = 'geometry'
+
+            try:
+                geom_count_query = text(f'SELECT COUNT(*) FROM "{layer_name}" WHERE "{geom_col_name}" IS NOT NULL')
+                geometry_feature_count = conn.execute(geom_count_query).scalar() or 0
+            except Exception:
+                # Fallback if column doesn't exist for some reason (e.g., non-spatial table)
+                geometry_feature_count = 0
+
             # Analyze property completeness using SQL aggregation
             property_stats = {}
             for col in columns:
-                # Handle GPKG lowercase convention
-                display_col = col.lower() if format_name == 'gpkg' else col
+                # Handle SQLite-based formats (GPKG, SPATIALITE) lowercase convention for consistency
+                display_col = col.lower() if format_name in ('gpkg', 'spatialite') else col
 
                 stats_query = text(f"""
                     SELECT
@@ -913,7 +937,8 @@ class S57DeepTester:
                 'layer_name': layer_name,
                 'feature_count': feature_count,
                 'column_count': total_columns,
-                'columns': [col.lower() if format_name == 'gpkg' else col for col in columns] + ['geom']
+                'columns': [col.lower() if format_name in ('gpkg', 'spatialite') else col for col in columns] + [geom_col_name],
+                'geometry_feature_count': geometry_feature_count
             }
 
             return layer_info, property_stats
@@ -1586,6 +1611,11 @@ class S57DeepTester:
             meta_a = data_a[layer_name]
             meta_b = data_b[layer_name]
 
+            # Skip layers that failed analysis (have 'error' field)
+            if 'error' in meta_a or 'error' in meta_b:
+                logger.debug(f"Skipping layer {layer_name} due to analysis errors")
+                continue
+
             count_a = meta_a['feature_count']
             count_b = meta_b['feature_count']
 
@@ -1612,13 +1642,30 @@ class S57DeepTester:
         # Save Level 1 detailed report
         self._save_level1_report(format_pair, layer_comparison, missing_in_a, missing_in_b)
 
-        # Calculate consistency score based on matching layer counts
+        # Calculate consistency score based on matching layer counts (excluding skipped layers)
+        valid_layers = len(layer_comparison)  # Only layers that were actually compared
         matching_layers = sum(1 for details in layer_comparison.values() if details['match'])
-        consistency_score = (matching_layers / len(common_layers) * 100) if common_layers else 0
+        consistency_score = (matching_layers / valid_layers * 100) if valid_layers > 0 else 0
+
+        # Debug: Log comparison details to understand the 3.5% issue
+        debug_file = self.config.reports_dir / "comparison_debug.txt"
+        with open(debug_file, 'a') as f:
+            f.write(f"=== COMPARISON DEBUG: {format_pair} ===\n")
+            f.write(f"Common layers: {len(common_layers)}\n")
+            f.write(f"Matching layers: {matching_layers}\n")
+            f.write(f"Consistency: {consistency_score:.1f}%\n")
+            f.write(f"Geometry differences: {len(geometry_differences)}\n")
+            non_matching = [name for name, details in layer_comparison.items() if not details['match']]
+            f.write(f"Non-matching layers sample: {non_matching[:5]}\n")
+            if non_matching[:3]:
+                for layer_name in non_matching[:3]:
+                    details = layer_comparison[layer_name]
+                    f.write(f"  {layer_name}: {format_a}={details[f'{format_a}_count']}, {format_b}={details[f'{format_b}_count']}\n")
+            f.write(f"\n")
 
         return ComparisonResult(
             format_pair=format_pair,
-            layers_compared=len(common_layers),
+            layers_compared=valid_layers,
             total_features=total_features,
             geometry_differences=geometry_differences,
             attribute_differences=[],  # Not checked in Level 1
@@ -1705,17 +1752,15 @@ class S57DeepTester:
         self._save_level2_report(format_pair, column_comparison)
         
         # Update consistency score to include column matching
-        # FIX: Correctly calculate consistency score by combining Level 1 and Level 2 results.
-        # The original implementation had a bug accessing a non-existent attribute.
-        level1_feature_matches = {d['layer'] for d in level1_result.geometry_differences if d['issue'] != 'feature_count_mismatch'}
-
+        # Combine Level 1 (feature count) and Level 2 (column) results.
+        # A layer is consistent if its feature count AND column schema match.
         consistent_layers_count = 0
         for layer_name, details in column_comparison.items():
             feature_count_match = layer_name not in {d['layer'] for d in level1_result.geometry_differences}
             if details['columns_match'] and feature_count_match:
                 consistent_layers_count += 1
 
-        consistency_score = (consistent_layers_count / len(common_layers) * 100) if common_layers else 0
+        consistency_score = (consistent_layers_count / len(common_layers) * 100) if common_layers else 100.0
         
         # Combine Level 1 and Level 2 results
         return ComparisonResult(
@@ -1775,25 +1820,53 @@ class S57DeepTester:
         
         # Start with Level 2 comparison
         level2_result = self._level2_comparison(format_a, data_a, format_b, data_b)
-        
+
+        # Get full import results to access detailed property statistics
+        results_a = self.test_results[format_a]
+        results_b = self.test_results[format_b]
+
         # Find common layers for detailed analysis
         layers_a = set(data_a.keys())
-        layers_b = set(data_b.keys())
-        common_layers = layers_a.intersection(layers_b)
-        
-        logger.info(f"Level 3 - Adding feature sampling for {len(common_layers)} layers")
-        
-        # Create detailed per-layer CSV reports with metadata analysis
+        common_layers = layers_a.intersection(data_b.keys())
+
+        logger.info(f"Level 3 - Adding feature sampling and property completeness analysis for {len(common_layers)} layers")
+
+        layer_consistency_scores = []
+
+        # Create detailed per-layer CSV reports with metadata and property analysis
         for layer_name in common_layers:
-            self._save_level3_layer_metadata_report(format_pair, layer_name,
-                                                   data_a[layer_name], data_b[layer_name])
-        
-        # Level 3 uses all Level 2 results plus detailed metadata analysis
-        return level2_result
+            layer_score = self._save_level3_layer_metadata_report(
+                format_pair, layer_name,
+                data_a.get(layer_name, {}), data_b.get(layer_name, {}),
+                results_a, results_b
+            )
+            if layer_score is not None:
+                layer_consistency_scores.append(layer_score)
+
+        # Calculate new consistency score based on property completeness
+        if layer_consistency_scores:
+            new_consistency_score = sum(layer_consistency_scores) / len(layer_consistency_scores)
+        else:
+            # Fallback to Level 2 score if no layers could be compared at Level 3
+            new_consistency_score = level2_result.consistency_score
+
+        logger.info(f"Level 3 property-based consistency for {format_pair}: {new_consistency_score:.1f}%")
+
+        # Return a new ComparisonResult with the updated score
+        return ComparisonResult(
+            format_pair=level2_result.format_pair,
+            layers_compared=level2_result.layers_compared,
+            total_features=level2_result.total_features,
+            geometry_differences=level2_result.geometry_differences,
+            attribute_differences=level2_result.attribute_differences,
+            data_type_differences=level2_result.data_type_differences,
+            missing_features=level2_result.missing_features,
+            consistency_score=new_consistency_score  # Use the new, more accurate score
+        )
 
     def _save_level3_layer_metadata_report(self, format_pair: str, layer_name: str,
-                                         meta_a: Dict, meta_b: Dict):
-        """Save Level 3 detailed layer comparison using database metadata."""
+                                         meta_a: Dict, meta_b: Dict, results_a: Dict, results_b: Dict) -> Optional[float]:
+        """Save Level 3 detailed layer comparison using database metadata and property statistics."""
         csv_file = self.config.reports_dir / f'level3_{layer_name}_{format_pair}.csv'
 
         format_a, format_b = format_pair.split('_vs_')
@@ -1802,6 +1875,12 @@ class S57DeepTester:
         cols_a = set(meta_a['columns'])
         cols_b = set(meta_b['columns'])
         all_columns = sorted(cols_a.union(cols_b))
+
+        # Extract property stats for the current layer from the full import results
+        layer_stats_a = next((s for s in results_a.get('layer_statistics', []) if s['layer_name'] == layer_name), {})
+        layer_stats_b = next((s for s in results_b.get('layer_statistics', []) if s['layer_name'] == layer_name), {})
+        props_a = layer_stats_a.get('property_stats', {})
+        props_b = layer_stats_b.get('property_stats', {})
 
         # Create vertical layout: columns as rows, formats as columns
         rows = []
@@ -1816,15 +1895,22 @@ class S57DeepTester:
 
         rows.append({
             'attribute': 'METADATA_TOTAL_FEATURES',
-            format_a: meta_a['feature_count'],
-            format_b: meta_b['feature_count'],
+            format_a: meta_a.get('feature_count', 'N/A'),
+            format_b: meta_b.get('feature_count', 'N/A'),
             'notes': f'Total features in each format'
         })
 
         rows.append({
+            'attribute': 'METADATA_GEOMETRY_FEATURES',
+            format_a: meta_a.get('geometry_feature_count', 'N/A'),
+            format_b: meta_b.get('geometry_feature_count', 'N/A'),
+            'notes': f'Features with non-null geometry'
+        })
+
+        rows.append({
             'attribute': 'METADATA_TOTAL_COLUMNS',
-            format_a: len(cols_a),
-            format_b: len(cols_b),
+            format_a: meta_a.get('column_count', 'N/A'),
+            format_b: meta_b.get('column_count', 'N/A'),
             'notes': f'Total columns in each format'
         })
 
@@ -1846,154 +1932,62 @@ class S57DeepTester:
                 'notes': 'Column presence comparison'
             })
 
+        # Property completeness analysis
+        rows.append({
+            'attribute': 'SEPARATOR_PROPERTY_COMPLETENESS',
+            format_a: '---',
+            format_b: '---',
+            'notes': 'Property completeness analysis (non-empty / total)'
+        })
+
+        matching_props_count = 0
+        total_props_compared = 0
+
+        common_props = sorted(set(props_a.keys()) | set(props_b.keys()))
+        for prop in common_props:
+            stats_a = props_a.get(prop)
+            stats_b = props_b.get(prop)
+
+            val_a = 'N/A'
+            if stats_a:
+                val_a = f"{stats_a['non_empty']}/{stats_a['total']} ({stats_a['completeness_pct']}%)"
+
+            val_b = 'N/A'
+            if stats_b:
+                val_b = f"{stats_b['non_empty']}/{stats_b['total']} ({stats_b['completeness_pct']}%)"
+
+            # Generate more descriptive notes for completeness
+            pct_a = stats_a.get('completeness_pct') if stats_a else None
+            pct_b = stats_b.get('completeness_pct') if stats_b else None
+
+            total_props_compared += 1
+            if pct_a is not None and pct_b is not None:
+                if pct_a == pct_b:
+                    notes = f"Values Match ({pct_a}%)"
+                    matching_props_count += 1
+                else:
+                    notes = f"Values MISMATCH ({pct_a}% vs {pct_b}%)"
+            else:
+                notes = 'Property completeness comparison'
+                # If one is missing, they don't match
+
+            rows.append({
+                'attribute': f'PROP_COMPLETENESS_{prop}',
+                format_a: val_a,
+                format_b: val_b,
+                'notes': notes
+            })
+
         # Save to CSV
         df = pd.DataFrame(rows)
         df.to_csv(csv_file, index=False)
         logger.debug(f"Level 3 metadata report saved: {csv_file}")
 
-    def _save_level3_layer_report_old_geopandas(self, format_pair: str, layer_name: str,
-                                 gdf_a, gdf_b):
-        """Save Level 3 detailed layer comparison with feature samples."""
-        csv_file = self.config.reports_dir / f'level3_{layer_name}_{format_pair}.csv'
-        
-        format_a, format_b = format_pair.split('_vs_')
-        
-        # Get all columns from both formats
-        cols_a = set(gdf_a.columns)
-        cols_b = set(gdf_b.columns)
-        all_columns = sorted(cols_a.union(cols_b))
-        
-        # Sample features (up to 10 examples from each format)
-        sample_size = min(10, len(gdf_a), len(gdf_b))
-        
-        # Create vertical layout: columns as rows, formats as columns
-        rows = []
-        
-        # Header row with metadata
-        rows.append({
-            'attribute': 'METADATA_LAYER_NAME',
-            format_a: layer_name,
-            format_b: layer_name,
-            'notes': f'Layer comparison between {format_a} and {format_b}'
-        })
-        
-        rows.append({
-            'attribute': 'METADATA_TOTAL_FEATURES',
-            format_a: len(gdf_a),
-            format_b: len(gdf_b),
-            'notes': f'Total features in each format'
-        })
-        
-        rows.append({
-            'attribute': 'METADATA_TOTAL_COLUMNS',
-            format_a: len(cols_a),
-            format_b: len(cols_b),
-            'notes': f'Total columns in each format'
-        })
-        
-        # Column presence analysis
-        rows.append({
-            'attribute': 'SEPARATOR_COLUMN_PRESENCE',
-            format_a: '--- COLUMN PRESENCE ---',
-            format_b: '--- COLUMN PRESENCE ---',
-            'notes': 'Which columns exist in each format'
-        })
-        
-        for col in all_columns:
-            if col == 'geometry':
-                continue
-                
-            present_a = 'YES' if col in cols_a else 'NO'
-            present_b = 'YES' if col in cols_b else 'NO'
-            
-            rows.append({
-                'attribute': f'COLUMN_PRESENT_{col}',
-                format_a: present_a,
-                format_b: present_b,
-                'notes': f'Column {col} presence'
-            })
-        
-        # Data type comparison
-        rows.append({
-            'attribute': 'SEPARATOR_DATA_TYPES',
-            format_a: '--- DATA TYPES ---',
-            format_b: '--- DATA TYPES ---',
-            'notes': 'Data types for each column'
-        })
-        
-        common_cols = cols_a.intersection(cols_b)
-        for col in sorted(common_cols):
-            if col == 'geometry':
-                continue
-                
-            type_a = str(gdf_a[col].dtype)
-            type_b = str(gdf_b[col].dtype)
-            
-            rows.append({
-                'attribute': f'DATATYPE_{col}',
-                format_a: type_a,
-                format_b: type_b,
-                'notes': f'Data type for {col}' + (' - MISMATCH!' if type_a != type_b else '')
-            })
-        
-        # Feature sample comparison
-        if sample_size > 0:
-            rows.append({
-                'attribute': 'SEPARATOR_FEATURE_SAMPLES',
-                format_a: f'--- FEATURE SAMPLES ({sample_size}) ---',
-                format_b: f'--- FEATURE SAMPLES ({sample_size}) ---',
-                'notes': f'Sample of {sample_size} features from each format'
-            })
-            
-            # Sample features from both datasets
-            sample_a = gdf_a.head(sample_size)
-            sample_b = gdf_b.head(sample_size)
-            
-            # Create feature comparison rows
-            for idx in range(sample_size):
-                rows.append({
-                    'attribute': f'SAMPLE_FEATURE_{idx+1}_SEPARATOR',
-                    format_a: f'--- FEATURE {idx+1} ---',
-                    format_b: f'--- FEATURE {idx+1} ---',
-                    'notes': f'Feature {idx+1} sample'
-                })
-                
-                # For each common column, show sample values
-                for col in sorted(common_cols):
-                    if col == 'geometry':
-                        # Special handling for geometry - show geometry type and coordinate count
-                        try:
-                            geom_a = sample_a.iloc[idx].geometry
-                            geom_b = sample_b.iloc[idx].geometry
-                            
-                            val_a = f"{geom_a.geom_type}({len(geom_a.coords) if hasattr(geom_a, 'coords') else 'complex'})"
-                            val_b = f"{geom_b.geom_type}({len(geom_b.coords) if hasattr(geom_b, 'coords') else 'complex'})"
-                        except:
-                            val_a = str(sample_a.iloc[idx].geometry)[:50] + "..."
-                            val_b = str(sample_b.iloc[idx].geometry)[:50] + "..."
-                    else:
-                        val_a = str(sample_a.iloc[idx][col]) if idx < len(sample_a) else 'N/A'
-                        val_b = str(sample_b.iloc[idx][col]) if idx < len(sample_b) else 'N/A'
-                        
-                        # Truncate long values
-                        if len(val_a) > 100:
-                            val_a = val_a[:97] + "..."
-                        if len(val_b) > 100:
-                            val_b = val_b[:97] + "..."
-                    
-                    mismatch_note = '' if val_a == val_b else ' - VALUES DIFFER!'
-                    
-                    rows.append({
-                        'attribute': f'SAMPLE_F{idx+1}_{col}',
-                        format_a: val_a,
-                        format_b: val_b,
-                        'notes': f'Feature {idx+1} - {col}{mismatch_note}'
-                    })
-        
-        # Save the vertical layout CSV
-        df = pd.DataFrame(rows)
-        df.to_csv(csv_file, index=False)
-        logger.info(f"Level 3 layer report saved: {csv_file}")
+        # Calculate and return layer-specific consistency score
+        if total_props_compared > 0:
+            return (matching_props_count / total_props_compared) * 100
+        else:
+            return None
 
     def _save_update_readiness_report(self, update_analysis: pd.DataFrame):
         """Save update readiness analysis to CSV and TXT files."""
