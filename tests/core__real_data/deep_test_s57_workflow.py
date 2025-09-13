@@ -1052,76 +1052,66 @@ class S57DeepTester:
             logger.error(f"❌ PostGIS force clean install failed: {e}")
 
     def _test_file_based_updates(self, format_name: str):
-        """Test file-based format updates (GPKG/SpatiaLite) using OGR-only operations."""
+        """
+        Test file-based format updates (GPKG/SpatiaLite) sequentially.
+        1. A normal update is applied to the original database.
+        2. A force-clean update is applied to the *already updated* database to test reversion.
+        """
         original_file_path = self.test_results[format_name]['output_path']
-        
-        # Test 1: Normal file-based update
-        logger.info(f"Testing {format_name.upper()} normal update using: {self.config.s57_update_root}")
+
+        try:
+            # --- Test 1: Normal file-based update ---
+            # This test runs on the original, pristine database.
+            self._run_file_update_test(format_name, original_file_path, 'normal')
+
+            # --- Test 2: Force-clean update (Revert) ---
+            # This test runs on the *already updated* database to test the revert capability.
+            self._run_file_update_test(format_name, original_file_path, 'force')
+        except Exception as e:
+            # A failure in the normal update will prevent the force update test.
+            logger.error(f"Halting update tests for {format_name.upper()} due to an error: {e}")
+
+    def _run_file_update_test(self, format_name: str, target_file: Path, update_type: str):
+        """Helper to run a specific type of file-based update test (normal or force)."""
+        is_force_clean = (update_type == 'force')
+        update_source = self.config.s57_data_root if is_force_clean else self.config.s57_update_root
+        test_key = f'update_{format_name}_{update_type}'
+        log_label = "force clean install" if is_force_clean else "normal update"
+
+        logger.info(f"Testing {format_name.upper()} {log_label} using: {update_source}")
         try:
             updater = S57Updater(
                 output_format=format_name,
-                dest_conn=original_file_path  # File path for file-based formats
+                dest_conn=str(target_file)
             )
 
             start_time = datetime.now()
             update_result = updater.update_from_location(
-                str(self.config.s57_update_root),
-                force_clean_install=False
+                str(update_source),
+                force_clean_install=is_force_clean
             )
             duration = datetime.now() - start_time
 
-            self.test_results[f'update_{format_name}_normal'] = {
+            self.test_results[test_key] = {
                 'status': 'success',
                 'duration': duration.total_seconds(),
-                'updates_applied': len(update_result.get('updated', [])),
-                'type': 'normal_update',
+                'files_processed': len(update_result.get('updated', [])),
+                'type': log_label,
                 'format': format_name,
-                'output_path': original_file_path
+                'output_path': str(target_file)
             }
-            logger.info(f"✅ {format_name.upper()} normal update completed in {duration}")
+            logger.info(f"✅ {format_name.upper()} {log_label} completed in {duration}")
 
         except Exception as e:
-            self.test_results[f'update_{format_name}_normal'] = {
+            self.test_results[test_key] = {
                 'status': 'failed',
                 'error': str(e),
-                'type': 'normal_update',
+                'type': log_label,
                 'format': format_name
             }
-            logger.error(f"❌ {format_name.upper()} normal update failed: {e}")
-
-        # Test 2: File-based force clean install
-        logger.info(f"Testing {format_name.upper()} force clean install using: {self.config.s57_data_root}")
-        try:
-            updater = S57Updater(
-                output_format=format_name,
-                dest_conn=original_file_path
-            )
-
-            start_time = datetime.now()
-            force_result = updater.update_from_location(
-                str(self.config.s57_data_root),
-                force_clean_install=True
-            )
-            duration = datetime.now() - start_time
-
-            self.test_results[f'update_{format_name}_force'] = {
-                'status': 'success',
-                'duration': duration.total_seconds(),
-                'files_processed': len(force_result.get('updated', [])),
-                'type': 'force_clean_install',
-                'format': format_name,
-                'output_path': original_file_path
-            }
-            logger.info(f"✅ {format_name.upper()} force clean install completed in {duration}")
-
-        except Exception as e:
-            self.test_results[f'update_{format_name}_force'] = {
-                'status': 'failed',
-                'error': str(e),
-                'type': 'force_clean_install',
-                'format': format_name
-            }
-            logger.error(f"❌ {format_name.upper()} force clean install failed: {e}")
+            logger.error(f"❌ {format_name.upper()} {log_label} failed: {e}")
+            # Re-raise the exception to halt further updates on this file
+            raise
 
     def _extract_and_compare_data(self):
         """Extract data from all successful imports and perform side-by-side comparisons."""
@@ -2377,27 +2367,20 @@ class S57DeepTester:
         # Import performance recommendations
         if len(import_results) > 1:
             durations = {fmt: result['duration'] for fmt, result in import_results.items() if 'duration' in result}
-            if durations:
-                fastest = min(durations, key=durations.get)
-                slowest = max(durations, key=durations.get)
-                
-                recommendations.append(
-                    f"Import Performance: {fastest.upper()} is fastest ({durations[fastest]:.1f}s), "
-                    f"{slowest.upper()} is slowest ({durations[slowest]:.1f}s)"
-                )
+            sorted_durations = sorted(durations.items(), key=lambda item: item[1])
+            perf_string = ", ".join([f"{fmt.upper()} ({duration:.1f}s)" for fmt, duration in sorted_durations])
+            recommendations.append(f"Import Performance (fastest to slowest): {perf_string}")
         
         # Update performance recommendations
         if len(update_results) > 1:
             update_durations = {fmt: result['duration'] for fmt, result in update_results.items() if 'duration' in result}
-            if update_durations:
-                fastest_update = min(update_durations, key=update_durations.get)
-                slowest_update = max(update_durations, key=update_durations.get)
-                
-                recommendations.append(
-                    f"Update Performance: {fastest_update.replace('update_', '').upper()} updates fastest "
-                    f"({update_durations[fastest_update]:.1f}s), {slowest_update.replace('update_', '').upper()} slowest "
-                    f"({update_durations[slowest_update]:.1f}s)"
-                )
+            sorted_updates = sorted(update_durations.items(), key=lambda item: item[1])
+            # Clean up names for display (e.g., 'update_postgis_normal' -> 'POSTGIS_NORMAL')
+            update_perf_string = ", ".join([
+                f"{fmt.replace('update_', '').upper()} ({duration:.1f}s)"
+                for fmt, duration in sorted_updates
+            ])
+            recommendations.append(f"Update Performance (fastest to slowest): {update_perf_string}")
             
         # Consistency recommendations  
         if self.comparison_results:
