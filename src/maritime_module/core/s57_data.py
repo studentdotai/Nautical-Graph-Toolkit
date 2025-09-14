@@ -2932,6 +2932,223 @@ class S57Updater:
             out_layer.CreateFeature(out_feature)
 
 # ==============================================================================
+# UNIFIED DATA ACCESS FACTORY
+# ==============================================================================
+
+class ENCDataFactory:
+    """
+    A factory and facade for accessing ENC data from multiple formats (PostGIS, GPKG, SpatiaLite)
+    through a single, unified interface. It standardizes the output to ensure a consistent
+    data schema for downstream analysis.
+    """
+
+    def __init__(self, source: Union[str, Path, Dict[str, Any]], schema: Optional[str] = 'public'):
+        """
+        Initializes the factory and instantiates the correct data manager.
+
+        Args:
+            source (Union[str, Path, Dict[str, Any]]): The data source.
+                - For PostGIS: A dictionary of connection parameters.
+                - For GPKG/SpatiaLite: A path to the file.
+            schema (Optional[str]): The schema name for PostGIS. Defaults to 'public'.
+        """
+        self.source = source
+        self.manager = self._get_manager(source, schema)
+        if not self.manager:
+            raise ValueError(f"Could not determine a valid manager for the given source.")
+
+    def _get_manager(self, source: Union[str, Path, Dict[str, Any]], schema: Optional[str]):
+        """Determines and returns the appropriate manager based on the source type."""
+        if isinstance(source, dict):
+            logger.info("Source is a dictionary, initializing PostGISManager.")
+            return PostGISManager(db_params=source, schema=schema)
+        elif isinstance(source, (str, Path)):
+            file_path = Path(source)
+            if not file_path.exists():
+                raise FileNotFoundError(f"File not found: {file_path}")
+
+            suffix = file_path.suffix.lower()
+            if suffix == '.gpkg':
+                logger.info("Source is a .gpkg file, initializing GPKGManager.")
+                return GPKGManager(gpkg_path=file_path)
+            elif suffix in ['.sqlite', '.db', '.sqlite3']:
+                logger.info("Source is a .sqlite file, initializing SpatiaLiteManager.")
+                return SpatiaLiteManager(db_path=file_path)
+            else:
+                raise ValueError(f"Unsupported file type: {suffix}")
+        return None
+
+    def _unify_dataframe(self, gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+        """
+        Standardizes a GeoDataFrame to a common schema.
+        - Renames columns to a consistent lowercase format using S-57 definitions.
+        - Enforces data types (Integer, Float) based on S-57 attribute definitions.
+        - Parses JSON-like string columns into Python lists for easier analysis.
+        """
+        if gdf.empty:
+            return gdf
+
+        unified_gdf = gdf.copy()
+        # Instantiate the utility class once for efficient lookups
+        s57_utils = S57Utils()
+
+        # --- 1. Standardize geometry column name FIRST ---
+        geom_col_name = unified_gdf.geometry.name
+        if geom_col_name != 'geometry':
+            unified_gdf = unified_gdf.rename_geometry('geometry')
+
+        # --- 2. Enforce Data Types BEFORE lowercasing columns ---
+        # This is the critical change. We iterate over the original column names
+        # (which might be uppercase, e.g., 'RCID' from GPKG) to ensure the
+        # lookup in S57Utils works correctly.
+        for col in unified_gdf.columns:
+            if col.lower() in ['geometry', 'ogc_fid']:  # Skip non-attribute columns
+                continue
+
+            # --- FIX: Explicitly handle core integer identifiers FIRST ---
+            # These are critical for linking data and are known to be integers.
+            # This ensures they are cast correctly even if the S57 attribute lookup fails.
+            # Also handle ENC stamping columns that are not in S-57 standard
+            integer_columns = ['rcid', 'fidn', 'fids', 'prim', 'grup', 'objl', 'rver', 'agen',
+                             'dsid_edtn', 'dsid_updn']  # Added ENC stamping columns
+            if col.lower() in integer_columns:
+                try:
+                    unified_gdf[col] = pd.to_numeric(
+                        unified_gdf[col], errors='coerce'
+                    ).astype(pd.Int32Dtype())
+                except (TypeError, ValueError) as e:
+                    logger.warning(f"Could not cast identifier column '{col}' to Int32. Error: {e}")
+                continue # Move to the next column
+
+            if col.lower() in ['geometry', 'ogc_fid']:  # Skip non-attribute columns
+                continue
+
+            # Use the original column name for the lookup
+            s57_type = s57_utils.get_attribute_type(col)
+
+            if s57_type:
+                try:
+                    if s57_type in ['I', 'E']:  # Integer or Enumerated
+                        # Use nullable integer type to handle potential NaNs gracefully
+                        # The `col` here is the original (potentially uppercase) column name
+                        unified_gdf[col] = pd.to_numeric(
+                            unified_gdf[col], errors='coerce'
+                        ).astype(pd.Int32Dtype())
+                    elif s57_type == 'F':  # Float
+                        unified_gdf[col] = pd.to_numeric(
+                            unified_gdf[col], errors='coerce'
+                        ).astype(float)
+                    # 'A' (Attribute) and 'S' (String) types are usually fine as objects,
+                    # but could be explicitly cast to string if needed for consistency.
+                except (TypeError, ValueError) as e:
+                    logger.warning(f"Could not cast column '{col}' to type '{s57_type}'. Error: {e}")
+
+        # --- 3. Standardize all column names to lowercase AFTER type casting ---
+        unified_gdf.columns = [c.lower() for c in unified_gdf.columns]
+
+        # --- 4. Parse list-like string columns ---
+        # Get all possible S-57 attributes that are lists
+        all_list_attrs = s57_utils.get_attributes_by_type('L')
+
+        for col_acronym in all_list_attrs:
+            # --- FIX: Ensure list-type columns exist before trying to parse them ---
+            # If a list column is missing from a source (e.g., lnam_refs in SpatiaLite),
+            # create it and fill with empty lists for schema consistency.
+            col = col_acronym.lower()
+            if col not in unified_gdf.columns:
+                # Check if this attribute is relevant for any object in the current GDF
+                # This is an optimization to avoid adding dozens of empty columns.
+                # We can simply check if 'objl' exists and is not empty.
+                if 'objl' in unified_gdf.columns and not unified_gdf.empty:
+                    logger.debug(f"Column '{col}' is missing. Adding it with empty lists for consistency.")
+                    # Create a series of empty lists with the same index as the dataframe
+                    unified_gdf[col] = [[] for _ in range(len(unified_gdf))]
+                else:
+                    # If there's no data anyway, no need to add the column.
+                    continue
+
+            if col in unified_gdf.columns and not unified_gdf[col].empty:
+                # Check if the column contains strings that look like lists/JSON
+                # The `pyogrio` engine often reads list-like columns as object arrays of lists already.
+                # The PostGIS driver may read them as JSON strings. This handles both cases.
+                if unified_gdf[col].dtype == 'object':
+                    # --- FIX: Handle rows that are None before applying list functions ---
+                    # This prevents errors when a list column has missing values. We replace
+                    # None with an empty list to ensure consistent data structure.
+                    is_list_or_none = unified_gdf[col].apply(lambda x: isinstance(x, (list, type(None), str)))
+                    if not is_list_or_none.all():
+                        logger.warning(f"Column '{col}' contains non-list/string types. Skipping unification.")
+                        continue
+
+                    try:
+                        # Define a robust parser function
+                        def parse_and_standardize(item):
+                            # First, if the item is a string that looks like a JSON list, parse it.
+                            if isinstance(item, str) and item.startswith('['):
+                                try:
+                                    item = json.loads(item)
+                                except json.JSONDecodeError:
+                                    # If it's not valid JSON, leave it as is for the next step.
+                                    pass
+
+                            # If item is None after potential parsing, return an empty list for consistency.
+                            if item is None:
+                                return []
+
+                            # --- FIX: Now, if the item is a list, ensure all its elements are strings. ---
+                            # This is the key change. It handles lists from all sources (already parsed or from JSON)
+                            # and guarantees that [17] becomes ['17'] and [022614076BFD0E9F] becomes ['022614076BFD0E9F'].
+                            if isinstance(item, list):
+                                return [str(i) for i in item if i is not None]
+                            return item
+                        unified_gdf[col] = unified_gdf[col].apply(parse_and_standardize)
+                    except (json.JSONDecodeError, TypeError):
+                        logger.debug(f"Could not parse column '{col}' as JSON list. Leaving as is.")
+
+        # --- 5. Sort the DataFrame for consistent output ---
+        # This is a critical step for ensuring unanimous output. It guarantees
+        # that dataframes from different sources have the same row order.
+        if 'rcid' in unified_gdf.columns:
+            unified_gdf = unified_gdf.sort_values(by='rcid').reset_index(drop=True)
+            logger.debug("Unified DataFrame sorted by 'rcid' for consistent ordering.")
+
+        return unified_gdf
+
+    def get_layer(self, layer_name: str, filter_by_enc: Optional[List[str]] = None) -> gpd.GeoDataFrame:
+        """
+        Retrieves a layer and returns it as a standardized GeoDataFrame.
+
+        Args:
+            layer_name (str): The name of the layer to retrieve.
+            filter_by_enc (Optional[List[str]]): A list of ENC names to filter by.
+
+        Returns:
+            gpd.GeoDataFrame: A GeoDataFrame with a unified schema.
+        """
+        logger.info(f"Factory: Getting layer '{layer_name}'...")
+        gdf = self.manager.get_layer(layer_name, filter_by_enc)
+        logger.info("Factory: Unifying DataFrame schema...")
+        return self._unify_dataframe(gdf)
+
+    def get_enc_summary(self, check_noaa: bool = False) -> pd.DataFrame:
+        """
+        Retrieves the ENC summary and returns it as a standardized DataFrame.
+
+        Args:
+            check_noaa (bool): Whether to check against the live NOAA database.
+
+        Returns:
+            pd.DataFrame: A DataFrame with a unified schema.
+        """
+        logger.info("Factory: Getting ENC summary...")
+        df = self.manager.get_enc_summary(check_noaa)
+
+        # Unify column names (e.g., GPKG uses uppercase)
+        df.columns = [col.lower() for col in df.columns]
+
+        return df
+
+# ==============================================================================
 # DATABASE ANALYSIS CLASS
 # ==============================================================================
 
@@ -3240,8 +3457,9 @@ class SpatiaLiteManager:
             enc_list_str = ", ".join([f"'{enc}'" for enc in filter_by_enc])
             where_clause = f"dsid_dsnm IN ({enc_list_str})"
 
-        # Use gpd.read_file, which is the correct, high-level function for reading file-based sources.
-        return gpd.read_file(self.db_path, layer=safe_layer_name, where=where_clause, engine='pyogrio')
+        # Use fiona engine for SpatiaLite to properly handle StringList/IntegerList fields
+        # that pyogrio engine skips as "unsupported OGR type"
+        return gpd.read_file(self.db_path, layer=safe_layer_name, where=where_clause, engine='fiona')
 
     def get_enc_summary(self, check_noaa: bool = False) -> pd.DataFrame:
         """
@@ -3502,8 +3720,8 @@ class GPKGManager:
             enc_list_str = ", ".join([f"'{enc}'" for enc in filter_by_enc])
             where_clause = f"DSID_DSNM IN ({enc_list_str})"
 
-        # Use gpd.read_file, which is the correct, high-level function for reading file-based sources.
-        return gpd.read_file(self.gpkg_path, layer=safe_layer_name, where=where_clause, engine='pyogrio')
+        # Use fiona engine for consistent handling of StringList/IntegerList fields across formats
+        return gpd.read_file(self.gpkg_path, layer=safe_layer_name, where=where_clause, engine='fiona')
 
     def get_enc_summary(self, check_noaa: bool = False) -> pd.DataFrame:
         """

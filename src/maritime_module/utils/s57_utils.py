@@ -57,47 +57,64 @@ class S57Utils:
     _s57_objects_df = None
     _s57_properties_df = None
 
-    # The data directory is one level up from this 'utils' directory.
-    _data_dir = Path(__file__).resolve().parent.parent / 'data'
+    def __init__(self):
+        """
+        Initializes the S57Utils instance and ensures that the necessary
+        S-57 definition files are loaded and cached for performance.
+        """
+        # The data directory is one level up from the 'utils' directory.
+        self._data_dir = Path(__file__).resolve().parent.parent / 'data'
+        self._load_attributes_df()
+        self._load_objects_df()
+        self._load_properties_df()
 
-    @staticmethod
-    def _load_attributes_df(csv_filename: str = 's57attributes.csv'):
+    def _load_attributes_df(self, csv_filename: str = 's57attributes.csv'):
         """Loads the attributes CSV, using a path relative to the package structure."""
-        if S57Utils._s57_attributes_df is None:
-            csv_path = S57Utils._data_dir / csv_filename
+        if self.__class__._s57_attributes_df is None:
+            csv_path = self._data_dir / csv_filename
             if not csv_path.is_file():
                 raise FileNotFoundError(f"S-57 attributes CSV not found at: {csv_path}")
 
             # Index by 'Acronym' for faster, more consistent lookups.
             df = pd.read_csv(csv_path)
-            S57Utils._s57_attributes_df = df.set_index('Acronym')
-        return S57Utils._s57_attributes_df
+            # Standardize column names and set index for quick lookups
+            df.columns = [col.lower().strip() for col in df.columns]
+            # Convert acronym values to lowercase to match lookup logic
+            df['acronym'] = df['acronym'].str.lower()
+            # Remove duplicates that may occur after lowercase conversion
+            # Keep the first occurrence of each acronym
+            df = df.drop_duplicates(subset=['acronym'], keep='first')
+            self.__class__._s57_attributes_df = df.set_index('acronym')
 
-    @staticmethod
-    def _load_objects_df(csv_filename: str = 's57objectclasses.csv'):
+    def _load_objects_df(self, csv_filename: str = 's57objectclasses.csv'):
         """Loads the object classes CSV, using a path relative to the package structure."""
-        if S57Utils._s57_objects_df is None:
-            csv_path = S57Utils._data_dir / csv_filename
+        if self.__class__._s57_objects_df is None:
+            csv_path = self._data_dir / csv_filename
             if not csv_path.is_file():
                 raise FileNotFoundError(f"S-57 object classes CSV not found at: {csv_path}")
 
-            S57Utils._s57_objects_df = pd.read_csv(csv_path).set_index('Acronym')
-        return S57Utils._s57_objects_df
+            df = pd.read_csv(csv_path)
+            df.columns = [col.lower().strip() for col in df.columns]
+            # Convert acronym values to lowercase to match lookup logic
+            df['acronym'] = df['acronym'].str.lower()
+            # Remove duplicates that may occur after lowercase conversion
+            # Keep the first occurrence of each acronym
+            df = df.drop_duplicates(subset=['acronym'], keep='first')
+            self.__class__._s57_objects_df = df.set_index('acronym')
 
-    @staticmethod
-    def _load_properties_df():
+    def _load_properties_df(self):
         """
         Loads and merges the attributes and expected input CSVs to create a master
         lookup table for property conversions. Caches the result for performance.
         """
-        if S57Utils._s57_properties_df is None:
+        if self.__class__._s57_properties_df is None:
             try:
                 # Load attributes, keeping 'Acronym' and 'Code' for the merge
-                attr_csv_path = S57Utils._data_dir / 's57attributes.csv'
+                attr_csv_path = self._data_dir / 's57attributes.csv'
                 attr_df = pd.read_csv(attr_csv_path, usecols=['Code', 'Acronym', 'Attributetype'])
 
                 # Load expected inputs
-                expected_csv_path = S57Utils._data_dir / 's57expectedinput.csv'
+                expected_csv_path = self._data_dir / 's57expectedinput.csv'
                 expected_df = pd.read_csv(expected_csv_path)
 
                 # Merge the two dataframes on the 'Code' column
@@ -105,7 +122,7 @@ class S57Utils:
 
                 # Clean up data for reliable lookups
                 prop_df.dropna(subset=['ID', 'Acronym'], inplace=True)
-                S57Utils._s57_properties_df = prop_df
+                self.__class__._s57_properties_df = prop_df
                 logger.debug("Successfully loaded and merged S-57 properties lookup table.")
             except FileNotFoundError as e:
                 logger.error(f"Could not load S-57 definition files: {e}")
@@ -113,25 +130,51 @@ class S57Utils:
             except Exception as e:
                 logger.error(f"Error processing S-57 definition files: {e}")
                 raise
-        return S57Utils._s57_properties_df
 
-    @staticmethod
-    def get_attribute_name(acronym: str) -> Optional[str]:
+    def get_attribute_name(self, acronym: str) -> Optional[str]:
         """Converts an S-57 attribute acronym (e.g., 'NATSUR') to its full name."""
         try:
-            df = S57Utils._load_attributes_df()
             # Use .loc for a fast, direct lookup on the index.
-            return df.loc[acronym.upper()]['Attribute']
+            return self.__class__._s57_attributes_df.loc[acronym.lower()]['attribute']
         except (FileNotFoundError, KeyError):
             logger.warning(f"Attribute acronym '{acronym}' not found.")
             return None
 
-    @staticmethod
-    def get_object_class_name(acronym: str) -> Optional[str]:
+    def get_attribute_type(self, acronym: str) -> Optional[str]:
+        """
+        Gets the S-57 attribute type (e.g., 'I', 'F', 'S', 'L') for a given acronym.
+        This is crucial for data type casting and validation.
+        """
+        if self.__class__._s57_attributes_df is None:
+            return None
+        try:
+            # Acronyms are stored in lowercase in the index
+            return self.__class__._s57_attributes_df.loc[acronym.lower(), 'attributetype']
+        except KeyError:
+            logger.debug(f"Attribute type for acronym '{acronym}' not found.")
+            return None
+
+    def get_attributes_by_type(self, attr_type: str) -> List[str]:
+        """
+        Gets a list of all attribute acronyms of a specific type.
+
+        Args:
+            attr_type (str): The attribute type to filter by (e.g., 'L', 'I', 'S').
+
+        Returns:
+            List[str]: A list of attribute acronyms.
+        """
+        if self.__class__._s57_attributes_df is None:
+            return []
+        try:
+            return self.__class__._s57_attributes_df[self.__class__._s57_attributes_df['attributetype'] == attr_type].index.tolist()
+        except KeyError:
+            return []
+
+    def get_object_class_name(self, acronym: str) -> Optional[str]:
         """Converts an S-57 object class acronym (e.g., 'SOUNDG') to its full name."""
         try:
-            df = S57Utils._load_objects_df()
-            return df.loc[acronym.upper()]['ObjectClass']
+            return self.__class__._s57_objects_df.loc[acronym.lower()]['objectclass']
         except (FileNotFoundError, KeyError):
             logger.warning(f"Object Class acronym '{acronym}' not found.")
             return None
@@ -146,9 +189,8 @@ class S57Utils:
             return s.strip('()').split(':', 1)[1].strip()
         return s
 
-    @staticmethod
-    def s57_properties_convert(acronym_str: str, property_value: Any, prop_mixed: bool = False,
-                               debug: bool = False) -> Union[str, List[str], None]:
+    def s57_properties_convert(self, acronym_str: str, property_value: Any, prop_mixed: bool = False,
+                             debug: bool = False) -> Union[str, List[str], None]:
         """
         Converts an S-57 layer property value to its human-readable meaning.
 
@@ -177,11 +219,7 @@ class S57Utils:
             return None
 
         # --- 2. Prepare Lookup Table ---
-        try:
-            prop_df = S57Utils._load_properties_df()
-        except (FileNotFoundError, Exception) as e:
-            logger.error(f"Cannot perform conversion, failed to load properties: {e}")
-            return property_value  # Return original value if definitions are missing
+        prop_df = self.__class__._s57_properties_df
 
         # Filter to only the relevant acronym for much faster lookups
         attr_lookup = prop_df[prop_df['Acronym'] == acronym_str.upper()]
