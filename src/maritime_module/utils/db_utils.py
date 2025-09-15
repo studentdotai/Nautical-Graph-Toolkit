@@ -254,6 +254,20 @@ class PostGISConnector(DatabaseConnector):
         
         return results_df
 
+    def drop_schema(self, schema_name: str):
+        """Drops a schema from the database."""
+        if not self.engine:
+            self.connect()
+
+        try:
+            with self.engine.connect() as connection:
+                with connection.begin(): # Use a transaction
+                    connection.execute(text(f'DROP SCHEMA IF EXISTS "{schema_name}" CASCADE'))
+            logger.info(f"Successfully dropped schema '{schema_name}'")
+        except Exception as e:
+            logger.error(f"Failed to drop schema '{schema_name}': {e}")
+            raise
+
 
 class FileDBConnector(DatabaseConnector):
     """Handles preparation for file-based databases like GeoPackage and SpatiaLite."""

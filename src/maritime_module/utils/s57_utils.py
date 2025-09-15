@@ -68,6 +68,18 @@ class S57Utils:
         self._load_objects_df()
         self._load_properties_df()
 
+    def get_attributes_df(self) -> Optional['pd.DataFrame']:
+        """Returns the cached S-57 attributes DataFrame."""
+        return self.__class__._s57_attributes_df
+
+    def get_objects_df(self) -> Optional['pd.DataFrame']:
+        """Returns the cached S-57 object classes DataFrame."""
+        return self.__class__._s57_objects_df
+
+    def get_properties_df(self) -> Optional['pd.DataFrame']:
+        """Returns the cached S-57 properties DataFrame."""
+        return self.__class__._s57_properties_df
+
     def _load_attributes_df(self, csv_filename: str = 's57attributes.csv'):
         """Loads the attributes CSV, using a path relative to the package structure."""
         if self.__class__._s57_attributes_df is None:
@@ -111,14 +123,14 @@ class S57Utils:
             try:
                 # Load attributes, keeping 'Acronym' and 'Code' for the merge
                 attr_csv_path = self._data_dir / 's57attributes.csv'
-                attr_df = pd.read_csv(attr_csv_path, usecols=['Code', 'Acronym', 'Attributetype'])
+                attr_df = pd.read_csv(attr_csv_path, usecols=['Code', 'Attribute', 'Acronym', 'Attributetype'])
 
                 # Load expected inputs
                 expected_csv_path = self._data_dir / 's57expectedinput.csv'
                 expected_df = pd.read_csv(expected_csv_path)
 
                 # Merge the two dataframes on the 'Code' column
-                prop_df = pd.merge(expected_df, attr_df, on='Code', how='left')
+                prop_df = pd.merge(attr_df, expected_df,  on='Code', how='left')
 
                 # Clean up data for reliable lookups
                 prop_df.dropna(subset=['ID', 'Acronym'], inplace=True)
@@ -212,7 +224,11 @@ class S57Utils:
                                          - None for null/empty input.
         """
         # --- 1. Initial Data Validation and Cleanup ---
-        if property_value is None or pd.isna(property_value):
+        # FIX: Handle empty lists explicitly before calling pd.isna() to avoid ValueError.
+        # An empty list is a valid, non-null value that should be handled.
+        if property_value is None:
+            return None
+        if isinstance(property_value, list) and not property_value:
             return None
         # Handle the specific integer used for null in some GDAL versions
         if isinstance(property_value, (int, float)) and property_value == -2147483648:

@@ -3114,21 +3114,48 @@ class ENCDataFactory:
 
         return unified_gdf
 
-    def get_layer(self, layer_name: str, filter_by_enc: Optional[List[str]] = None) -> gpd.GeoDataFrame:
+    def get_layer(self, layer_name: str, filter_by_enc: Optional[List[str]] = None,
+                  convert_acronyms: bool = False, convert_properties: bool = False,
+                  prop_mixed: bool = False) -> gpd.GeoDataFrame:
         """
         Retrieves a layer and returns it as a standardized GeoDataFrame.
 
         Args:
             layer_name (str): The name of the layer to retrieve.
             filter_by_enc (Optional[List[str]]): A list of ENC names to filter by.
+            convert_acronyms (bool): If True, converts S-57 column acronyms to full names.
+            convert_properties (bool): If True, converts S-57 property values to human-readable meanings.
+                                       Requires `convert_acronyms=True`.
+            prop_mixed (bool): If True, includes original codes with converted property values, e.g., "sand (1)".
 
         Returns:
             gpd.GeoDataFrame: A GeoDataFrame with a unified schema.
         """
         logger.info(f"Factory: Getting layer '{layer_name}'...")
         gdf = self.manager.get_layer(layer_name, filter_by_enc)
-        logger.info("Factory: Unifying DataFrame schema...")
-        return self._unify_dataframe(gdf)
+        unified_gdf = self._unify_dataframe(gdf)
+
+        if convert_acronyms:
+            logger.info("Factory: Applying S-57 conversions...")
+            s57_utils = S57Utils()
+            # Iterate over a copy of columns as we might be changing them
+            for col_acronym in list(unified_gdf.columns):
+                # Skip non-attribute columns
+                if col_acronym.lower() in ['geometry', 'ogc_fid', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn']:
+                    continue
+
+                # Convert property values if requested
+                if convert_properties:
+                    unified_gdf[col_acronym] = unified_gdf[col_acronym].apply(
+                        lambda val: s57_utils.s57_properties_convert(col_acronym, val, prop_mixed=prop_mixed)
+                    )
+
+                # Convert column name (acronym) to full attribute name
+                full_name = s57_utils.get_attribute_name(col_acronym)
+                if full_name:
+                    unified_gdf.rename(columns={col_acronym: f"{full_name} ({col_acronym})"}, inplace=True)
+
+        return unified_gdf
 
     def get_enc_summary(self, check_noaa: bool = False) -> pd.DataFrame:
         """
@@ -3147,6 +3174,59 @@ class ENCDataFactory:
         df.columns = [col.lower() for col in df.columns]
 
         return df
+
+    def get_layers_summary(self, include_empty: bool = False) -> pd.DataFrame:
+        """
+        Retrieves a summary of all layers (tables) in the data source.
+
+        This method is a facade that calls the appropriate implementation on the
+        underlying data manager (PostGIS, GPKG, or SpatiaLite).
+
+        Args:
+            include_empty (bool): If True, includes layers with zero features.
+
+        Returns:
+            pd.DataFrame: A DataFrame with columns ['LayerName', 'Acronym', 'FeatureCount'].
+        """
+        logger.info("Factory: Getting layers summary...")
+        return self.manager.get_layers_summary(include_empty=include_empty)
+
+    def get_encs_by_usage_band(self, usage_band: int) -> List[str]:
+        """
+        Filters and returns ENC names based on their navigational usage band.
+
+        This method is a facade that calls the appropriate implementation on the
+        underlying data manager.
+
+        Navigational Usage Bands:
+        1: Overview, 2: General, 3: Coastal, 4: Approach, 5: Harbour, 6: Berthing
+
+        Args:
+            usage_band (int): The usage band number (1-6).
+
+        Returns:
+            List[str]: A list of ENC names matching the usage band.
+        """
+        logger.info(f"Factory: Getting ENCs for usage band {usage_band}...")
+        return self.manager.get_encs_by_usage_band(usage_band=usage_band)
+
+    def get_enc_bounding_boxes(self, enc_names: List[str]) -> gpd.GeoDataFrame:
+        """
+        Retrieves the bounding box geometries for a list of specified ENCs.
+
+        This method is a facade that calls the appropriate implementation on the
+        underlying data manager. It queries the 'm_covr' layer for the
+        official dataset boundaries.
+
+        Args:
+            enc_names (List[str]): A list of ENC names to query.
+
+        Returns:
+            gpd.GeoDataFrame: A GeoDataFrame containing the ENC names and their
+                              bounding box geometries.
+        """
+        logger.info(f"Factory: Getting bounding boxes for {len(enc_names)} ENCs...")
+        return self.manager.get_enc_bounding_boxes(enc_names=enc_names)
 
 # ==============================================================================
 # DATABASE ANALYSIS CLASS
@@ -3203,6 +3283,113 @@ class PostGISManager:
         #    It safely combines them at the database level, preventing injection.
         return gpd.read_postgis(sql, self.engine, params=params, geom_col='wkb_geometry')
 
+    def get_layers_summary(self, include_empty: bool = False) -> pd.DataFrame:
+        """
+        Retrieves a summary of all layers (tables) in the schema, including their
+        feature counts and human-readable S-57 object class names.
+
+        Args:
+            include_empty (bool): If True, includes layers with zero features.
+
+        Returns:
+            pd.DataFrame: A DataFrame with columns ['LayerName', 'Acronym', 'FeatureCount'].
+        """
+        logger.info(f"Fetching layer summary for schema '{self.schema}'...")
+        inspector = inspect(self.engine)
+        table_names = inspector.get_table_names(schema=self.schema)
+
+        s57_utils = S57Utils()
+        summary_data = []
+
+        for table_name in table_names:
+            try:
+                count_query = text(f'SELECT COUNT(*) FROM "{self.schema}"."{table_name}"')
+                with self.engine.connect() as conn:
+                    feature_count = conn.execute(count_query).scalar()
+
+                if not include_empty and feature_count == 0:
+                    continue
+
+                # Convert acronym to full name
+                full_name = s57_utils.get_object_class_name(table_name)
+                summary_data.append({
+                    'LayerName': full_name or table_name.capitalize(),
+                    'Acronym': table_name,
+                    'FeatureCount': feature_count
+                })
+            except Exception as e:
+                logger.warning(f"Could not process table '{table_name}': {e}")
+
+        df = pd.DataFrame(summary_data)
+        return df.sort_values(by='FeatureCount', ascending=False).reset_index(drop=True)
+
+    def get_encs_by_usage_band(self, usage_band: Union[int, List[int]]) -> List[str]:
+        """
+        Filters and returns ENC names based on their navigational usage band.
+
+        Navigational Usage Bands:
+        1: Overview
+        2: General
+        3: Coastal
+        4: Approach
+        5: Harbour
+        6: Berthing
+
+        Args:
+            usage_band (Union[int, List[int]]): A single usage band number or a list of bands (1-6).
+
+        Returns:
+            List[str]: A list of ENC names matching the usage band.
+        """
+        bands = [usage_band] if isinstance(usage_band, int) else usage_band
+        if not all(1 <= b <= 6 for b in bands):
+            raise ValueError("All usage bands must be integers between 1 and 6.")
+
+        # Build a list of LIKE patterns for each usage band
+        patterns = [f"__{b}%" for b in bands]
+
+        # Create a WHERE clause with multiple LIKE conditions
+        where_conditions = " OR ".join([f"dsid_dsnm LIKE '{p}'" for p in patterns])
+        sql = text(f'SELECT DISTINCT dsid_dsnm FROM "{self.schema}"."dsid" WHERE {where_conditions}')
+
+        with self.engine.connect() as conn:
+            result = conn.execute(sql).fetchall()
+
+        # Clean the .000 extension from the ENC names
+        cleaned_names = []
+        for row in result:
+            name = row[0]
+            if name and name.upper().endswith('.000'):
+                cleaned_names.append(name[:-4])
+            else:
+                cleaned_names.append(name)
+
+        return sorted(cleaned_names)
+
+    def get_enc_bounding_boxes(self, enc_names: List[str]) -> gpd.GeoDataFrame:
+        """
+        Retrieves the bounding box geometries for a list of specified ENCs.
+
+        Args:
+            enc_names (List[str]): A list of ENC names to query.
+
+        Returns:
+            gpd.GeoDataFrame: A GeoDataFrame containing the ENC names and their
+                              bounding box geometries from the 'm_covr' layer.
+        """
+        if not enc_names:
+            return gpd.GeoDataFrame()
+
+        # The 'm_covr' layer with CATCOV=1 defines the dataset's bounding box.
+        sql = text(f"""
+            SELECT dsid_dsnm, wkb_geometry
+            FROM "{self.schema}"."m_covr"
+            WHERE catcov = 1 AND dsid_dsnm IN :enc_names
+        """)
+
+        gdf = gpd.read_postgis(sql, self.engine, params={'enc_names': tuple(enc_names)}, geom_col='wkb_geometry')
+        return gdf.sort_values(by='dsid_dsnm').reset_index(drop=True)
+
     def get_enc_summary(self, check_noaa: bool = False) -> pd.DataFrame:
         """
         Provides a summary of all ENCs in the database.
@@ -3217,47 +3404,64 @@ class PostGISManager:
         """
         sql = f'SELECT dsid_dsnm, dsid_edtn, dsid_updn FROM "{self.schema}"."dsid"'
         df = pd.read_sql(sql, self.engine)
-        df.rename(columns={'dsid_dsnm': 'ENC_Name', 'dsid_edtn': 'Edition', 'dsid_updn': 'Update'}, inplace=True)
+        df.rename(columns={'dsid_dsnm': 'ENC_Name', 'dsid_edtn': 'DB_Edition', 'dsid_updn': 'DB_Update'}, inplace=True)
 
         if not check_noaa:
             return df
 
         logger.info("Checking against NOAA database for latest versions...")
         try:
-            noaa_db = NoaaDB()
-            noaa_df = noaa_db.get_dataframe()
+            noaa_db = NoaaDatabase() # Corrected from NoaaDB
+            noaa_df = noaa_db.get_dataframe(force_refresh=False) # Use cached data if available
 
             # Clean local ENC names to match NOAA format (e.g., remove .000)
             df['ENC_Name_Clean'] = df['ENC_Name'].str.split('.').str[0]
 
             # Prepare NOAA data for efficient lookup, renaming columns to avoid conflicts
-            noaa_df_renamed = noaa_df.rename(columns={'Edition': 'NOAA_Edition', 'Update': 'NOAA_Update'})
-            noaa_lookup = noaa_df_renamed.set_index('ENC_Name')[['NOAA_Edition', 'NOAA_Update']]
+            noaa_df_renamed = noaa_df.rename(columns={'Edition': 'NOAA_Edition', 'Update': 'NOAA_Update', 'Update_Application_Date': 'NOAA_Update_Date'})
+            noaa_lookup = noaa_df_renamed.set_index('ENC_Name')[['NOAA_Edition', 'NOAA_Update', 'NOAA_Update_Date']]
 
             # Merge the NOAA data into our local dataframe
             merged_df = df.join(noaa_lookup, on='ENC_Name_Clean')
 
             # Ensure all version columns are numeric for comparison, coercing errors
-            for col in ['Edition', 'Update', 'NOAA_Edition', 'NOAA_Update']:
+            for col in ['DB_Edition', 'DB_Update', 'NOAA_Edition', 'NOAA_Update']:
                 merged_df[col] = pd.to_numeric(merged_df[col], errors='coerce')
+
+            # --- Enhanced Status Logic ---
+            def get_status(row):
+                if pd.isna(row['NOAA_Edition']):
+                    return 'Not in NOAA DB'
+                if row['DB_Edition'] < row['NOAA_Edition']:
+                    return 'Outdated (Edition)'
+                if row['DB_Edition'] == row['NOAA_Edition'] and row['DB_Update'] < row['NOAA_Update']:
+                    return 'Outdated (Update)'
+                if row['DB_Edition'] > row['NOAA_Edition'] or \
+                   (row['DB_Edition'] == row['NOAA_Edition'] and row['DB_Update'] > row['NOAA_Update']):
+                    return 'Newer in DB'
+                return 'Up-to-date'
+
+            merged_df['Status'] = merged_df.apply(get_status, axis=1)
 
             # Determine if the local ENC is outdated
             # An ENC is outdated if:
             # 1. The NOAA edition is greater than the local edition.
             # 2. Editions are the same, but the NOAA update is greater than the local update.
             is_outdated = (
-                    (merged_df['Edition'] < merged_df['NOAA_Edition']) |
-                    ((merged_df['Edition'] == merged_df['NOAA_Edition']) & (
-                                merged_df['Update'] < merged_df['NOAA_Update']))
+                    (merged_df['DB_Edition'] < merged_df['NOAA_Edition']) |
+                    ((merged_df['DB_Edition'] == merged_df['NOAA_Edition']) & (
+                                merged_df['DB_Update'] < merged_df['NOAA_Update']))
             )
 
             # Add the 'is_outdated' column to the original dataframe
             # Fill NaNs (for ENCs not in NOAA DB) with False, as their status can't be confirmed.
-            df['is_outdated'] = is_outdated.values
-            df['is_outdated'].fillna(False, inplace=True)
+            # FIX: Avoid chained assignment with inplace=True to prevent FutureWarning.
+            df = merged_df
+            df['is_outdated'] = df['Status'].str.contains('Outdated', na=False)
 
             # Clean up the temporary column
-            df.drop(columns=['ENC_Name_Clean'], inplace=True)
+            df.drop(columns=['ENC_Name_Clean'], inplace=True, errors='ignore')
+            df.rename(columns={'Edition': 'DB_Edition', 'Update': 'DB_Update'}, inplace=True)
 
         except (ConnectionError, RuntimeError) as e:
             logger.error(f"Could not fetch or process NOAA data: {e}")
@@ -3461,6 +3665,115 @@ class SpatiaLiteManager:
         # that pyogrio engine skips as "unsupported OGR type"
         return gpd.read_file(self.db_path, layer=safe_layer_name, where=where_clause, engine='fiona')
 
+    def get_layers_summary(self, include_empty: bool = False) -> pd.DataFrame:
+        """
+        Retrieves a summary of all layers (tables) in the database, including their
+        feature counts and human-readable S-57 object class names.
+
+        Args:
+            include_empty (bool): If True, includes layers with zero features.
+
+        Returns:
+            pd.DataFrame: A DataFrame with columns ['LayerName', 'Acronym', 'FeatureCount'].
+        """
+        logger.info(f"Fetching layer summary for SpatiaLite database '{self.db_path.name}'...")
+        inspector = inspect(self.engine)
+        all_tables = inspector.get_table_names()
+
+        # Filter out system/metadata tables
+        system_tables = {'spatial_ref_sys', 'geometry_columns', 'sqlite_sequence'}
+        table_names = [t for t in all_tables if t not in system_tables and not t.startswith('rtree_')]
+
+        s57_utils = S57Utils()
+        summary_data = []
+
+        for table_name in table_names:
+            try:
+                count_query = text(f'SELECT COUNT(*) FROM "{table_name}"')
+                with self.engine.connect() as conn:
+                    feature_count = conn.execute(count_query).scalar()
+
+                if not include_empty and feature_count == 0:
+                    continue
+
+                full_name = s57_utils.get_object_class_name(table_name)
+                summary_data.append({
+                    'LayerName': full_name or table_name.capitalize(),
+                    'Acronym': table_name,
+                    'FeatureCount': feature_count
+                })
+            except Exception as e:
+                logger.warning(f"Could not process table '{table_name}': {e}")
+
+        df = pd.DataFrame(summary_data)
+        return df.sort_values(by='FeatureCount', ascending=False).reset_index(drop=True)
+
+    def get_encs_by_usage_band(self, usage_band: Union[int, List[int]]) -> List[str]:
+        """
+        Filters and returns ENC names based on their navigational usage band.
+        """
+        bands = [usage_band] if isinstance(usage_band, int) else usage_band
+        if not all(1 <= b <= 6 for b in bands):
+            raise ValueError("All usage bands must be integers between 1 and 6.")
+
+        # Build a list of LIKE patterns for each usage band
+        patterns = [f"__{b}%" for b in bands]
+
+        # Create a WHERE clause with multiple LIKE conditions
+        where_conditions = " OR ".join([f"dsid_dsnm LIKE '{p}'" for p in patterns])
+        sql = text(f'SELECT DISTINCT dsid_dsnm FROM "dsid" WHERE {where_conditions}')
+
+        with self.engine.connect() as conn:
+            result = conn.execute(sql).fetchall()
+
+        cleaned_names = []
+        for row in result:
+            name = row[0]
+            if name and name.upper().endswith('.000'):
+                cleaned_names.append(name[:-4])
+            else:
+                cleaned_names.append(name)
+
+        return sorted(cleaned_names)
+
+    def get_enc_bounding_boxes(self, enc_names: List[str]) -> gpd.GeoDataFrame:
+        """
+        Retrieves the bounding box geometries for a list of specified ENCs.
+        """
+        if not enc_names:
+            return gpd.GeoDataFrame()
+
+        # For file-based dbs, we use the fiona engine which handles the WHERE clause differently.
+        # We build a simple string-based WHERE clause.
+        enc_list_str = ", ".join([f"'{enc}'" for enc in enc_names])
+        where_clause = f"catcov = 1 AND dsid_dsnm IN ({enc_list_str})"
+
+        try:
+            gdf = gpd.read_file(
+                self.db_path,
+                layer='m_covr',
+                where=where_clause,
+                engine='fiona'
+            )
+            # Fiona engine uses 'geom' as the default geometry column name.
+            # We rename it here for consistency with the PostGIS manager's output.
+            if 'geom' in gdf.columns:
+                gdf = gdf.rename_geometry('wkb_geometry')
+
+            # --- FIX: Standardize output to only include essential columns ---
+            if not gdf.empty:
+                gdf = gdf[['dsid_dsnm', gdf.geometry.name]]
+
+            return gdf.sort_values(by='dsid_dsnm').reset_index(drop=True)
+        except Exception as e:
+            # This can happen if 'm_covr' layer doesn't exist or has no matching features.
+            logger.warning(f"Could not retrieve bounding boxes from SpatiaLite: {e}")
+            return gpd.GeoDataFrame(
+                columns=['dsid_dsnm', 'wkb_geometry'],
+                geometry='wkb_geometry',
+                crs="EPSG:4326"
+            )
+
     def get_enc_summary(self, check_noaa: bool = False) -> pd.DataFrame:
         """
         Provides a summary of all ENCs in the database.
@@ -3481,40 +3794,56 @@ class SpatiaLiteManager:
 
         sql = 'SELECT dsid_dsnm, dsid_edtn, dsid_updn FROM "dsid"'
         df = pd.read_sql(sql, self.engine)
-        df.rename(columns={'dsid_dsnm': 'ENC_Name', 'dsid_edtn': 'Edition', 'dsid_updn': 'Update'}, inplace=True)
+        df.rename(columns={'dsid_dsnm': 'ENC_Name', 'dsid_edtn': 'DB_Edition', 'dsid_updn': 'DB_Update'}, inplace=True)
 
         if not check_noaa:
             return df
 
         logger.info("Checking against NOAA database for latest versions...")
         try:
-            noaa_db = NoaaDatabase()
-            noaa_df = noaa_db.get_dataframe()
+            noaa_db = NoaaDatabase() # Corrected from NoaaDB
+            noaa_df = noaa_db.get_dataframe(force_refresh=False)
 
             # Clean local ENC names to match NOAA format
             df['ENC_Name_Clean'] = df['ENC_Name'].str.split('.').str[0]
 
             # Prepare NOAA data for efficient lookup
-            noaa_df_renamed = noaa_df.rename(columns={'Edition': 'NOAA_Edition', 'Update': 'NOAA_Update'})
-            noaa_lookup = noaa_df_renamed.set_index('ENC_Name')[['NOAA_Edition', 'NOAA_Update']]
+            noaa_df_renamed = noaa_df.rename(columns={'Edition': 'NOAA_Edition', 'Update': 'NOAA_Update', 'Update_Application_Date': 'NOAA_Update_Date'})
+            noaa_lookup = noaa_df_renamed.set_index('ENC_Name')[['NOAA_Edition', 'NOAA_Update', 'NOAA_Update_Date']]
 
             # Merge the NOAA data
             merged_df = df.join(noaa_lookup, on='ENC_Name_Clean')
 
             # Ensure all version columns are numeric
-            for col in ['Edition', 'Update', 'NOAA_Edition', 'NOAA_Update']:
+            for col in ['DB_Edition', 'DB_Update', 'NOAA_Edition', 'NOAA_Update']:
                 merged_df[col] = pd.to_numeric(merged_df[col], errors='coerce')
+
+            # --- Enhanced Status Logic ---
+            def get_status(row):
+                if pd.isna(row['NOAA_Edition']):
+                    return 'Not in NOAA DB'
+                if row['DB_Edition'] < row['NOAA_Edition']:
+                    return 'Outdated (Edition)'
+                if row['DB_Edition'] == row['NOAA_Edition'] and row['DB_Update'] < row['NOAA_Update']:
+                    return 'Outdated (Update)'
+                if row['DB_Edition'] > row['NOAA_Edition'] or \
+                   (row['DB_Edition'] == row['NOAA_Edition'] and row['DB_Update'] > row['NOAA_Update']):
+                    return 'Newer in DB'
+                return 'Up-to-date'
+
+            merged_df['Status'] = merged_df.apply(get_status, axis=1)
 
             # Determine if the local ENC is outdated
             is_outdated = (
-                    (merged_df['Edition'] < merged_df['NOAA_Edition']) |
-                    ((merged_df['Edition'] == merged_df['NOAA_Edition']) & (
-                                merged_df['Update'] < merged_df['NOAA_Update']))
+                    (merged_df['DB_Edition'] < merged_df['NOAA_Edition']) |
+                    ((merged_df['DB_Edition'] == merged_df['NOAA_Edition']) & (
+                                merged_df['DB_Update'] < merged_df['NOAA_Update']))
             )
 
-            df['is_outdated'] = is_outdated.values
-            df['is_outdated'].fillna(False, inplace=True)
-            df.drop(columns=['ENC_Name_Clean'], inplace=True)
+            # FIX: Avoid chained assignment with inplace=True to prevent FutureWarning.
+            df = merged_df
+            df['is_outdated'] = df['Status'].str.contains('Outdated', na=False)
+            df.drop(columns=['ENC_Name_Clean'], inplace=True, errors='ignore')
 
         except (ConnectionError, RuntimeError) as e:
             logger.error(f"Could not fetch or process NOAA data: {e}")
@@ -3723,6 +4052,117 @@ class GPKGManager:
         # Use fiona engine for consistent handling of StringList/IntegerList fields across formats
         return gpd.read_file(self.gpkg_path, layer=safe_layer_name, where=where_clause, engine='fiona')
 
+    def get_layers_summary(self, include_empty: bool = False) -> pd.DataFrame:
+        """
+        Retrieves a summary of all layers (tables) in the GeoPackage, including their
+        feature counts and human-readable S-57 object class names.
+
+        Args:
+            include_empty (bool): If True, includes layers with zero features.
+
+        Returns:
+            pd.DataFrame: A DataFrame with columns ['LayerName', 'Acronym', 'FeatureCount'].
+        """
+        logger.info(f"Fetching layer summary for GeoPackage '{self.gpkg_path.name}'...")
+        inspector = inspect(self.engine)
+        all_tables = inspector.get_table_names()
+
+        # Filter out GPKG system tables
+        table_names = [t for t in all_tables if not t.startswith('gpkg_') and not t.startswith('rtree_')]
+
+        s57_utils = S57Utils()
+        summary_data = []
+
+        for table_name in table_names:
+            try:
+                count_query = text(f'SELECT COUNT(*) FROM "{table_name}"')
+                with self.engine.connect() as conn:
+                    feature_count = conn.execute(count_query).scalar()
+
+                if not include_empty and feature_count == 0:
+                    continue
+
+                # GPKG layer names are lowercase, but S57Utils expects uppercase for lookup
+                full_name = s57_utils.get_object_class_name(table_name)
+                summary_data.append({
+                    'LayerName': full_name or table_name.capitalize(),
+                    'Acronym': table_name,
+                    'FeatureCount': feature_count
+                })
+            except Exception as e:
+                logger.warning(f"Could not process table '{table_name}': {e}")
+
+        df = pd.DataFrame(summary_data)
+        return df.sort_values(by='FeatureCount', ascending=False).reset_index(drop=True)
+
+    def get_encs_by_usage_band(self, usage_band: Union[int, List[int]]) -> List[str]:
+        """
+        Filters and returns ENC names based on their navigational usage band.
+        """
+        bands = [usage_band] if isinstance(usage_band, int) else usage_band
+        if not all(1 <= b <= 6 for b in bands):
+            raise ValueError("All usage bands must be integers between 1 and 6.")
+
+        # Build a list of LIKE patterns for each usage band
+        patterns = [f"__{b}%" for b in bands]
+
+        # Create a WHERE clause with multiple LIKE conditions. GPKG uses uppercase column names.
+        where_conditions = " OR ".join([f'"DSID_DSNM" LIKE \'{p}\'' for p in patterns])
+        sql = text(f'SELECT DISTINCT "DSID_DSNM" FROM "dsid" WHERE {where_conditions}')
+
+        with self.engine.connect() as conn:
+            result = conn.execute(sql).fetchall()
+
+        cleaned_names = []
+        for row in result:
+            name = row[0]
+            if name and name.upper().endswith('.000'):
+                cleaned_names.append(name[:-4])
+            else:
+                cleaned_names.append(name)
+
+        return sorted(cleaned_names)
+
+    def get_enc_bounding_boxes(self, enc_names: List[str]) -> gpd.GeoDataFrame:
+        """
+        Retrieves the bounding box geometries for a list of specified ENCs.
+        """
+        if not enc_names:
+            return gpd.GeoDataFrame()
+
+        # For file-based dbs, we use the fiona engine which handles the WHERE clause differently.
+        # We build a simple string-based WHERE clause. GPKG uses uppercase column names.
+        enc_list_str = ", ".join([f"'{enc}'" for enc in enc_names])
+        where_clause = f"CATCOV = 1 AND DSID_DSNM IN ({enc_list_str})"
+
+        try:
+            gdf = gpd.read_file(
+                self.gpkg_path,
+                layer='m_covr',
+                where=where_clause,
+                engine='fiona'
+            )
+            # Fiona engine uses 'geom' as the default geometry column name.
+            # We rename it here for consistency with the PostGIS manager's output.
+            if 'geom' in gdf.columns:
+                gdf = gdf.rename_geometry('wkb_geometry')
+
+            # GPKG columns are uppercase, so we standardize them here for consistency.
+            gdf.columns = [c.lower() for c in gdf.columns]
+
+            # --- FIX: Standardize output to only include essential columns ---
+            if not gdf.empty:
+                gdf = gdf[['dsid_dsnm', gdf.geometry.name]]
+
+            return gdf.sort_values(by='dsid_dsnm').reset_index(drop=True)
+        except Exception as e:
+            logger.warning(f"Could not retrieve bounding boxes from GeoPackage: {e}")
+            return gpd.GeoDataFrame(
+                columns=['dsid_dsnm', 'wkb_geometry'],
+                geometry='wkb_geometry',
+                crs="EPSG:4326"
+            )
+
     def get_enc_summary(self, check_noaa: bool = False) -> pd.DataFrame:
         """
         Provides a summary of all ENCs in the GeoPackage.
@@ -3744,40 +4184,56 @@ class GPKGManager:
         # GPKG uses uppercase field names from S-57 standard
         sql = 'SELECT "DSID_DSNM", "DSID_EDTN", "DSID_UPDN" FROM "dsid"'
         df = pd.read_sql(sql, self.engine)
-        df.rename(columns={'DSID_DSNM': 'ENC_Name', 'DSID_EDTN': 'Edition', 'DSID_UPDN': 'Update'}, inplace=True)
+        df.rename(columns={'DSID_DSNM': 'ENC_Name', 'DSID_EDTN': 'DB_Edition', 'DSID_UPDN': 'DB_Update'}, inplace=True)
 
         if not check_noaa:
             return df
 
         logger.info("Checking against NOAA database for latest versions...")
         try:
-            noaa_db = NoaaDatabase()
-            noaa_df = noaa_db.get_dataframe()
+            noaa_db = NoaaDatabase() # Corrected from NoaaDB
+            noaa_df = noaa_db.get_dataframe(force_refresh=False)
 
             # Clean local ENC names to match NOAA format
             df['ENC_Name_Clean'] = df['ENC_Name'].str.split('.').str[0]
 
             # Prepare NOAA data for efficient lookup
-            noaa_df_renamed = noaa_df.rename(columns={'Edition': 'NOAA_Edition', 'Update': 'NOAA_Update'})
-            noaa_lookup = noaa_df_renamed.set_index('ENC_Name')[['NOAA_Edition', 'NOAA_Update']]
+            noaa_df_renamed = noaa_df.rename(columns={'Edition': 'NOAA_Edition', 'Update': 'NOAA_Update', 'Update_Application_Date': 'NOAA_Update_Date'})
+            noaa_lookup = noaa_df_renamed.set_index('ENC_Name')[['NOAA_Edition', 'NOAA_Update', 'NOAA_Update_Date']]
 
             # Merge the NOAA data
             merged_df = df.join(noaa_lookup, on='ENC_Name_Clean')
 
             # Ensure all version columns are numeric
-            for col in ['Edition', 'Update', 'NOAA_Edition', 'NOAA_Update']:
+            for col in ['DB_Edition', 'DB_Update', 'NOAA_Edition', 'NOAA_Update']:
                 merged_df[col] = pd.to_numeric(merged_df[col], errors='coerce')
+
+            # --- Enhanced Status Logic ---
+            def get_status(row):
+                if pd.isna(row['NOAA_Edition']):
+                    return 'Not in NOAA DB'
+                if row['DB_Edition'] < row['NOAA_Edition']:
+                    return 'Outdated (Edition)'
+                if row['DB_Edition'] == row['NOAA_Edition'] and row['DB_Update'] < row['NOAA_Update']:
+                    return 'Outdated (Update)'
+                if row['DB_Edition'] > row['NOAA_Edition'] or \
+                   (row['DB_Edition'] == row['NOAA_Edition'] and row['DB_Update'] > row['NOAA_Update']):
+                    return 'Newer in DB'
+                return 'Up-to-date'
+
+            merged_df['Status'] = merged_df.apply(get_status, axis=1)
 
             # Determine if the local ENC is outdated
             is_outdated = (
-                    (merged_df['Edition'] < merged_df['NOAA_Edition']) |
-                    ((merged_df['Edition'] == merged_df['NOAA_Edition']) & (
-                                merged_df['Update'] < merged_df['NOAA_Update']))
+                    (merged_df['DB_Edition'] < merged_df['NOAA_Edition']) |
+                    ((merged_df['DB_Edition'] == merged_df['NOAA_Edition']) & (
+                                merged_df['DB_Update'] < merged_df['NOAA_Update']))
             )
 
-            df['is_outdated'] = is_outdated.values
-            df['is_outdated'].fillna(False, inplace=True)
-            df.drop(columns=['ENC_Name_Clean'], inplace=True)
+            # FIX: Avoid chained assignment with inplace=True to prevent FutureWarning.
+            df = merged_df
+            df['is_outdated'] = df['Status'].str.contains('Outdated', na=False)
+            df.drop(columns=['ENC_Name_Clean'], inplace=True, errors='ignore')
 
         except (ConnectionError, RuntimeError) as e:
             logger.error(f"Could not fetch or process NOAA data: {e}")

@@ -305,12 +305,9 @@ class S57DeepTester:
             if schema_name:
                 logger.info(f"Dropping PostGIS schema: {schema_name}")
                 try:
-                    engine = self._get_engine('postgis')
-                    with engine.connect() as conn:
-                        with conn.begin(): # Start a transaction for DDL
-                            conn.execute(text(f'DROP SCHEMA IF EXISTS "{schema_name}" CASCADE'))
-                    logger.info(f"Successfully dropped schema {schema_name}")
-                    engine.dispose()
+                    pg_connector = PostGISConnector(self.config.postgis_config)
+                    pg_connector.connect()
+                    pg_connector.drop_schema(schema_name)
                 except Exception as e:
                     logger.error(f"Failed to drop PostGIS schema {schema_name}: {e}")
 

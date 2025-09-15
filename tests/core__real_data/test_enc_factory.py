@@ -310,9 +310,6 @@ class TestENCDataFactory(unittest.TestCase):
         if not test_results['passed']:
             self.fail("No layers passed the consistency test!")
 
-        # Report pass rate
-        pass_rate = len(test_results['passed']) / max(1, len(test_results['passed']) + len(test_results['failed'])) * 100
-        print(f"\nPass rate: {pass_rate:.1f}% ({len(test_results['passed'])}/{len(test_results['passed']) + len(test_results['failed'])} layers)")
 
     def _compare_file_formats(self, gdf_gpkg, gdf_sqlite, gdf_pg, layer_name=None):
         """
