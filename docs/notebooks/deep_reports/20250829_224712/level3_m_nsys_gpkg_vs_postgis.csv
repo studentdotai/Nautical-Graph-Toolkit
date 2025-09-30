@@ -1,0 +1,277 @@
+attribute,gpkg,postgis,notes
+METADATA_LAYER_NAME,m_nsys,m_nsys,Layer comparison between gpkg and postgis
+METADATA_TOTAL_FEATURES,8,8,Total features in each format
+METADATA_TOTAL_COLUMNS,27,28,Total columns in each format
+SEPARATOR_COLUMN_PRESENCE,--- COLUMN PRESENCE ---,--- COLUMN PRESENCE ---,Which columns exist in each format
+COLUMN_PRESENT_agen,YES,YES,Column agen presence
+COLUMN_PRESENT_dsid_dsnm,YES,YES,Column dsid_dsnm presence
+COLUMN_PRESENT_dsid_edtn,YES,YES,Column dsid_edtn presence
+COLUMN_PRESENT_dsid_updn,YES,YES,Column dsid_updn presence
+COLUMN_PRESENT_ffpt_rind,YES,YES,Column ffpt_rind presence
+COLUMN_PRESENT_fidn,YES,YES,Column fidn presence
+COLUMN_PRESENT_fids,YES,YES,Column fids presence
+COLUMN_PRESENT_grup,YES,YES,Column grup presence
+COLUMN_PRESENT_inform,YES,YES,Column inform presence
+COLUMN_PRESENT_lnam,YES,YES,Column lnam presence
+COLUMN_PRESENT_lnam_refs,YES,YES,Column lnam_refs presence
+COLUMN_PRESENT_marsys,YES,YES,Column marsys presence
+COLUMN_PRESENT_ninfom,YES,YES,Column ninfom presence
+COLUMN_PRESENT_ntxtds,YES,YES,Column ntxtds presence
+COLUMN_PRESENT_objl,YES,YES,Column objl presence
+COLUMN_PRESENT_ogc_fid,NO,YES,Column ogc_fid presence
+COLUMN_PRESENT_orient,YES,YES,Column orient presence
+COLUMN_PRESENT_prim,YES,YES,Column prim presence
+COLUMN_PRESENT_rcid,YES,YES,Column rcid presence
+COLUMN_PRESENT_recdat,YES,YES,Column recdat presence
+COLUMN_PRESENT_recind,YES,YES,Column recind presence
+COLUMN_PRESENT_rver,YES,YES,Column rver presence
+COLUMN_PRESENT_scamax,YES,YES,Column scamax presence
+COLUMN_PRESENT_scamin,YES,YES,Column scamin presence
+COLUMN_PRESENT_sordat,YES,YES,Column sordat presence
+COLUMN_PRESENT_sorind,YES,YES,Column sorind presence
+COLUMN_PRESENT_txtdsc,YES,YES,Column txtdsc presence
+COLUMN_PRESENT_wkb_geometry,NO,YES,Column wkb_geometry presence
+SEPARATOR_DATA_TYPES,--- DATA TYPES ---,--- DATA TYPES ---,Data types for each column
+DATATYPE_agen,int32,float64,Data type for agen - MISMATCH!
+DATATYPE_dsid_dsnm,object,object,Data type for dsid_dsnm
+DATATYPE_dsid_edtn,int32,int64,Data type for dsid_edtn - MISMATCH!
+DATATYPE_dsid_updn,int32,int64,Data type for dsid_updn - MISMATCH!
+DATATYPE_ffpt_rind,object,object,Data type for ffpt_rind
+DATATYPE_fidn,int32,float64,Data type for fidn - MISMATCH!
+DATATYPE_fids,int32,float64,Data type for fids - MISMATCH!
+DATATYPE_grup,int32,float64,Data type for grup - MISMATCH!
+DATATYPE_inform,object,object,Data type for inform
+DATATYPE_lnam,object,object,Data type for lnam
+DATATYPE_lnam_refs,object,object,Data type for lnam_refs
+DATATYPE_marsys,int32,int64,Data type for marsys - MISMATCH!
+DATATYPE_ninfom,object,object,Data type for ninfom
+DATATYPE_ntxtds,object,object,Data type for ntxtds
+DATATYPE_objl,int32,float64,Data type for objl - MISMATCH!
+DATATYPE_orient,float64,object,Data type for orient - MISMATCH!
+DATATYPE_prim,int32,float64,Data type for prim - MISMATCH!
+DATATYPE_rcid,int32,float64,Data type for rcid - MISMATCH!
+DATATYPE_recdat,object,object,Data type for recdat
+DATATYPE_recind,object,object,Data type for recind
+DATATYPE_rver,int32,float64,Data type for rver - MISMATCH!
+DATATYPE_scamax,float64,object,Data type for scamax - MISMATCH!
+DATATYPE_scamin,float64,object,Data type for scamin - MISMATCH!
+DATATYPE_sordat,object,object,Data type for sordat
+DATATYPE_sorind,object,object,Data type for sorind
+DATATYPE_txtdsc,object,object,Data type for txtdsc
+SEPARATOR_FEATURE_SAMPLES,--- FEATURE SAMPLES (8) ---,--- FEATURE SAMPLES (8) ---,Sample of 8 features from each format
+SAMPLE_FEATURE_1_SEPARATOR,--- FEATURE 1 ---,--- FEATURE 1 ---,Feature 1 sample
+SAMPLE_F1_agen,550,550.0,Feature 1 - agen - VALUES DIFFER!
+SAMPLE_F1_dsid_dsnm,US3CA52M,US3CA52M,Feature 1 - dsid_dsnm
+SAMPLE_F1_dsid_edtn,31,31,Feature 1 - dsid_edtn
+SAMPLE_F1_dsid_updn,0,0,Feature 1 - dsid_updn
+SAMPLE_F1_ffpt_rind,None,None,Feature 1 - ffpt_rind
+SAMPLE_F1_fidn,48295218,48295218.0,Feature 1 - fidn - VALUES DIFFER!
+SAMPLE_F1_fids,2009,2009.0,Feature 1 - fids - VALUES DIFFER!
+SAMPLE_F1_grup,2,2.0,Feature 1 - grup - VALUES DIFFER!
+SAMPLE_F1_inform,None,None,Feature 1 - inform
+SAMPLE_F1_lnam,022602E0ED3207D9,022602E0ED3207D9,Feature 1 - lnam
+SAMPLE_F1_lnam_refs,None,None,Feature 1 - lnam_refs
+SAMPLE_F1_marsys,2,2,Feature 1 - marsys
+SAMPLE_F1_ninfom,None,None,Feature 1 - ninfom
+SAMPLE_F1_ntxtds,None,None,Feature 1 - ntxtds
+SAMPLE_F1_objl,306,306.0,Feature 1 - objl - VALUES DIFFER!
+SAMPLE_F1_orient,nan,None,Feature 1 - orient
+SAMPLE_F1_prim,3,3.0,Feature 1 - prim - VALUES DIFFER!
+SAMPLE_F1_rcid,802,802.0,Feature 1 - rcid - VALUES DIFFER!
+SAMPLE_F1_recdat,None,None,Feature 1 - recdat
+SAMPLE_F1_recind,None,None,Feature 1 - recind
+SAMPLE_F1_rver,1,1.0,Feature 1 - rver - VALUES DIFFER!
+SAMPLE_F1_scamax,nan,None,Feature 1 - scamax
+SAMPLE_F1_scamin,nan,None,Feature 1 - scamin
+SAMPLE_F1_sordat,201305,201305,Feature 1 - sordat
+SAMPLE_F1_sorind,"US,US,graph,Chart 18680","US,US,graph,Chart 18680",Feature 1 - sorind
+SAMPLE_F1_txtdsc,None,None,Feature 1 - txtdsc
+SAMPLE_FEATURE_2_SEPARATOR,--- FEATURE 2 ---,--- FEATURE 2 ---,Feature 2 sample
+SAMPLE_F2_agen,550,550.0,Feature 2 - agen - VALUES DIFFER!
+SAMPLE_F2_dsid_dsnm,US1EEZ1M,US1EEZ1M,Feature 2 - dsid_dsnm
+SAMPLE_F2_dsid_edtn,9,9,Feature 2 - dsid_edtn
+SAMPLE_F2_dsid_updn,0,0,Feature 2 - dsid_updn
+SAMPLE_F2_ffpt_rind,None,None,Feature 2 - ffpt_rind
+SAMPLE_F2_fidn,28944322,28944322.0,Feature 2 - fidn - VALUES DIFFER!
+SAMPLE_F2_fids,1,1.0,Feature 2 - fids - VALUES DIFFER!
+SAMPLE_F2_grup,2,2.0,Feature 2 - grup - VALUES DIFFER!
+SAMPLE_F2_inform,None,None,Feature 2 - inform
+SAMPLE_F2_lnam,022601B9A7C20001,022601B9A7C20001,Feature 2 - lnam
+SAMPLE_F2_lnam_refs,None,None,Feature 2 - lnam_refs
+SAMPLE_F2_marsys,1,1,Feature 2 - marsys
+SAMPLE_F2_ninfom,None,None,Feature 2 - ninfom
+SAMPLE_F2_ntxtds,None,None,Feature 2 - ntxtds
+SAMPLE_F2_objl,306,306.0,Feature 2 - objl - VALUES DIFFER!
+SAMPLE_F2_orient,nan,None,Feature 2 - orient
+SAMPLE_F2_prim,3,3.0,Feature 2 - prim - VALUES DIFFER!
+SAMPLE_F2_rcid,89,89.0,Feature 2 - rcid - VALUES DIFFER!
+SAMPLE_F2_recdat,None,None,Feature 2 - recdat
+SAMPLE_F2_recind,None,None,Feature 2 - recind
+SAMPLE_F2_rver,1,1.0,Feature 2 - rver - VALUES DIFFER!
+SAMPLE_F2_scamax,nan,None,Feature 2 - scamax
+SAMPLE_F2_scamin,nan,None,Feature 2 - scamin
+SAMPLE_F2_sordat,19960323,19960323,Feature 2 - sordat
+SAMPLE_F2_sorind,"US,US,graph,Chart 526","US,US,graph,Chart 526",Feature 2 - sorind
+SAMPLE_F2_txtdsc,None,None,Feature 2 - txtdsc
+SAMPLE_FEATURE_3_SEPARATOR,--- FEATURE 3 ---,--- FEATURE 3 ---,Feature 3 sample
+SAMPLE_F3_agen,550,550.0,Feature 3 - agen - VALUES DIFFER!
+SAMPLE_F3_dsid_dsnm,US2WC12M,US2WC12M,Feature 3 - dsid_dsnm
+SAMPLE_F3_dsid_edtn,27,27,Feature 3 - dsid_edtn
+SAMPLE_F3_dsid_updn,8,8,Feature 3 - dsid_updn
+SAMPLE_F3_ffpt_rind,None,None,Feature 3 - ffpt_rind
+SAMPLE_F3_fidn,29334133,29334133.0,Feature 3 - fidn - VALUES DIFFER!
+SAMPLE_F3_fids,50,50.0,Feature 3 - fids - VALUES DIFFER!
+SAMPLE_F3_grup,2,2.0,Feature 3 - grup - VALUES DIFFER!
+SAMPLE_F3_inform,None,None,Feature 3 - inform
+SAMPLE_F3_lnam,022601BF9A750032,022601BF9A750032,Feature 3 - lnam
+SAMPLE_F3_lnam_refs,None,None,Feature 3 - lnam_refs
+SAMPLE_F3_marsys,2,2,Feature 3 - marsys
+SAMPLE_F3_ninfom,None,None,Feature 3 - ninfom
+SAMPLE_F3_ntxtds,None,None,Feature 3 - ntxtds
+SAMPLE_F3_objl,306,306.0,Feature 3 - objl - VALUES DIFFER!
+SAMPLE_F3_orient,nan,None,Feature 3 - orient
+SAMPLE_F3_prim,3,3.0,Feature 3 - prim - VALUES DIFFER!
+SAMPLE_F3_rcid,267,267.0,Feature 3 - rcid - VALUES DIFFER!
+SAMPLE_F3_recdat,None,None,Feature 3 - recdat
+SAMPLE_F3_recind,None,None,Feature 3 - recind
+SAMPLE_F3_rver,4,4.0,Feature 3 - rver - VALUES DIFFER!
+SAMPLE_F3_scamax,nan,None,Feature 3 - scamax
+SAMPLE_F3_scamin,nan,None,Feature 3 - scamin
+SAMPLE_F3_sordat,200902,200902,Feature 3 - sordat
+SAMPLE_F3_sorind,"US,US,graph,Chart 18007","US,US,graph,Chart 18007",Feature 3 - sorind
+SAMPLE_F3_txtdsc,None,None,Feature 3 - txtdsc
+SAMPLE_FEATURE_4_SEPARATOR,--- FEATURE 4 ---,--- FEATURE 4 ---,Feature 4 sample
+SAMPLE_F4_agen,550,550.0,Feature 4 - agen - VALUES DIFFER!
+SAMPLE_F4_dsid_dsnm,US1PO02M,US1PO02M,Feature 4 - dsid_dsnm
+SAMPLE_F4_dsid_edtn,21,21,Feature 4 - dsid_edtn
+SAMPLE_F4_dsid_updn,1,1,Feature 4 - dsid_updn
+SAMPLE_F4_ffpt_rind,None,None,Feature 4 - ffpt_rind
+SAMPLE_F4_fidn,68785788,68785788.0,Feature 4 - fidn - VALUES DIFFER!
+SAMPLE_F4_fids,134,134.0,Feature 4 - fids - VALUES DIFFER!
+SAMPLE_F4_grup,2,2.0,Feature 4 - grup - VALUES DIFFER!
+SAMPLE_F4_inform,None,None,Feature 4 - inform
+SAMPLE_F4_lnam,02260419967C0086,02260419967C0086,Feature 4 - lnam
+SAMPLE_F4_lnam_refs,None,None,Feature 4 - lnam_refs
+SAMPLE_F4_marsys,2,2,Feature 4 - marsys
+SAMPLE_F4_ninfom,None,None,Feature 4 - ninfom
+SAMPLE_F4_ntxtds,None,None,Feature 4 - ntxtds
+SAMPLE_F4_objl,306,306.0,Feature 4 - objl - VALUES DIFFER!
+SAMPLE_F4_orient,nan,None,Feature 4 - orient
+SAMPLE_F4_prim,3,3.0,Feature 4 - prim - VALUES DIFFER!
+SAMPLE_F4_rcid,126,126.0,Feature 4 - rcid - VALUES DIFFER!
+SAMPLE_F4_recdat,None,None,Feature 4 - recdat
+SAMPLE_F4_recind,None,None,Feature 4 - recind
+SAMPLE_F4_rver,1,1.0,Feature 4 - rver - VALUES DIFFER!
+SAMPLE_F4_scamax,nan,None,Feature 4 - scamax
+SAMPLE_F4_scamin,nan,None,Feature 4 - scamin
+SAMPLE_F4_sordat,20170720,20170720,Feature 4 - sordat
+SAMPLE_F4_sorind,"US,US,graph,Chart 50","US,US,graph,Chart 50",Feature 4 - sorind
+SAMPLE_F4_txtdsc,None,None,Feature 4 - txtdsc
+SAMPLE_FEATURE_5_SEPARATOR,--- FEATURE 5 ---,--- FEATURE 5 ---,Feature 5 sample
+SAMPLE_F5_agen,550,550.0,Feature 5 - agen - VALUES DIFFER!
+SAMPLE_F5_dsid_dsnm,US1PO02M,US1PO02M,Feature 5 - dsid_dsnm
+SAMPLE_F5_dsid_edtn,21,21,Feature 5 - dsid_edtn
+SAMPLE_F5_dsid_updn,1,1,Feature 5 - dsid_updn
+SAMPLE_F5_ffpt_rind,None,None,Feature 5 - ffpt_rind
+SAMPLE_F5_fidn,38359479,38359479.0,Feature 5 - fidn - VALUES DIFFER!
+SAMPLE_F5_fids,50,50.0,Feature 5 - fids - VALUES DIFFER!
+SAMPLE_F5_grup,2,2.0,Feature 5 - grup - VALUES DIFFER!
+SAMPLE_F5_inform,None,None,Feature 5 - inform
+SAMPLE_F5_lnam,0226024951B70032,0226024951B70032,Feature 5 - lnam
+SAMPLE_F5_lnam_refs,None,None,Feature 5 - lnam_refs
+SAMPLE_F5_marsys,2,2,Feature 5 - marsys
+SAMPLE_F5_ninfom,None,None,Feature 5 - ninfom
+SAMPLE_F5_ntxtds,None,None,Feature 5 - ntxtds
+SAMPLE_F5_objl,306,306.0,Feature 5 - objl - VALUES DIFFER!
+SAMPLE_F5_orient,nan,None,Feature 5 - orient
+SAMPLE_F5_prim,3,3.0,Feature 5 - prim - VALUES DIFFER!
+SAMPLE_F5_rcid,127,127.0,Feature 5 - rcid - VALUES DIFFER!
+SAMPLE_F5_recdat,None,None,Feature 5 - recdat
+SAMPLE_F5_recind,None,None,Feature 5 - recind
+SAMPLE_F5_rver,1,1.0,Feature 5 - rver - VALUES DIFFER!
+SAMPLE_F5_scamax,nan,None,Feature 5 - scamax
+SAMPLE_F5_scamin,nan,None,Feature 5 - scamin
+SAMPLE_F5_sordat,200306,200306,Feature 5 - sordat
+SAMPLE_F5_sorind,"US,US,graph,chart 50","US,US,graph,chart 50",Feature 5 - sorind
+SAMPLE_F5_txtdsc,None,None,Feature 5 - txtdsc
+SAMPLE_FEATURE_6_SEPARATOR,--- FEATURE 6 ---,--- FEATURE 6 ---,Feature 6 sample
+SAMPLE_F6_agen,550,550.0,Feature 6 - agen - VALUES DIFFER!
+SAMPLE_F6_dsid_dsnm,US4CA60M,US4CA60M,Feature 6 - dsid_dsnm
+SAMPLE_F6_dsid_edtn,37,37,Feature 6 - dsid_edtn
+SAMPLE_F6_dsid_updn,6,6,Feature 6 - dsid_updn
+SAMPLE_F6_ffpt_rind,None,None,Feature 6 - ffpt_rind
+SAMPLE_F6_fidn,274898323,274898323.0,Feature 6 - fidn - VALUES DIFFER!
+SAMPLE_F6_fids,4121,4121.0,Feature 6 - fids - VALUES DIFFER!
+SAMPLE_F6_grup,2,2.0,Feature 6 - grup - VALUES DIFFER!
+SAMPLE_F6_inform,None,None,Feature 6 - inform
+SAMPLE_F6_lnam,022610629D931019,022610629D931019,Feature 6 - lnam
+SAMPLE_F6_lnam_refs,None,None,Feature 6 - lnam_refs
+SAMPLE_F6_marsys,2,2,Feature 6 - marsys
+SAMPLE_F6_ninfom,None,None,Feature 6 - ninfom
+SAMPLE_F6_ntxtds,None,None,Feature 6 - ntxtds
+SAMPLE_F6_objl,306,306.0,Feature 6 - objl - VALUES DIFFER!
+SAMPLE_F6_orient,nan,None,Feature 6 - orient
+SAMPLE_F6_prim,3,3.0,Feature 6 - prim - VALUES DIFFER!
+SAMPLE_F6_rcid,1987,1987.0,Feature 6 - rcid - VALUES DIFFER!
+SAMPLE_F6_recdat,None,None,Feature 6 - recdat
+SAMPLE_F6_recind,None,None,Feature 6 - recind
+SAMPLE_F6_rver,1,1.0,Feature 6 - rver - VALUES DIFFER!
+SAMPLE_F6_scamax,nan,None,Feature 6 - scamax
+SAMPLE_F6_scamin,nan,None,Feature 6 - scamin
+SAMPLE_F6_sordat,20090410,20090410,Feature 6 - sordat
+SAMPLE_F6_sorind,"US,US,graph,Chart 18746","US,US,graph,Chart 18746",Feature 6 - sorind
+SAMPLE_F6_txtdsc,None,None,Feature 6 - txtdsc
+SAMPLE_FEATURE_7_SEPARATOR,--- FEATURE 7 ---,--- FEATURE 7 ---,Feature 7 sample
+SAMPLE_F7_agen,550,550.0,Feature 7 - agen - VALUES DIFFER!
+SAMPLE_F7_dsid_dsnm,US1GC09M,US1GC09M,Feature 7 - dsid_dsnm
+SAMPLE_F7_dsid_edtn,65,65,Feature 7 - dsid_edtn
+SAMPLE_F7_dsid_updn,5,5,Feature 7 - dsid_updn
+SAMPLE_F7_ffpt_rind,None,None,Feature 7 - ffpt_rind
+SAMPLE_F7_fidn,253918586,253918586.0,Feature 7 - fidn - VALUES DIFFER!
+SAMPLE_F7_fids,4044,4044.0,Feature 7 - fids - VALUES DIFFER!
+SAMPLE_F7_grup,2,2.0,Feature 7 - grup - VALUES DIFFER!
+SAMPLE_F7_inform,None,None,Feature 7 - inform
+SAMPLE_F7_lnam,02260F227D7A0FCC,02260F227D7A0FCC,Feature 7 - lnam
+SAMPLE_F7_lnam_refs,None,None,Feature 7 - lnam_refs
+SAMPLE_F7_marsys,2,2,Feature 7 - marsys
+SAMPLE_F7_ninfom,None,None,Feature 7 - ninfom
+SAMPLE_F7_ntxtds,None,None,Feature 7 - ntxtds
+SAMPLE_F7_objl,306,306.0,Feature 7 - objl - VALUES DIFFER!
+SAMPLE_F7_orient,nan,None,Feature 7 - orient
+SAMPLE_F7_prim,3,3.0,Feature 7 - prim - VALUES DIFFER!
+SAMPLE_F7_rcid,2920,2920.0,Feature 7 - rcid - VALUES DIFFER!
+SAMPLE_F7_recdat,None,None,Feature 7 - recdat
+SAMPLE_F7_recind,None,None,Feature 7 - recind
+SAMPLE_F7_rver,1,1.0,Feature 7 - rver - VALUES DIFFER!
+SAMPLE_F7_scamax,nan,None,Feature 7 - scamax
+SAMPLE_F7_scamin,nan,None,Feature 7 - scamin
+SAMPLE_F7_sordat,200303,200303,Feature 7 - sordat
+SAMPLE_F7_sorind,"US,US,graph,Chart 411","US,US,graph,Chart 411",Feature 7 - sorind
+SAMPLE_F7_txtdsc,None,None,Feature 7 - txtdsc
+SAMPLE_FEATURE_8_SEPARATOR,--- FEATURE 8 ---,--- FEATURE 8 ---,Feature 8 sample
+SAMPLE_F8_agen,550,550.0,Feature 8 - agen - VALUES DIFFER!
+SAMPLE_F8_dsid_dsnm,US1GC09M,US1GC09M,Feature 8 - dsid_dsnm
+SAMPLE_F8_dsid_edtn,65,65,Feature 8 - dsid_edtn
+SAMPLE_F8_dsid_updn,5,5,Feature 8 - dsid_updn
+SAMPLE_F8_ffpt_rind,None,None,Feature 8 - ffpt_rind
+SAMPLE_F8_fidn,317265742,317265742.0,Feature 8 - fidn - VALUES DIFFER!
+SAMPLE_F8_fids,8676,8676.0,Feature 8 - fids - VALUES DIFFER!
+SAMPLE_F8_grup,2,2.0,Feature 8 - grup - VALUES DIFFER!
+SAMPLE_F8_inform,None,None,Feature 8 - inform
+SAMPLE_F8_lnam,022612E9174E21E4,022612E9174E21E4,Feature 8 - lnam
+SAMPLE_F8_lnam_refs,None,None,Feature 8 - lnam_refs
+SAMPLE_F8_marsys,2,2,Feature 8 - marsys
+SAMPLE_F8_ninfom,None,None,Feature 8 - ninfom
+SAMPLE_F8_ntxtds,None,None,Feature 8 - ntxtds
+SAMPLE_F8_objl,306,306.0,Feature 8 - objl - VALUES DIFFER!
+SAMPLE_F8_orient,nan,None,Feature 8 - orient
+SAMPLE_F8_prim,3,3.0,Feature 8 - prim - VALUES DIFFER!
+SAMPLE_F8_rcid,2921,2921.0,Feature 8 - rcid - VALUES DIFFER!
+SAMPLE_F8_recdat,None,None,Feature 8 - recdat
+SAMPLE_F8_recind,None,None,Feature 8 - recind
+SAMPLE_F8_rver,1,1.0,Feature 8 - rver - VALUES DIFFER!
+SAMPLE_F8_scamax,nan,None,Feature 8 - scamax
+SAMPLE_F8_scamin,nan,None,Feature 8 - scamin
+SAMPLE_F8_sordat,200303,200303,Feature 8 - sordat
+SAMPLE_F8_sorind,"US,US,graph,Chart 411","US,US,graph,Chart 411",Feature 8 - sorind
+SAMPLE_F8_txtdsc,None,None,Feature 8 - txtdsc

@@ -1,0 +1,58 @@
+attribute,gpkg,spatialite,notes
+METADATA_LAYER_NAME,m_npub,m_npub,Layer comparison between gpkg and spatialite
+METADATA_TOTAL_FEATURES,8,8,Total features in each format
+METADATA_GEOMETRY_FEATURES,8,8,Features with non-null geometry
+METADATA_TOTAL_COLUMNS,26,27,Total columns in each format
+SEPARATOR_COLUMN_PRESENCE,---,---,Column presence analysis follows
+COLUMN_agen,PRESENT,PRESENT,Column presence comparison
+COLUMN_dsid_dsnm,PRESENT,PRESENT,Column presence comparison
+COLUMN_dsid_edtn,PRESENT,PRESENT,Column presence comparison
+COLUMN_dsid_updn,PRESENT,PRESENT,Column presence comparison
+COLUMN_ffpt_rind,PRESENT,PRESENT,Column presence comparison
+COLUMN_fidn,PRESENT,PRESENT,Column presence comparison
+COLUMN_fids,PRESENT,PRESENT,Column presence comparison
+COLUMN_geom,PRESENT,PRESENT,Column presence comparison
+COLUMN_grup,PRESENT,PRESENT,Column presence comparison
+COLUMN_inform,PRESENT,PRESENT,Column presence comparison
+COLUMN_lnam,PRESENT,PRESENT,Column presence comparison
+COLUMN_lnam_refs,PRESENT,PRESENT,Column presence comparison
+COLUMN_ninfom,PRESENT,PRESENT,Column presence comparison
+COLUMN_ntxtds,PRESENT,PRESENT,Column presence comparison
+COLUMN_objl,PRESENT,PRESENT,Column presence comparison
+COLUMN_ogc_fid,PRESENT,PRESENT,Column presence comparison
+COLUMN_picrep,PRESENT,PRESENT,Column presence comparison
+COLUMN_prim,PRESENT,PRESENT,Column presence comparison
+COLUMN_pubref,PRESENT,PRESENT,Column presence comparison
+COLUMN_rcid,PRESENT,PRESENT,Column presence comparison
+COLUMN_recdat,PRESENT,PRESENT,Column presence comparison
+COLUMN_recind,PRESENT,PRESENT,Column presence comparison
+COLUMN_rver,PRESENT,PRESENT,Column presence comparison
+COLUMN_sordat,PRESENT,PRESENT,Column presence comparison
+COLUMN_sorind,PRESENT,PRESENT,Column presence comparison
+COLUMN_txtdsc,PRESENT,PRESENT,Column presence comparison
+SEPARATOR_PROPERTY_COMPLETENESS,---,---,Property completeness analysis (non-empty / total)
+PROP_COMPLETENESS_agen,8/8 (100.0%),8/8 (100.0%),Values Match (100.0%)
+PROP_COMPLETENESS_dsid_dsnm,8/8 (100.0%),8/8 (100.0%),Values Match (100.0%)
+PROP_COMPLETENESS_dsid_edtn,8/8 (100.0%),8/8 (100.0%),Values Match (100.0%)
+PROP_COMPLETENESS_dsid_updn,8/8 (100.0%),8/8 (100.0%),Values Match (100.0%)
+PROP_COMPLETENESS_ffpt_rind,0/8 (0.0%),0/8 (0.0%),Values Match (0.0%)
+PROP_COMPLETENESS_fidn,8/8 (100.0%),8/8 (100.0%),Values Match (100.0%)
+PROP_COMPLETENESS_fids,8/8 (100.0%),8/8 (100.0%),Values Match (100.0%)
+PROP_COMPLETENESS_grup,8/8 (100.0%),8/8 (100.0%),Values Match (100.0%)
+PROP_COMPLETENESS_inform,0/8 (0.0%),0/8 (0.0%),Values Match (0.0%)
+PROP_COMPLETENESS_lnam,8/8 (100.0%),8/8 (100.0%),Values Match (100.0%)
+PROP_COMPLETENESS_lnam_refs,0/8 (0.0%),0/8 (0.0%),Values Match (0.0%)
+PROP_COMPLETENESS_ninfom,0/8 (0.0%),0/8 (0.0%),Values Match (0.0%)
+PROP_COMPLETENESS_ntxtds,0/8 (0.0%),0/8 (0.0%),Values Match (0.0%)
+PROP_COMPLETENESS_objl,8/8 (100.0%),8/8 (100.0%),Values Match (100.0%)
+PROP_COMPLETENESS_ogc_fid,8/8 (100.0%),8/8 (100.0%),Values Match (100.0%)
+PROP_COMPLETENESS_picrep,0/8 (0.0%),0/8 (0.0%),Values Match (0.0%)
+PROP_COMPLETENESS_prim,8/8 (100.0%),8/8 (100.0%),Values Match (100.0%)
+PROP_COMPLETENESS_pubref,0/8 (0.0%),0/8 (0.0%),Values Match (0.0%)
+PROP_COMPLETENESS_rcid,8/8 (100.0%),8/8 (100.0%),Values Match (100.0%)
+PROP_COMPLETENESS_recdat,0/8 (0.0%),0/8 (0.0%),Values Match (0.0%)
+PROP_COMPLETENESS_recind,0/8 (0.0%),0/8 (0.0%),Values Match (0.0%)
+PROP_COMPLETENESS_rver,8/8 (100.0%),8/8 (100.0%),Values Match (100.0%)
+PROP_COMPLETENESS_sordat,8/8 (100.0%),8/8 (100.0%),Values Match (100.0%)
+PROP_COMPLETENESS_sorind,8/8 (100.0%),8/8 (100.0%),Values Match (100.0%)
+PROP_COMPLETENESS_txtdsc,8/8 (100.0%),8/8 (100.0%),Values Match (100.0%)

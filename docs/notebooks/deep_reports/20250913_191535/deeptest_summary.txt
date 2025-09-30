@@ -1,0 +1,51 @@
+
+================================================================================
+🔍 DEEPTEST COMPREHENSIVE REPORT
+📊 Test Level: 3 (Deep)
+================================================================================
+
+📊 TEST SUMMARY:
+   • Total Tests: 3
+   • Initial Imports: 3/3 successful
+     Formats: gpkg, spatialite, postgis
+   • Update Tests: None performed
+   • Comparisons: 3
+
+🗃️  IMPORT RESULTS:
+   ✅ GPKG: success
+      Duration: 22.0s
+      Features: 21539
+      Layers: 86
+      Properties: 195 unique (2980 total)
+   ✅ SPATIALITE: success
+      Duration: 7.3s
+      Features: 21539
+      Layers: 86
+      Properties: 196 unique (3063 total)
+   ✅ POSTGIS: success
+      Duration: 18.2s
+      Features: 21539
+      Layers: 86
+      Properties: 195 unique (2980 total)
+
+🔍 PROPERTY VALIDATION (baseline: GPKG):
+
+   SPATIALITE: 100.0% coverage (195/195 properties)
+
+   POSTGIS: 100.0% coverage (195/195 properties)
+
+📊 DATA COMPARISON RESULTS:
+   • gpkg_vs_spatialite: 100.0% consistent
+     Layers: 86, Differences: 0
+   • gpkg_vs_postgis: 100.0% consistent
+     Layers: 86, Differences found in 169 layers.
+       ↳ Layers with differences: achare, admare, airare, bcnlat, bcnspp, boylat, boysaw, boyspp, bridge, buaare, buisgl, c_aggr, c_asso, canals, cblare, cblohd, cblsub, cgusta, coalne, connectednode, conzne, ctnare, ctsare, curent, damcon, daymar, depare, depcnt, dmpgrd, dsid, edge, exezne, face, fairwy, feryrt, fogsig, fshzne, hrbfac, isolatednode, lakare, lights, lndare, lndelv, lndmrk, lndrgn, m_covr, m_npub, m_nsys, m_qual, magvar, marcul, mipare, morfac, navlne, obstrn, ofsplf, pilbop, pilpnt, pipare, pipsol, ponton, prcare, rdocal, rdosta, rectrc, resare, rivers, rtpbcn, sbdare, seaare, siltnk, slcons, slogrd, slotop, soundg, splare, tesare, topmar, tsezne, tssbnd, tsslpt, unsare, uwtroc, wattur, wedklp, wrecks
+   • spatialite_vs_postgis: 100.0% consistent
+     Layers: 86, Differences found in 169 layers.
+       ↳ Layers with differences: achare, admare, airare, bcnlat, bcnspp, boylat, boysaw, boyspp, bridge, buaare, buisgl, c_aggr, c_asso, canals, cblare, cblohd, cblsub, cgusta, coalne, connectednode, conzne, ctnare, ctsare, curent, damcon, daymar, depare, depcnt, dmpgrd, dsid, edge, exezne, face, fairwy, feryrt, fogsig, fshzne, hrbfac, isolatednode, lakare, lights, lndare, lndelv, lndmrk, lndrgn, m_covr, m_npub, m_nsys, m_qual, magvar, marcul, mipare, morfac, navlne, obstrn, ofsplf, pilbop, pilpnt, pipare, pipsol, ponton, prcare, rdocal, rdosta, rectrc, resare, rivers, rtpbcn, sbdare, seaare, siltnk, slcons, slogrd, slotop, soundg, splare, tesare, topmar, tsezne, tssbnd, tsslpt, unsare, uwtroc, wattur, wedklp, wrecks
+
+💡 RECOMMENDATIONS:
+   1. Import Performance: SPATIALITE is fastest (7.3s), GPKG is slowest (22.0s)
+   2. Data Consistency Good: Average consistency is 100.0%
+
+================================================================================

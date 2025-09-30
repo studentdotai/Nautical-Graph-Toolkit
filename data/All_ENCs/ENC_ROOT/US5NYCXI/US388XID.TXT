@@ -1,0 +1,2 @@
+WARNING - BATHYMETRY FROM SMALLER SCALES
+Hydrography within this ENC may be from smaller scale sources. Positions of these depths are approximate. Depths between soundings can only be inferred. Uncharted shoals, features, and large depth anomalies may exist in these areas, especially in areas of irregular relief.

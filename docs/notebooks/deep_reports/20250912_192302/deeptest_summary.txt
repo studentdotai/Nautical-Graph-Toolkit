@@ -1,0 +1,26 @@
+
+================================================================================
+🔍 DEEPTEST COMPREHENSIVE REPORT
+📊 Test Level: 3 (Deep)
+================================================================================
+
+📊 TEST SUMMARY:
+   • Total Tests: 3
+   • Initial Imports: 1/3 successful
+     Formats: gpkg, spatialite, postgis
+   • Update Tests: None performed
+   • Comparisons: 0
+
+🗃️  IMPORT RESULTS:
+   ❌ GPKG: failed
+      Error: 'unique_properties'
+   ❌ SPATIALITE: failed
+      Error: 'unique_properties'
+   ✅ POSTGIS: success
+      Duration: 21.0s
+      Features: 21539
+      Layers: 86
+      Properties: 168 unique (3279 total)
+      Completeness: 239,116 filled / 418,429 total (179,313 empty)
+
+================================================================================

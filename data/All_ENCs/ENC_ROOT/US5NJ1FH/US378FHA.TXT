@@ -1,0 +1,141 @@
+NOAA ENC®
+
+NATIONAL OCEANIC AND ATMOSPHERIC ADMINISTRATION
+
+US5NJ1FH - NORTH ATLANTIC OCEAN
+
+
+INDEX:
+
+NOTE A
+AIDS TO NAVIGATION
+POLLUTION REPORTS
+CAUTION - USE OF RADIO SIGNALS (LIMITATIONS)
+SUPPLEMENTAL INFORMATION
+CAUTION - TEMPORARY CHANGES
+WARNING - PRUDENT MARINER
+ADDITIONAL INFORMATION
+AUTHORITIES
+BROADCASTS OF MARINE WEATHER FORECASTS AND WARNINGS BY MARINE RADIOTELEPHONE STATIONS
+CAUTION - ALL CRAFT
+CAUTION - OYSTER GROUNDS
+CAUTION - QUALITY OF BATHYMETRIC DATA
+CAUTION - SMALL CRAFT
+CAUTION - WARNINGS CONCERNING LARGE VESSELS
+MARINE WEATHER FORECASTS
+NOAA WEATHER RADIO BROADCASTS
+PUBLIC BOATING INSTRUCTION PROGRAMS
+RACING BUOYS
+RADAR REFLECTORS
+STORM WARNING DISPLAYS
+WATER LEVELS, CURRENTS, AND TIDES
+COMMENTS REQUESTED
+
+
+NOTES:
+
+NOTE A
+Navigation regulations are published in Chapter 2, U.S. Coast Pilot 3. Additions or revisions to Chapter 2 are published in the Notice to Mariners. Information concerning the regulations may be obtained at the Office of the Commander, 5th Coast Guard District in Portsmouth, Virginia or at the Office of the District Engineer, Corps of Engineers in Philadelphia, Pennsylvania. Refer to charted regulation section numbers.
+
+
+AIDS TO NAVIGATION
+Consult U.S. Coast Guard Light List for supplemental information concerning aids to navigation.
+
+
+POLLUTION REPORTS
+Report all spills of oil and hazardous substances to the National Response Center via 1-800-424-8802 (toll free), or to the nearest U.S. Coast Guard facility if telephone communication is impossible (33 CFR 153).
+
+
+CAUTION - USE OF RADIO SIGNALS (LIMITATIONS)
+Limitations on the use of radio signals as aids to marine navigation can be found in the U.S. Coast Guard Light Lists and National Geospatial-Intelligence Agency Publication 117. Radio direction-finder bearings to commercial broadcasting stations are subject to error and should be used with caution.
+
+
+SUPPLEMENTAL INFORMATION
+Consult U.S. Coast Pilot 3 for important supplemental information.
+
+
+CAUTION - TEMPORARY CHANGES
+Temporary changes or defects in aids to navigation are not indicated. See Local Notice to Mariners. During some winter months or when endangered by ice, certain aids to navigation are replaced by other types or removed. For details see U.S. Coast Guard Light List.
+
+
+WARNING - PRUDENT MARINER
+The prudent mariner will not rely solely on any single aid to navigation, particularly on floating aids. See U.S. Coast Guard Light List and U.S. Coast Pilot for details.
+
+
+ADDITIONAL INFORMATION
+Additional information can be obtained at https://www.nauticalcharts.noaa.gov .
+
+
+AUTHORITIES
+Hydrography and topography by the National Ocean Service, Coast Survey, with additional data from the Corps of Engineers, Geological Survey, State of New Jersey, Division of Navigation, and U.S. Coast Guard.
+
+
+BROADCASTS OF MARINE WEATHER FORECASTS AND WARNINGS BY MARINE RADIOTELEPHONE STATIONS
+CITY           STATION   FREQ.     BROADCAST TIMES - EST    SPECIAL WARNING
+Cape May, NJ   NMK       2670kHz   6:03 AM & PM             On receipt
+
+Distress calls for small craft are made on 2182 kHz or channel 16 (156.80MHz) VHF.
+
+
+CAUTION - ALL CRAFT
+All craft should avoid areas where the skin divers flag, a red square with a diagonal white stripe, is displayed.
+
+
+CAUTION - OYSTER GROUNDS
+Oyster grounds are marked by stakes and flags. Submerged broken stakes become dangerous obstructions to small craft.
+
+
+CAUTION - QUALITY OF BATHYMETRIC DATA
+The areas represented by the object M_QUAL (Quality of data) are approximate due to generalizing for clarity. Caution is advised, particularly for nearshore navigation or voyage planning. M_QUAL represents areas of uniform quality of bathymetric data. The CATZOC (Category of zone of confidence in data) attribute of M_QUAL provides an assessment of the overall zone of confidence.
+
+
+CAUTION - SMALL CRAFT
+Small craft should stay clear of large commercial and government vessels even if small craft have the right-of-way.
+
+
+CAUTION - WARNINGS CONCERNING LARGE VESSELS
+The "Rules of the Road" state that recreational boats shall not impede the passage of a vessel that can navigate only within a narrow channel or fairway. Large vessels may appear to move slowly due to their large size but actually transit at speeds in excess of 12 knots, requiring a great distance in which to maneuver or stop. A large vessel's superstructure may block the wind with the result that sailboats and sailboards may unexpectedly find themselves unable to maneuver. Bow and stern waves can be hazardous to small vessels. Large vessels may not be able to see small craft close to their bows.
+
+
+MARINE WEATHER FORECASTS
+NATIONAL WEATHER SERVICE             TELEPHONE NUMBERS   OFFICE HOURS
+New York, NY/Upton, NY               (631) 924-0517*     9:00 AM - 5:00 PM M-F
+Philadelphia, PA/Mount Holly, NJ     (609) 261-6615*     8:00 AM - 4:00 PM M-F
+				     (609) 261-6600**
+Baltimore, MD/Washington, DC         (703) 260-0107*     24 hours daily
+
+*Recorded
+**Recorded forecast only
+
+
+NOAA WEATHER RADIO BROADCASTS
+The NOAA Weather Radio stations listed below provide continuous weather broadcasts. The reception range is typically 20 to 40 nautical miles from the antenna site, but can be as much as 100 nautical miles for stations at high elevations.
+
+Atlantic City, NJ		KHB-38		162.400 MHz
+
+
+PUBLIC BOATING INSTRUCTION PROGRAMS
+The United States Power Squadron (USPS) and U.S. Coast Guard Auxiliary (USCGAUX) national organizations of boatmen, conduct extensive boating instruction programs in communities throughout the United States. For information regarding these educational courses, contact the following sources: USPS - Local Squadron Commander of USPS Headquarters, Post Office Box 30423, Raleigh, N.C. 27612, 919-821-0281. USCGAUX - 1st Coast Guard District, 408 Atlantic Ave., Boston, MA 02110-2209, Tel. 617-223-8310 or USCG Headquarters (G - BAU), Washington D.C. 20593-0001
+
+
+RACING BUOYS
+Racing buoys within the limits of this chart are not shown hereon. Information may be obtained from the U.S. Coast Guard District Offices as racing and other private buoys are not all listed in the U.S. Coast Guard Light List.
+
+
+RADAR REFLECTORS
+Radar reflectors have been placed on many floating aids to navigation. Individual radar reflector identification on these aids has been omitted from this chart.
+
+
+STORM WARNING DISPLAYS
+Storm warning signals are displayed form masts of Police Patrol Boats while underway along the New Jersey coast and the Inland Waterway.
+
+
+WATER LEVELS, CURRENTS, AND TIDES
+Real-time water levels, tide predictions, and tidal current predictions are available on the internet from NOAA's Center for Operational Oceanographic Products and Services (CO-OPS) at https://tidesandcurrents.noaa.gov/water_level_info.html and https://tidesandcurrents.noaa.gov/currents_info.html .
+
+
+COMMENTS REQUESTED
+NOAA encourages users to submit inquiries, discrepancies, or comments about this chart via NOAA's ASSIST tool at https://www.nauticalcharts.noaa.gov/customer-service/assist/ .
+
+
+END OF FILE

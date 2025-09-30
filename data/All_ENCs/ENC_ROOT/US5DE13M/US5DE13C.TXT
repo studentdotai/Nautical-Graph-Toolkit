@@ -1,0 +1,2 @@
+DEPTH DATUM CHANGE
+Depths outside of the USACE authorized channels refer to Christina River Datum.

@@ -1,0 +1,242 @@
+attribute,gpkg,spatialite,notes
+METADATA_LAYER_NAME,rdocal,rdocal,Layer comparison between gpkg and spatialite
+METADATA_TOTAL_FEATURES,5,5,Total features in each format
+METADATA_TOTAL_COLUMNS,40,32,Total columns in each format
+SEPARATOR_COLUMN_PRESENCE,--- COLUMN PRESENCE ---,--- COLUMN PRESENCE ---,Which columns exist in each format
+COLUMN_PRESENT_agen,YES,YES,Column agen presence
+COLUMN_PRESENT_comcha,YES,YES,Column comcha presence
+COLUMN_PRESENT_datend,YES,YES,Column datend presence
+COLUMN_PRESENT_datsta,YES,YES,Column datsta presence
+COLUMN_PRESENT_dsid_dsnm,YES,YES,Column dsid_dsnm presence
+COLUMN_PRESENT_dsid_edtn,YES,YES,Column dsid_edtn presence
+COLUMN_PRESENT_dsid_updn,YES,YES,Column dsid_updn presence
+COLUMN_PRESENT_ffpt_rind,YES,NO,Column ffpt_rind presence
+COLUMN_PRESENT_fidn,YES,YES,Column fidn presence
+COLUMN_PRESENT_fids,YES,YES,Column fids presence
+COLUMN_PRESENT_grup,YES,YES,Column grup presence
+COLUMN_PRESENT_inform,YES,YES,Column inform presence
+COLUMN_PRESENT_lnam,YES,YES,Column lnam presence
+COLUMN_PRESENT_lnam_refs,YES,NO,Column lnam_refs presence
+COLUMN_PRESENT_mask,YES,NO,Column mask presence
+COLUMN_PRESENT_name_rcid,YES,NO,Column name_rcid presence
+COLUMN_PRESENT_name_rcnm,YES,NO,Column name_rcnm presence
+COLUMN_PRESENT_ninfom,YES,YES,Column ninfom presence
+COLUMN_PRESENT_nobjnm,YES,YES,Column nobjnm presence
+COLUMN_PRESENT_ntxtds,YES,YES,Column ntxtds presence
+COLUMN_PRESENT_objl,YES,YES,Column objl presence
+COLUMN_PRESENT_objnam,YES,YES,Column objnam presence
+COLUMN_PRESENT_orient,YES,YES,Column orient presence
+COLUMN_PRESENT_ornt,YES,NO,Column ornt presence
+COLUMN_PRESENT_perend,YES,YES,Column perend presence
+COLUMN_PRESENT_persta,YES,YES,Column persta presence
+COLUMN_PRESENT_prim,YES,YES,Column prim presence
+COLUMN_PRESENT_rcid,YES,YES,Column rcid presence
+COLUMN_PRESENT_recdat,YES,YES,Column recdat presence
+COLUMN_PRESENT_recind,YES,YES,Column recind presence
+COLUMN_PRESENT_rver,YES,YES,Column rver presence
+COLUMN_PRESENT_scamax,YES,YES,Column scamax presence
+COLUMN_PRESENT_scamin,YES,YES,Column scamin presence
+COLUMN_PRESENT_sordat,YES,YES,Column sordat presence
+COLUMN_PRESENT_sorind,YES,YES,Column sorind presence
+COLUMN_PRESENT_status,YES,NO,Column status presence
+COLUMN_PRESENT_trafic,YES,YES,Column trafic presence
+COLUMN_PRESENT_txtdsc,YES,YES,Column txtdsc presence
+COLUMN_PRESENT_usag,YES,NO,Column usag presence
+SEPARATOR_DATA_TYPES,--- DATA TYPES ---,--- DATA TYPES ---,Data types for each column
+DATATYPE_agen,int32,int32,Data type for agen
+DATATYPE_comcha,object,object,Data type for comcha
+DATATYPE_datend,object,object,Data type for datend
+DATATYPE_datsta,object,object,Data type for datsta
+DATATYPE_dsid_dsnm,object,object,Data type for dsid_dsnm
+DATATYPE_dsid_edtn,int32,int32,Data type for dsid_edtn
+DATATYPE_dsid_updn,int32,int32,Data type for dsid_updn
+DATATYPE_fidn,int32,int32,Data type for fidn
+DATATYPE_fids,int32,int32,Data type for fids
+DATATYPE_grup,int32,int32,Data type for grup
+DATATYPE_inform,object,object,Data type for inform
+DATATYPE_lnam,object,object,Data type for lnam
+DATATYPE_ninfom,object,object,Data type for ninfom
+DATATYPE_nobjnm,object,object,Data type for nobjnm
+DATATYPE_ntxtds,object,object,Data type for ntxtds
+DATATYPE_objl,int32,int32,Data type for objl
+DATATYPE_objnam,object,object,Data type for objnam
+DATATYPE_orient,float64,float64,Data type for orient
+DATATYPE_perend,object,object,Data type for perend
+DATATYPE_persta,object,object,Data type for persta
+DATATYPE_prim,int32,int32,Data type for prim
+DATATYPE_rcid,int32,int32,Data type for rcid
+DATATYPE_recdat,object,object,Data type for recdat
+DATATYPE_recind,object,object,Data type for recind
+DATATYPE_rver,int32,int32,Data type for rver
+DATATYPE_scamax,float64,float64,Data type for scamax
+DATATYPE_scamin,int32,int32,Data type for scamin
+DATATYPE_sordat,object,object,Data type for sordat
+DATATYPE_sorind,object,object,Data type for sorind
+DATATYPE_trafic,int32,int32,Data type for trafic
+DATATYPE_txtdsc,object,object,Data type for txtdsc
+SEPARATOR_FEATURE_SAMPLES,--- FEATURE SAMPLES (5) ---,--- FEATURE SAMPLES (5) ---,Sample of 5 features from each format
+SAMPLE_FEATURE_1_SEPARATOR,--- FEATURE 1 ---,--- FEATURE 1 ---,Feature 1 sample
+SAMPLE_F1_agen,550,550,Feature 1 - agen
+SAMPLE_F1_comcha,[12],[12],Feature 1 - comcha
+SAMPLE_F1_datend,None,None,Feature 1 - datend
+SAMPLE_F1_datsta,None,None,Feature 1 - datsta
+SAMPLE_F1_dsid_dsnm,US3CA52M,US3CA52M,Feature 1 - dsid_dsnm
+SAMPLE_F1_dsid_edtn,31,31,Feature 1 - dsid_edtn
+SAMPLE_F1_dsid_updn,0,0,Feature 1 - dsid_updn
+SAMPLE_F1_fidn,402827956,402827956,Feature 1 - fidn
+SAMPLE_F1_fids,12345,12345,Feature 1 - fids
+SAMPLE_F1_geometry,Point(1),Point(1),Feature 1 - geometry
+SAMPLE_F1_grup,2,2,Feature 1 - grup
+SAMPLE_F1_inform,None,None,Feature 1 - inform
+SAMPLE_F1_lnam,02261802AAB43039,02261802AAB43039,Feature 1 - lnam
+SAMPLE_F1_ninfom,None,None,Feature 1 - ninfom
+SAMPLE_F1_nobjnm,None,None,Feature 1 - nobjnm
+SAMPLE_F1_ntxtds,None,None,Feature 1 - ntxtds
+SAMPLE_F1_objl,104,104,Feature 1 - objl
+SAMPLE_F1_objnam,"San Francisco Approach Outbound Southern TSS V-AIS ""5S""","San Francisco Approach Outbound Southern TSS V-AIS ""5S""",Feature 1 - objnam
+SAMPLE_F1_orient,180.0,180.0,Feature 1 - orient
+SAMPLE_F1_perend,None,None,Feature 1 - perend
+SAMPLE_F1_persta,None,None,Feature 1 - persta
+SAMPLE_F1_prim,1,1,Feature 1 - prim
+SAMPLE_F1_rcid,2142,2142,Feature 1 - rcid
+SAMPLE_F1_recdat,None,None,Feature 1 - recdat
+SAMPLE_F1_recind,None,None,Feature 1 - recind
+SAMPLE_F1_rver,1,1,Feature 1 - rver
+SAMPLE_F1_scamax,nan,nan,Feature 1 - scamax
+SAMPLE_F1_scamin,499999,499999,Feature 1 - scamin
+SAMPLE_F1_sordat,20150113,20150113,Feature 1 - sordat
+SAMPLE_F1_sorind,"US,US,reprt,11thCGD,LNM 02/15","US,US,reprt,11thCGD,LNM 02/15",Feature 1 - sorind
+SAMPLE_F1_trafic,2,2,Feature 1 - trafic
+SAMPLE_F1_txtdsc,None,None,Feature 1 - txtdsc
+SAMPLE_FEATURE_2_SEPARATOR,--- FEATURE 2 ---,--- FEATURE 2 ---,Feature 2 sample
+SAMPLE_F2_agen,550,550,Feature 2 - agen
+SAMPLE_F2_comcha,[12],[12],Feature 2 - comcha
+SAMPLE_F2_datend,None,None,Feature 2 - datend
+SAMPLE_F2_datsta,None,None,Feature 2 - datsta
+SAMPLE_F2_dsid_dsnm,US3CA52M,US3CA52M,Feature 2 - dsid_dsnm
+SAMPLE_F2_dsid_edtn,31,31,Feature 2 - dsid_edtn
+SAMPLE_F2_dsid_updn,0,0,Feature 2 - dsid_updn
+SAMPLE_F2_fidn,31307956,31307956,Feature 2 - fidn
+SAMPLE_F2_fids,12345,12345,Feature 2 - fids
+SAMPLE_F2_geometry,Point(1),Point(1),Feature 2 - geometry
+SAMPLE_F2_grup,2,2,Feature 2 - grup
+SAMPLE_F2_inform,None,None,Feature 2 - inform
+SAMPLE_F2_lnam,022601DDB8B43039,022601DDB8B43039,Feature 2 - lnam
+SAMPLE_F2_ninfom,None,None,Feature 2 - ninfom
+SAMPLE_F2_nobjnm,None,None,Feature 2 - nobjnm
+SAMPLE_F2_ntxtds,None,None,Feature 2 - ntxtds
+SAMPLE_F2_objl,104,104,Feature 2 - objl
+SAMPLE_F2_objnam,"San Francisco Approach Inbound VTS Western Limit TSS V-AIS ""3W""","San Francisco Approach Inbound VTS Western Limit TSS V-AIS ""3W""",Feature 2 - objnam
+SAMPLE_F2_orient,236.3,236.3,Feature 2 - orient
+SAMPLE_F2_perend,None,None,Feature 2 - perend
+SAMPLE_F2_persta,None,None,Feature 2 - persta
+SAMPLE_F2_prim,1,1,Feature 2 - prim
+SAMPLE_F2_rcid,2143,2143,Feature 2 - rcid
+SAMPLE_F2_recdat,None,None,Feature 2 - recdat
+SAMPLE_F2_recind,None,None,Feature 2 - recind
+SAMPLE_F2_rver,1,1,Feature 2 - rver
+SAMPLE_F2_scamax,nan,nan,Feature 2 - scamax
+SAMPLE_F2_scamin,499999,499999,Feature 2 - scamin
+SAMPLE_F2_sordat,20150113,20150113,Feature 2 - sordat
+SAMPLE_F2_sorind,"US,US,reprt,11thCGD,LNM 02/15","US,US,reprt,11thCGD,LNM 02/15",Feature 2 - sorind
+SAMPLE_F2_trafic,4,4,Feature 2 - trafic
+SAMPLE_F2_txtdsc,None,None,Feature 2 - txtdsc
+SAMPLE_FEATURE_3_SEPARATOR,--- FEATURE 3 ---,--- FEATURE 3 ---,Feature 3 sample
+SAMPLE_F3_agen,550,550,Feature 3 - agen
+SAMPLE_F3_comcha,[12],[12],Feature 3 - comcha
+SAMPLE_F3_datend,None,None,Feature 3 - datend
+SAMPLE_F3_datsta,None,None,Feature 3 - datsta
+SAMPLE_F3_dsid_dsnm,US3CA52M,US3CA52M,Feature 3 - dsid_dsnm
+SAMPLE_F3_dsid_edtn,31,31,Feature 3 - dsid_edtn
+SAMPLE_F3_dsid_updn,0,0,Feature 3 - dsid_updn
+SAMPLE_F3_fidn,214700363,214700363,Feature 3 - fidn
+SAMPLE_F3_fids,12345,12345,Feature 3 - fids
+SAMPLE_F3_geometry,Point(1),Point(1),Feature 3 - geometry
+SAMPLE_F3_grup,2,2,Feature 3 - grup
+SAMPLE_F3_inform,None,None,Feature 3 - inform
+SAMPLE_F3_lnam,02260CCC114B3039,02260CCC114B3039,Feature 3 - lnam
+SAMPLE_F3_ninfom,None,None,Feature 3 - ninfom
+SAMPLE_F3_nobjnm,None,None,Feature 3 - nobjnm
+SAMPLE_F3_ntxtds,None,None,Feature 3 - ntxtds
+SAMPLE_F3_objl,104,104,Feature 3 - objl
+SAMPLE_F3_objnam,"San Francisco Approach Inbound Southern TSS V-AIS ""2S""","San Francisco Approach Inbound Southern TSS V-AIS ""2S""",Feature 3 - objnam
+SAMPLE_F3_orient,0.0,0.0,Feature 3 - orient
+SAMPLE_F3_perend,None,None,Feature 3 - perend
+SAMPLE_F3_persta,None,None,Feature 3 - persta
+SAMPLE_F3_prim,1,1,Feature 3 - prim
+SAMPLE_F3_rcid,2144,2144,Feature 3 - rcid
+SAMPLE_F3_recdat,None,None,Feature 3 - recdat
+SAMPLE_F3_recind,None,None,Feature 3 - recind
+SAMPLE_F3_rver,1,1,Feature 3 - rver
+SAMPLE_F3_scamax,nan,nan,Feature 3 - scamax
+SAMPLE_F3_scamin,499999,499999,Feature 3 - scamin
+SAMPLE_F3_sordat,20150113,20150113,Feature 3 - sordat
+SAMPLE_F3_sorind,"US,US,reprt,11thCGD,LNM 02/15","US,US,reprt,11thCGD,LNM 02/15",Feature 3 - sorind
+SAMPLE_F3_trafic,1,1,Feature 3 - trafic
+SAMPLE_F3_txtdsc,None,None,Feature 3 - txtdsc
+SAMPLE_FEATURE_4_SEPARATOR,--- FEATURE 4 ---,--- FEATURE 4 ---,Feature 4 sample
+SAMPLE_F4_agen,550,550,Feature 4 - agen
+SAMPLE_F4_comcha,[12],[12],Feature 4 - comcha
+SAMPLE_F4_datend,None,None,Feature 4 - datend
+SAMPLE_F4_datsta,None,None,Feature 4 - datsta
+SAMPLE_F4_dsid_dsnm,US3CA52M,US3CA52M,Feature 4 - dsid_dsnm
+SAMPLE_F4_dsid_edtn,31,31,Feature 4 - dsid_edtn
+SAMPLE_F4_dsid_updn,0,0,Feature 4 - dsid_updn
+SAMPLE_F4_fidn,567008908,567008908,Feature 4 - fidn
+SAMPLE_F4_fids,12345,12345,Feature 4 - fids
+SAMPLE_F4_geometry,Point(1),Point(1),Feature 4 - geometry
+SAMPLE_F4_grup,2,2,Feature 4 - grup
+SAMPLE_F4_inform,None,None,Feature 4 - inform
+SAMPLE_F4_lnam,022621CBDE8C3039,022621CBDE8C3039,Feature 4 - lnam
+SAMPLE_F4_ninfom,None,None,Feature 4 - ninfom
+SAMPLE_F4_nobjnm,None,None,Feature 4 - nobjnm
+SAMPLE_F4_ntxtds,None,None,Feature 4 - ntxtds
+SAMPLE_F4_objl,104,104,Feature 4 - objl
+SAMPLE_F4_objnam,"San Francisco Approach Outbound VTS Southern Limit TSS V-AIS ""4S""","San Francisco Approach Outbound VTS Southern Limit TSS V-AIS ""4S""",Feature 4 - objnam
+SAMPLE_F4_orient,180.0,180.0,Feature 4 - orient
+SAMPLE_F4_perend,None,None,Feature 4 - perend
+SAMPLE_F4_persta,None,None,Feature 4 - persta
+SAMPLE_F4_prim,1,1,Feature 4 - prim
+SAMPLE_F4_rcid,2145,2145,Feature 4 - rcid
+SAMPLE_F4_recdat,None,None,Feature 4 - recdat
+SAMPLE_F4_recind,None,None,Feature 4 - recind
+SAMPLE_F4_rver,1,1,Feature 4 - rver
+SAMPLE_F4_scamax,nan,nan,Feature 4 - scamax
+SAMPLE_F4_scamin,499999,499999,Feature 4 - scamin
+SAMPLE_F4_sordat,20150113,20150113,Feature 4 - sordat
+SAMPLE_F4_sorind,"US,US,reprt,11thCGD,LNM 02/15","US,US,reprt,11thCGD,LNM 02/15",Feature 4 - sorind
+SAMPLE_F4_trafic,2,2,Feature 4 - trafic
+SAMPLE_F4_txtdsc,None,None,Feature 4 - txtdsc
+SAMPLE_FEATURE_5_SEPARATOR,--- FEATURE 5 ---,--- FEATURE 5 ---,Feature 5 sample
+SAMPLE_F5_agen,550,550,Feature 5 - agen
+SAMPLE_F5_comcha,[12],[12],Feature 5 - comcha
+SAMPLE_F5_datend,None,None,Feature 5 - datend
+SAMPLE_F5_datsta,None,None,Feature 5 - datsta
+SAMPLE_F5_dsid_dsnm,US3CA52M,US3CA52M,Feature 5 - dsid_dsnm
+SAMPLE_F5_dsid_edtn,31,31,Feature 5 - dsid_edtn
+SAMPLE_F5_dsid_updn,0,0,Feature 5 - dsid_updn
+SAMPLE_F5_fidn,442885107,442885107,Feature 5 - fidn
+SAMPLE_F5_fids,12345,12345,Feature 5 - fids
+SAMPLE_F5_geometry,Point(1),Point(1),Feature 5 - geometry
+SAMPLE_F5_grup,2,2,Feature 5 - grup
+SAMPLE_F5_inform,None,None,Feature 5 - inform
+SAMPLE_F5_lnam,02261A65E3F33039,02261A65E3F33039,Feature 5 - lnam
+SAMPLE_F5_ninfom,None,None,Feature 5 - ninfom
+SAMPLE_F5_nobjnm,None,None,Feature 5 - nobjnm
+SAMPLE_F5_ntxtds,None,None,Feature 5 - ntxtds
+SAMPLE_F5_objl,104,104,Feature 5 - objl
+SAMPLE_F5_objnam,"San Francisco Approach Inbound VTS Southern Limit TSS V-AIS ""3S""","San Francisco Approach Inbound VTS Southern Limit TSS V-AIS ""3S""",Feature 5 - objnam
+SAMPLE_F5_orient,0.0,0.0,Feature 5 - orient
+SAMPLE_F5_perend,None,None,Feature 5 - perend
+SAMPLE_F5_persta,None,None,Feature 5 - persta
+SAMPLE_F5_prim,1,1,Feature 5 - prim
+SAMPLE_F5_rcid,2146,2146,Feature 5 - rcid
+SAMPLE_F5_recdat,None,None,Feature 5 - recdat
+SAMPLE_F5_recind,None,None,Feature 5 - recind
+SAMPLE_F5_rver,1,1,Feature 5 - rver
+SAMPLE_F5_scamax,nan,nan,Feature 5 - scamax
+SAMPLE_F5_scamin,499999,499999,Feature 5 - scamin
+SAMPLE_F5_sordat,20150113,20150113,Feature 5 - sordat
+SAMPLE_F5_sorind,"US,US,reprt,11thCGD,LNM 02/15","US,US,reprt,11thCGD,LNM 02/15",Feature 5 - sorind
+SAMPLE_F5_trafic,1,1,Feature 5 - trafic
+SAMPLE_F5_txtdsc,None,None,Feature 5 - txtdsc

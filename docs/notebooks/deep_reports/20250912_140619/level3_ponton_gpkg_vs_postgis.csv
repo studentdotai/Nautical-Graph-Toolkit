@@ -1,0 +1,136 @@
+attribute,gpkg,postgis,notes
+METADATA_LAYER_NAME,ponton,ponton,Layer comparison between gpkg and postgis
+METADATA_TOTAL_FEATURES,1,1,Total features in each format
+METADATA_TOTAL_COLUMNS,43,44,Total columns in each format
+SEPARATOR_COLUMN_PRESENCE,--- COLUMN PRESENCE ---,--- COLUMN PRESENCE ---,Which columns exist in each format
+COLUMN_PRESENT_agen,YES,YES,Column agen presence
+COLUMN_PRESENT_condtn,YES,YES,Column condtn presence
+COLUMN_PRESENT_conrad,YES,YES,Column conrad presence
+COLUMN_PRESENT_convis,YES,YES,Column convis presence
+COLUMN_PRESENT_datend,YES,YES,Column datend presence
+COLUMN_PRESENT_datsta,YES,YES,Column datsta presence
+COLUMN_PRESENT_dsid_dsnm,YES,YES,Column dsid_dsnm presence
+COLUMN_PRESENT_dsid_edtn,YES,YES,Column dsid_edtn presence
+COLUMN_PRESENT_dsid_updn,YES,YES,Column dsid_updn presence
+COLUMN_PRESENT_feature_id,NO,YES,Column feature_id presence
+COLUMN_PRESENT_ffpt_rind,YES,YES,Column ffpt_rind presence
+COLUMN_PRESENT_fidn,YES,YES,Column fidn presence
+COLUMN_PRESENT_fids,YES,YES,Column fids presence
+COLUMN_PRESENT_grup,YES,YES,Column grup presence
+COLUMN_PRESENT_inform,YES,YES,Column inform presence
+COLUMN_PRESENT_lnam,YES,YES,Column lnam presence
+COLUMN_PRESENT_lnam_refs,YES,YES,Column lnam_refs presence
+COLUMN_PRESENT_mask,YES,YES,Column mask presence
+COLUMN_PRESENT_name_rcid,YES,YES,Column name_rcid presence
+COLUMN_PRESENT_name_rcnm,YES,YES,Column name_rcnm presence
+COLUMN_PRESENT_natcon,YES,YES,Column natcon presence
+COLUMN_PRESENT_ninfom,YES,YES,Column ninfom presence
+COLUMN_PRESENT_nobjnm,YES,YES,Column nobjnm presence
+COLUMN_PRESENT_ntxtds,YES,YES,Column ntxtds presence
+COLUMN_PRESENT_objl,YES,YES,Column objl presence
+COLUMN_PRESENT_objnam,YES,YES,Column objnam presence
+COLUMN_PRESENT_ornt,YES,YES,Column ornt presence
+COLUMN_PRESENT_perend,YES,YES,Column perend presence
+COLUMN_PRESENT_persta,YES,YES,Column persta presence
+COLUMN_PRESENT_prim,YES,YES,Column prim presence
+COLUMN_PRESENT_rcid,YES,YES,Column rcid presence
+COLUMN_PRESENT_recdat,YES,YES,Column recdat presence
+COLUMN_PRESENT_recind,YES,YES,Column recind presence
+COLUMN_PRESENT_rver,YES,YES,Column rver presence
+COLUMN_PRESENT_scamax,YES,YES,Column scamax presence
+COLUMN_PRESENT_scamin,YES,YES,Column scamin presence
+COLUMN_PRESENT_sordat,YES,YES,Column sordat presence
+COLUMN_PRESENT_sorind,YES,YES,Column sorind presence
+COLUMN_PRESENT_status,YES,YES,Column status presence
+COLUMN_PRESENT_txtdsc,YES,YES,Column txtdsc presence
+COLUMN_PRESENT_usag,YES,YES,Column usag presence
+COLUMN_PRESENT_veracc,YES,YES,Column veracc presence
+COLUMN_PRESENT_verlen,YES,YES,Column verlen presence
+SEPARATOR_DATA_TYPES,--- DATA TYPES ---,--- DATA TYPES ---,Data types for each column
+DATATYPE_agen,int32,float64,Data type for agen - MISMATCH!
+DATATYPE_condtn,float64,object,Data type for condtn - MISMATCH!
+DATATYPE_conrad,float64,object,Data type for conrad - MISMATCH!
+DATATYPE_convis,float64,object,Data type for convis - MISMATCH!
+DATATYPE_datend,object,object,Data type for datend
+DATATYPE_datsta,object,object,Data type for datsta
+DATATYPE_dsid_dsnm,object,object,Data type for dsid_dsnm
+DATATYPE_dsid_edtn,int32,int64,Data type for dsid_edtn - MISMATCH!
+DATATYPE_dsid_updn,int32,int64,Data type for dsid_updn - MISMATCH!
+DATATYPE_ffpt_rind,object,object,Data type for ffpt_rind
+DATATYPE_fidn,int32,float64,Data type for fidn - MISMATCH!
+DATATYPE_fids,int32,float64,Data type for fids - MISMATCH!
+DATATYPE_grup,int32,float64,Data type for grup - MISMATCH!
+DATATYPE_inform,object,object,Data type for inform
+DATATYPE_lnam,object,object,Data type for lnam
+DATATYPE_lnam_refs,object,object,Data type for lnam_refs
+DATATYPE_mask,object,object,Data type for mask
+DATATYPE_name_rcid,object,object,Data type for name_rcid
+DATATYPE_name_rcnm,object,object,Data type for name_rcnm
+DATATYPE_natcon,object,object,Data type for natcon
+DATATYPE_ninfom,object,object,Data type for ninfom
+DATATYPE_nobjnm,object,object,Data type for nobjnm
+DATATYPE_ntxtds,object,object,Data type for ntxtds
+DATATYPE_objl,int32,float64,Data type for objl - MISMATCH!
+DATATYPE_objnam,object,object,Data type for objnam
+DATATYPE_ornt,object,object,Data type for ornt
+DATATYPE_perend,object,object,Data type for perend
+DATATYPE_persta,object,object,Data type for persta
+DATATYPE_prim,int32,float64,Data type for prim - MISMATCH!
+DATATYPE_rcid,int32,float64,Data type for rcid - MISMATCH!
+DATATYPE_recdat,object,object,Data type for recdat
+DATATYPE_recind,object,object,Data type for recind
+DATATYPE_rver,int32,float64,Data type for rver - MISMATCH!
+DATATYPE_scamax,float64,object,Data type for scamax - MISMATCH!
+DATATYPE_scamin,int32,int64,Data type for scamin - MISMATCH!
+DATATYPE_sordat,object,object,Data type for sordat
+DATATYPE_sorind,object,object,Data type for sorind
+DATATYPE_status,object,object,Data type for status
+DATATYPE_txtdsc,object,object,Data type for txtdsc
+DATATYPE_usag,object,object,Data type for usag
+DATATYPE_veracc,float64,object,Data type for veracc - MISMATCH!
+DATATYPE_verlen,float64,object,Data type for verlen - MISMATCH!
+SEPARATOR_FEATURE_SAMPLES,--- FEATURE SAMPLES (1) ---,--- FEATURE SAMPLES (1) ---,Sample of 1 features from each format
+SAMPLE_FEATURE_1_SEPARATOR,--- FEATURE 1 ---,--- FEATURE 1 ---,Feature 1 sample
+SAMPLE_F1_agen,550,550.0,Feature 1 - agen - VALUES DIFFER!
+SAMPLE_F1_condtn,nan,None,Feature 1 - condtn
+SAMPLE_F1_conrad,nan,None,Feature 1 - conrad
+SAMPLE_F1_convis,nan,None,Feature 1 - convis
+SAMPLE_F1_datend,None,None,Feature 1 - datend
+SAMPLE_F1_datsta,None,None,Feature 1 - datsta
+SAMPLE_F1_dsid_dsnm,US4CA60M,US4CA60M,Feature 1 - dsid_dsnm
+SAMPLE_F1_dsid_edtn,37,37,Feature 1 - dsid_edtn
+SAMPLE_F1_dsid_updn,6,6,Feature 1 - dsid_updn
+SAMPLE_F1_ffpt_rind,None,None,Feature 1 - ffpt_rind
+SAMPLE_F1_fidn,273757609,273757609.0,Feature 1 - fidn - VALUES DIFFER!
+SAMPLE_F1_fids,4157,4157.0,Feature 1 - fids - VALUES DIFFER!
+SAMPLE_F1_geometry,LineString(2),LineString(2),Feature 1 - geometry
+SAMPLE_F1_grup,2,2.0,Feature 1 - grup - VALUES DIFFER!
+SAMPLE_F1_inform,None,None,Feature 1 - inform
+SAMPLE_F1_lnam,0226105135A9103D,0226105135A9103D,Feature 1 - lnam
+SAMPLE_F1_lnam_refs,None,None,Feature 1 - lnam_refs
+SAMPLE_F1_mask,[ 2 ],[2],Feature 1 - mask - VALUES DIFFER!
+SAMPLE_F1_name_rcid,[ 2753 ],[2753],Feature 1 - name_rcid - VALUES DIFFER!
+SAMPLE_F1_name_rcnm,[ 130 ],[130],Feature 1 - name_rcnm - VALUES DIFFER!
+SAMPLE_F1_natcon,None,None,Feature 1 - natcon
+SAMPLE_F1_ninfom,None,None,Feature 1 - ninfom
+SAMPLE_F1_nobjnm,None,None,Feature 1 - nobjnm
+SAMPLE_F1_ntxtds,None,None,Feature 1 - ntxtds
+SAMPLE_F1_objl,95,95.0,Feature 1 - objl - VALUES DIFFER!
+SAMPLE_F1_objnam,None,None,Feature 1 - objnam
+SAMPLE_F1_ornt,[ 1 ],[1],Feature 1 - ornt - VALUES DIFFER!
+SAMPLE_F1_perend,None,None,Feature 1 - perend
+SAMPLE_F1_persta,None,None,Feature 1 - persta
+SAMPLE_F1_prim,2,2.0,Feature 1 - prim - VALUES DIFFER!
+SAMPLE_F1_rcid,3237,3237.0,Feature 1 - rcid - VALUES DIFFER!
+SAMPLE_F1_recdat,None,None,Feature 1 - recdat
+SAMPLE_F1_recind,None,None,Feature 1 - recind
+SAMPLE_F1_rver,1,1.0,Feature 1 - rver - VALUES DIFFER!
+SAMPLE_F1_scamax,nan,None,Feature 1 - scamax
+SAMPLE_F1_scamin,119999,119999,Feature 1 - scamin
+SAMPLE_F1_sordat,20090410,20090410,Feature 1 - sordat
+SAMPLE_F1_sorind,"US,US,graph,Chart 18746","US,US,graph,Chart 18746",Feature 1 - sorind
+SAMPLE_F1_status,None,None,Feature 1 - status
+SAMPLE_F1_txtdsc,None,None,Feature 1 - txtdsc
+SAMPLE_F1_usag,[ 255 ],[255],Feature 1 - usag - VALUES DIFFER!
+SAMPLE_F1_veracc,nan,None,Feature 1 - veracc
+SAMPLE_F1_verlen,nan,None,Feature 1 - verlen

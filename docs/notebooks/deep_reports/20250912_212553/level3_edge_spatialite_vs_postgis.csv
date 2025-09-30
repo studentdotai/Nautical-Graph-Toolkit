@@ -1,0 +1,50 @@
+attribute,spatialite,postgis,notes
+METADATA_LAYER_NAME,edge,edge,Layer comparison between spatialite and postgis
+METADATA_TOTAL_FEATURES,0,0,Total features in each format
+METADATA_TOTAL_COLUMNS,22,23,Total columns in each format
+SEPARATOR_COLUMN_PRESENCE,--- COLUMN PRESENCE ---,--- COLUMN PRESENCE ---,Which columns exist in each format
+COLUMN_PRESENT_dsid_dsnm,YES,YES,Column dsid_dsnm presence
+COLUMN_PRESENT_dsid_edtn,YES,YES,Column dsid_edtn presence
+COLUMN_PRESENT_dsid_updn,YES,YES,Column dsid_updn presence
+COLUMN_PRESENT_mask_0,YES,YES,Column mask_0 presence
+COLUMN_PRESENT_mask_1,YES,YES,Column mask_1 presence
+COLUMN_PRESENT_name_rcid_0,YES,YES,Column name_rcid_0 presence
+COLUMN_PRESENT_name_rcid_1,YES,YES,Column name_rcid_1 presence
+COLUMN_PRESENT_name_rcnm_0,YES,YES,Column name_rcnm_0 presence
+COLUMN_PRESENT_name_rcnm_1,YES,YES,Column name_rcnm_1 presence
+COLUMN_PRESENT_ogc_fid,NO,YES,Column ogc_fid presence
+COLUMN_PRESENT_ornt_0,YES,YES,Column ornt_0 presence
+COLUMN_PRESENT_ornt_1,YES,YES,Column ornt_1 presence
+COLUMN_PRESENT_posacc,YES,YES,Column posacc presence
+COLUMN_PRESENT_quapos,YES,YES,Column quapos presence
+COLUMN_PRESENT_rcid,YES,YES,Column rcid presence
+COLUMN_PRESENT_rcnm,YES,YES,Column rcnm presence
+COLUMN_PRESENT_ruin,YES,YES,Column ruin presence
+COLUMN_PRESENT_rver,YES,YES,Column rver presence
+COLUMN_PRESENT_topi_0,YES,YES,Column topi_0 presence
+COLUMN_PRESENT_topi_1,YES,YES,Column topi_1 presence
+COLUMN_PRESENT_usag_0,YES,YES,Column usag_0 presence
+COLUMN_PRESENT_usag_1,YES,YES,Column usag_1 presence
+COLUMN_PRESENT_wkb_geometry,NO,YES,Column wkb_geometry presence
+SEPARATOR_DATA_TYPES,--- DATA TYPES ---,--- DATA TYPES ---,Data types for each column
+DATATYPE_dsid_dsnm,object,object,Data type for dsid_dsnm
+DATATYPE_dsid_edtn,int32,object,Data type for dsid_edtn - MISMATCH!
+DATATYPE_dsid_updn,int32,object,Data type for dsid_updn - MISMATCH!
+DATATYPE_mask_0,int32,object,Data type for mask_0 - MISMATCH!
+DATATYPE_mask_1,int32,object,Data type for mask_1 - MISMATCH!
+DATATYPE_name_rcid_0,int32,object,Data type for name_rcid_0 - MISMATCH!
+DATATYPE_name_rcid_1,int32,object,Data type for name_rcid_1 - MISMATCH!
+DATATYPE_name_rcnm_0,int32,object,Data type for name_rcnm_0 - MISMATCH!
+DATATYPE_name_rcnm_1,int32,object,Data type for name_rcnm_1 - MISMATCH!
+DATATYPE_ornt_0,int32,object,Data type for ornt_0 - MISMATCH!
+DATATYPE_ornt_1,int32,object,Data type for ornt_1 - MISMATCH!
+DATATYPE_posacc,float64,object,Data type for posacc - MISMATCH!
+DATATYPE_quapos,int32,object,Data type for quapos - MISMATCH!
+DATATYPE_rcid,int32,object,Data type for rcid - MISMATCH!
+DATATYPE_rcnm,int32,object,Data type for rcnm - MISMATCH!
+DATATYPE_ruin,int32,object,Data type for ruin - MISMATCH!
+DATATYPE_rver,int32,object,Data type for rver - MISMATCH!
+DATATYPE_topi_0,int32,object,Data type for topi_0 - MISMATCH!
+DATATYPE_topi_1,int32,object,Data type for topi_1 - MISMATCH!
+DATATYPE_usag_0,int32,object,Data type for usag_0 - MISMATCH!
+DATATYPE_usag_1,int32,object,Data type for usag_1 - MISMATCH!

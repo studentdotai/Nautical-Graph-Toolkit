@@ -1,0 +1,393 @@
+Code,Column,Acronym,Meaning
+4,COUNTRY,AE,United Arab Emirates
+4,COUNTRY,AG,Antigua and Barbuda
+4,COUNTRY,AI,Anguilla
+4,COUNTRY,AL,Albania
+4,COUNTRY,AO,Angola
+4,COUNTRY,AQ,Antarctica
+4,COUNTRY,AR,Argentina
+4,COUNTRY,AS,American Samoa
+4,COUNTRY,AU,Australia
+4,COUNTRY,AW,Aruba
+4,COUNTRY,AZ,Azerbaijan
+4,COUNTRY,BA,Bosnia and Herzegovina
+4,COUNTRY,BB,Barbados
+4,COUNTRY,BD,Bangladesh
+4,COUNTRY,BE,Belgium
+4,COUNTRY,BG,Bulgaria
+4,COUNTRY,BH,Bahrain
+4,COUNTRY,BJ,Benin
+4,COUNTRY,BM,Bermuda
+4,COUNTRY,BN,Brunei
+4,COUNTRY,BQ,"Bonaire, Sint Eustatius, and Saba"
+4,COUNTRY,BR,Brazil
+4,COUNTRY,BS,"Bahamas, The"
+4,COUNTRY,BV,Bouvet Island
+4,COUNTRY,BZ,Belize
+4,COUNTRY,CA,Canada
+4,COUNTRY,CC,Cocos (Keeling) Islands
+4,COUNTRY,CD,Congo (Kinshasa)
+4,COUNTRY,CG,Congo (Brazzaville)
+4,COUNTRY,CI,Côte d’Ivoire
+4,COUNTRY,CK,Cook Islands
+4,COUNTRY,CL,Chile
+4,COUNTRY,CM,Cameroon
+4,COUNTRY,CN,China
+4,COUNTRY,CO,Colombia
+4,COUNTRY,CR,Costa Rica
+4,COUNTRY,CU,Cuba
+4,COUNTRY,CV,Cabo Verde
+4,COUNTRY,CW,Curacao
+4,COUNTRY,CX,Christmas Island
+4,COUNTRY,CY,Cyprus
+4,COUNTRY,DE,Germany
+4,COUNTRY,DJ,Djibouti
+4,COUNTRY,DK,Denmark
+4,COUNTRY,DM,Dominica
+4,COUNTRY,DO,Dominican Republic
+4,COUNTRY,DZ,Algeria
+4,COUNTRY,EC,Ecuador
+4,COUNTRY,EE,Estonia
+4,COUNTRY,EG,Egypt
+4,COUNTRY,EH,Western Sahara
+4,COUNTRY,ER,Eritrea
+4,COUNTRY,ES,Spain
+4,COUNTRY,ET,Ethiopia
+4,COUNTRY,FI,Finland
+4,COUNTRY,FJ,Fiji
+4,COUNTRY,FK,Falkland Islands (Islas Malvinas)
+4,COUNTRY,FM,"Micronesia, Federated States of"
+4,COUNTRY,FO,Faroe Islands
+4,COUNTRY,FR,France
+4,COUNTRY,GA,Gabon
+4,COUNTRY,GB,United Kingdom
+4,COUNTRY,GD,Grenada
+4,COUNTRY,GE,Georgia
+4,COUNTRY,GF,French Guiana
+4,COUNTRY,GG,Guernsey
+4,COUNTRY,GH,Ghana
+4,COUNTRY,GI,Gibraltar
+4,COUNTRY,GQ,Equatorial Guinea
+4,COUNTRY,GL,Greenland
+4,COUNTRY,GM,"Gambia, The"
+4,COUNTRY,GN,Guinea
+4,COUNTRY,GP,Guadeloupe
+4,COUNTRY,GR,Greece
+4,COUNTRY,GS,South Georgia and South Sandwich Islands
+4,COUNTRY,GT,Guatemala
+4,COUNTRY,GU,Guam
+4,COUNTRY,GW,Guinea-Bissau
+4,COUNTRY,GY,Guyana
+4,COUNTRY,HK,Hong Kong
+4,COUNTRY,HN,Honduras
+4,COUNTRY,HR,Croatia
+4,COUNTRY,HT,Haiti
+4,COUNTRY,ID,Indonesia
+4,COUNTRY,IE,Ireland
+4,COUNTRY,IL,Israel
+4,COUNTRY,IM,Isle of Man
+4,COUNTRY,IN,India
+4,COUNTRY,IO,British Indian Ocean Territory
+4,COUNTRY,IQ,Iraq
+4,COUNTRY,IR,Iran
+4,COUNTRY,IS,Iceland
+4,COUNTRY,IT,Italy
+4,COUNTRY,JE,Jersey
+4,COUNTRY,JM,Jamaica
+4,COUNTRY,JO,Jordan
+4,COUNTRY,JP,Japan
+4,COUNTRY,KE,Kenya
+4,COUNTRY,KH,Cambodia
+4,COUNTRY,KI,Kiribati
+4,COUNTRY,KM,Comoros
+4,COUNTRY,KN,Saint Kitts and Nevis
+4,COUNTRY,KP,"Korea, North"
+4,COUNTRY,KR,"Korea, South"
+4,COUNTRY,KW,Kuwait
+4,COUNTRY,KY,Cayman Islands
+4,COUNTRY,LB,Lebanon
+4,COUNTRY,LC,Saint Lucia
+4,COUNTRY,LK,Sri Lanka
+4,COUNTRY,LR,Liberia
+4,COUNTRY,LT,Lithuania
+4,COUNTRY,LV,Latvia
+4,COUNTRY,LY,Libya
+4,COUNTRY,MA,Morocco
+4,COUNTRY,MC,Monaco
+4,COUNTRY,ME,Montenegro
+4,COUNTRY,MG,Madagascar
+4,COUNTRY,MH,Marshall Islands
+4,COUNTRY,MM,Burma
+4,COUNTRY,MO,Macau
+4,COUNTRY,MP,Northern Mariana Islands
+4,COUNTRY,MQ,Martinique
+4,COUNTRY,MR,Mauritania
+4,COUNTRY,MS,Montserrat
+4,COUNTRY,MT,Malta
+4,COUNTRY,MU,Mauritius
+4,COUNTRY,MV,Maldives
+4,COUNTRY,MX,Mexico
+4,COUNTRY,MY,Malaysia
+4,COUNTRY,MZ,Mozambique
+4,COUNTRY,NA,Namibia
+4,COUNTRY,NC,New Caledonia
+4,COUNTRY,NF,Norfolk Island
+4,COUNTRY,NG,Nigeria
+4,COUNTRY,NI,Nicaragua
+4,COUNTRY,NL,Netherlands
+4,COUNTRY,NO,Norway
+4,COUNTRY,NR,Nauru
+4,COUNTRY,NU,Niue
+4,COUNTRY,NZ,New Zealand
+4,COUNTRY,OM,Oman
+4,COUNTRY,PA,Panama
+4,COUNTRY,PE,Peru
+4,COUNTRY,PF,French Polynesia
+4,COUNTRY,PG,Papua New Guinea
+4,COUNTRY,PH,Philippines
+4,COUNTRY,PK,Pakistan
+4,COUNTRY,PL,Poland
+4,COUNTRY,PM,Saint Pierre and Miquelon
+4,COUNTRY,PN,Pitcairn Islands
+4,COUNTRY,PR,Puerto Rico
+4,COUNTRY,PT,Portugal
+4,COUNTRY,PW,Palau
+4,COUNTRY,PY,Paraguay
+4,COUNTRY,QA,Qatar
+4,COUNTRY,QM,Midway Islands
+4,COUNTRY,QS,Bassas da India
+4,COUNTRY,QW,Wake Island
+4,COUNTRY,QX,Glorioso Islands
+4,COUNTRY,RE,Reunion
+4,COUNTRY,RO,Romania
+4,COUNTRY,RU,Russia
+4,COUNTRY,SA,Saudi Arabia
+4,COUNTRY,SB,Solomon Islands
+4,COUNTRY,SC,Seychelles
+4,COUNTRY,SD,Sudan
+4,COUNTRY,SE,Sweden
+4,COUNTRY,SG,Singapore
+4,COUNTRY,SH,"Saint Helena, Ascension, and Tristan da Cunha"
+4,COUNTRY,SI,Slovenia
+4,COUNTRY,SL,Sierra Leone
+4,COUNTRY,SN,Senegal
+4,COUNTRY,SO,Somalia
+4,COUNTRY,SR,Suriname
+4,COUNTRY,ST,Sao Tome and Principe
+4,COUNTRY,SV,El Salvador
+4,COUNTRY,SX,Sint Maarten
+4,COUNTRY,SY,Syria
+4,COUNTRY,TC,Turks and Caicos Islands
+4,COUNTRY,TG,Togo
+4,COUNTRY,TH,Thailand
+4,COUNTRY,TK,Tokelau
+4,COUNTRY,TL,Timor-Leste
+4,COUNTRY,TN,Tunisia
+4,COUNTRY,TO,Tonga
+4,COUNTRY,TR,Turkey
+4,COUNTRY,TT,Trinidad and Tobago
+4,COUNTRY,TV,Tuvalu
+4,COUNTRY,TW,Taiwan
+4,COUNTRY,TZ,Tanzania
+4,COUNTRY,UA,Ukraine
+4,COUNTRY,US,United States
+4,COUNTRY,UY,Uruguay
+4,COUNTRY,VC,Saint Vincent and the Grenadines
+4,COUNTRY,VE,Venezuela
+4,COUNTRY,VG,"Virgin Islands, British"
+4,COUNTRY,VI,"Virgin Islands, U.S."
+4,COUNTRY,VN,Vietnam
+4,COUNTRY,VU,Vanuatu
+4,COUNTRY,WF,Wallis and Futuna
+4,COUNTRY,WS,Samoa
+4,COUNTRY,XA,Ashmore and Cartier Islands
+4,COUNTRY,XB,Baker Island
+4,COUNTRY,XC,Coral Sea Islands
+4,COUNTRY,XE,Europa Island
+4,COUNTRY,XG,Gaza Strip
+4,COUNTRY,XH,Howland Island
+4,COUNTRY,XJ,Jan Mayen
+4,COUNTRY,XL,Palmyra Atoll
+4,COUNTRY,XM,Kingman Reef
+4,COUNTRY,XP,Paracel Islands
+4,COUNTRY,XQ,Jarvis Island
+4,COUNTRY,XR,Svalbard
+4,COUNTRY,XS,Spratly Islands
+4,COUNTRY,XT,Tromelin Island
+4,COUNTRY,XU,Johnston Atoll
+4,COUNTRY,XV,Navassa Island
+4,COUNTRY,XW,West Bank
+4,COUNTRY,YE,Yemen
+4,COUNTRY,YT,Mayotte
+4,COUNTRY,ZA,South Africa
+15,HARBORSIZE,L,Large
+15,HARBORSIZE,M,Medium
+15,HARBORSIZE,S,Small
+15,HARBORSIZE,V,Very Small
+16,HARBORTYPE,CN,Coastal Natural
+16,HARBORTYPE,CB,Coastal Breakwater
+16,HARBORTYPE,CT,Coastal Tide Gate
+16,HARBORTYPE,RN,River Natural
+16,HARBORTYPE,RB,RIVER BASIN N - NONE
+16,HARBORTYPE,RT,River Tide Gate
+16,HARBORTYPE,LC,Lake or Canal
+16,HARBORTYPE,OR,Open Roadstead
+16,HARBORTYPE,TH,Typhoon Harbor
+17,SHELTER,E,Excellent
+17,SHELTER,G,Good
+17,SHELTER,F,Fair
+17,SHELTER,P,Poor
+17,SHELTER,N,None
+18,ENTRY_TIDE,Y,Yes
+18,ENTRY_TIDE,N,No
+19,ENTRYSWELL,Y,Yes
+19,ENTRYSWELL,N,No
+20,ENTRY_ICE,Y,Yes
+20,ENTRY_ICE,N,No
+21,ENTRYOTHER,Y,Yes
+21,ENTRYOTHER,N,No
+22,OVERHD_LIM,Y,Yes
+22,OVERHD_LIM,N,No
+23,CHAN_DEPTH,A,"Feet: 76-over, Meters: 23.2-over"
+23,CHAN_DEPTH,B,"Feet: 71-75, Meters: 21.6-22.9"
+23,CHAN_DEPTH,C,"Feet: 66-70, Meters: 20.1-21.3"
+23,CHAN_DEPTH,D,"Feet: 61-65, Meters: 18.6-19.8"
+23,CHAN_DEPTH,E,"Feet: 56-60, Meters: 17.1-18.2"
+23,CHAN_DEPTH,F,"Feet: 51-55, Meters: 15.5-16.8"
+23,CHAN_DEPTH,G,"Feet: 46-51, Meters: 14.0-15.2"
+23,CHAN_DEPTH,H,"Feet: 41-45, Meters: 12.5-13.7"
+23,CHAN_DEPTH,J,"Feet: 36-40, Meters: 11.0-12.2"
+23,CHAN_DEPTH,K,"Feet: 31-35, Meters: 9.4-10.7"
+23,CHAN_DEPTH,L,"Feet: 26-30, Meters: 7.9-9.1"
+23,CHAN_DEPTH,M,"Feet: 21-25, Meters: 6.4-7.6"
+23,CHAN_DEPTH,N,"Feet: 16-20, Meters: 4.9-6.1"
+23,CHAN_DEPTH,O,"Feet: 11-15, Meters: 3.4-4.6"
+23,CHAN_DEPTH,P,"Feet: 6-10, Meters: 1.8-3.0"
+23,CHAN_DEPTH,Q,"Feet: 0-5, Meters: 0-1.5"
+24,ANCH_DEPTH,A,"Feet: 76-over, Meters: 23.2-over"
+24,ANCH_DEPTH,B,"Feet: 71-75, Meters: 21.6-22.9"
+24,ANCH_DEPTH,C,"Feet: 66-70, Meters: 20.1-21.3"
+24,ANCH_DEPTH,D,"Feet: 61-65, Meters: 18.6-19.8"
+24,ANCH_DEPTH,E,"Feet: 56-60, Meters: 17.1-18.2"
+24,ANCH_DEPTH,F,"Feet: 51-55, Meters: 15.5-16.8"
+24,ANCH_DEPTH,G,"Feet: 46-51, Meters: 14.0-15.2"
+24,ANCH_DEPTH,H,"Feet: 41-45, Meters: 12.5-13.7"
+24,ANCH_DEPTH,J,"Feet: 36-40, Meters: 11.0-12.2"
+24,ANCH_DEPTH,K,"Feet: 31-35, Meters: 9.4-10.7"
+24,ANCH_DEPTH,L,"Feet: 26-30, Meters: 7.9-9.1"
+24,ANCH_DEPTH,M,"Feet: 21-25, Meters: 6.4-7.6"
+24,ANCH_DEPTH,N,"Feet: 16-20, Meters: 4.9-6.1"
+24,ANCH_DEPTH,O,"Feet: 11-15, Meters: 3.4-4.6"
+24,ANCH_DEPTH,P,"Feet: 6-10, Meters: 1.8-3.0"
+24,ANCH_DEPTH,Q,"Feet: 0-5, Meters: 0-1.5"
+25,CARGODEPTH,A,"Feet: 76-over, Meters: 23.2-over"
+25,CARGODEPTH,B,"Feet: 71-75, Meters: 21.6-22.9"
+25,CARGODEPTH,C,"Feet: 66-70, Meters: 20.1-21.3"
+25,CARGODEPTH,D,"Feet: 61-65, Meters: 18.6-19.8"
+25,CARGODEPTH,E,"Feet: 56-60, Meters: 17.1-18.2"
+25,CARGODEPTH,F,"Feet: 51-55, Meters: 15.5-16.8"
+25,CARGODEPTH,G,"Feet: 46-51, Meters: 14.0-15.2"
+25,CARGODEPTH,H,"Feet: 41-45, Meters: 12.5-13.7"
+25,CARGODEPTH,J,"Feet: 36-40, Meters: 11.0-12.2"
+25,CARGODEPTH,K,"Feet: 31-35, Meters: 9.4-10.7"
+25,CARGODEPTH,L,"Feet: 26-30, Meters: 7.9-9.1"
+25,CARGODEPTH,M,"Feet: 21-25, Meters: 6.4-7.6"
+25,CARGODEPTH,N,"Feet: 16-20, Meters: 4.9-6.1"
+25,CARGODEPTH,O,"Feet: 11-15, Meters: 3.4-4.6"
+25,CARGODEPTH,P,"Feet: 6-10, Meters: 1.8-3.0"
+25,CARGODEPTH,Q,"Feet: 0-5, Meters: 0-1.5"
+26,OIL_DEPTH,A,"Feet: 76-over, Meters: 23.2-over"
+26,OIL_DEPTH,B,"Feet: 71-75, Meters: 21.6-22.9"
+26,OIL_DEPTH,C,"Feet: 66-70, Meters: 20.1-21.3"
+26,OIL_DEPTH,D,"Feet: 61-65, Meters: 18.6-19.8"
+26,OIL_DEPTH,E,"Feet: 56-60, Meters: 17.1-18.2"
+26,OIL_DEPTH,F,"Feet: 51-55, Meters: 15.5-16.8"
+26,OIL_DEPTH,G,"Feet: 46-51, Meters: 14.0-15.2"
+26,OIL_DEPTH,H,"Feet: 41-45, Meters: 12.5-13.7"
+26,OIL_DEPTH,J,"Feet: 36-40, Meters: 11.0-12.2"
+26,OIL_DEPTH,K,"Feet: 31-35, Meters: 9.4-10.7"
+26,OIL_DEPTH,L,"Feet: 26-30, Meters: 7.9-9.1"
+26,OIL_DEPTH,M,"Feet: 21-25, Meters: 6.4-7.6"
+26,OIL_DEPTH,N,"Feet: 16-20, Meters: 4.9-6.1"
+26,OIL_DEPTH,O,"Feet: 11-15, Meters: 3.4-4.6"
+26,OIL_DEPTH,P,"Feet: 6-10, Meters: 1.8-3.0"
+26,OIL_DEPTH,Q,"Feet: 0-5, Meters: 0-1.5"
+28,MAX_VESSEL,L,Over 150m Length
+28,MAX_VESSEL,M,up to 150m Length
+29,HOLDGROUND,Y,Yes
+29,HOLDGROUND,N,No
+30,TURN_BASIN,Y,Yes
+30,TURN_BASIN,N,No
+31,PORTOFENTR,Y,Yes
+31,PORTOFENTR,N,No
+33,ETAMESSAGE,Y,Yes
+33,ETAMESSAGE,N,No
+34,PILOT_REQD,Y,Yes
+34,PILOT_REQD,N,No
+35,PILOTAVAIL,Y,Yes
+35,PILOTAVAIL,N,No
+37,PILOTADVSD,Y,Yes
+37,PILOTADVSD,N,No
+38,TUGSALVAGE,Y,Yes
+38,TUGSALVAGE,N,No
+39,TUG_ASSIST,Y,Yes
+39,TUG_ASSIST,N,No
+40,PRATIQUE,Y,Yes
+40,PRATIQUE,N,No
+43,COMM_PHONE,Y,Yes
+43,COMM_PHONE,N,No
+44,COMM_FAX,Y,Yes
+44,COMM_FAX,N,No
+45,COMM_RADIO,Y,Yes
+45,COMM_RADIO,N,No
+46,COMM_VHF,Y,Yes
+46,COMM_VHF,N,No
+47,COMM_AIR,Y,Yes
+47,COMM_AIR,N,No
+48,COMM_RAIL,Y,Yes
+48,COMM_RAIL,N,No
+49,CARGOWHARF,Y,Yes
+49,CARGOWHARF,N,No
+50,CARGO_ANCH,Y,Yes
+50,CARGO_ANCH,N,No
+54,MED_FACIL,Y,Yes
+54,MED_FACIL,N,No
+55,GARBAGE,Y,Yes
+55,GARBAGE,N,No
+57,DRTYBALLST,Y,Yes
+57,DRTYBALLST,N,No
+58,CRANEFIXED,Y,Yes
+58,CRANEFIXED,N,No
+59,CRANEMOBIL,Y,Yes
+59,CRANEMOBIL,N,No
+60,CRANEFLOAT,Y,Yes
+60,CRANEFLOAT,N,No
+62,LIFT50_100,Y,Yes
+62,LIFT50_100,N,No
+65,LONGSHORE,Y,Yes
+65,LONGSHORE,N,No
+66,ELECTRICAL,Y,Yes
+66,ELECTRICAL,N,No
+70,PROVISIONS,Y,Yes
+70,PROVISIONS,N,No
+71,WATER,Y,Yes
+71,WATER,N,No
+72,FUEL_OIL,Y,Yes
+72,FUEL_OIL,N,No
+73,DIESEL,Y,Yes
+73,DIESEL,N,No
+74,DECKSUPPLY,Y,Yes
+74,DECKSUPPLY,N,No
+75,ENG_SUPPLY,Y,Yes
+75,ENG_SUPPLY,N,No
+76,REPAIRCODE,A,Major
+76,REPAIRCODE,B,Moderate
+76,REPAIRCODE,C,Limited
+76,REPAIRCODE,D,Emergency Only
+76,REPAIRCODE,N,None
+77,DRYDOCK,L,Large
+77,DRYDOCK,M,Medium
+77,DRYDOCK,S,Small
+78,RAILWAY,L,Large
+78,RAILWAY,M,Medium
+78,RAILWAY,S,Small

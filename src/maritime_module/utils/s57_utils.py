@@ -304,12 +304,18 @@ class NoaaDatabase:
         get_dataframe(): Returns the scraped data as a pandas DataFrame.
         save_to_csv(filename="ENC_DB.csv"): Saves the DataFrame to a CSV file.
     """
+    _cache_filename = "noaa_database.csv"
 
     def __init__(self):
         self.url = "https://www.charts.noaa.gov/ENCs/ENCsIndv.shtml"
         self.df: Optional[pd.DataFrame] = None
         self.session = requests.Session()
-        # It's good practice to identify your scraper with a User-Agent.
+
+        # The data directory is one level up from the 'utils' directory.
+        self._data_dir = Path(__file__).resolve().parent.parent / 'data'
+        # Ensure the data directory exists
+        self._data_dir.mkdir(parents=True, exist_ok=True)
+
         self.session.headers.update({
             'User-Agent': 'MaritimeModule/1.0 (Python Scraper; +https://vectornautical.com)'
         })
@@ -322,6 +328,18 @@ class NoaaDatabase:
         Args:
             force_refresh (bool): If True, bypasses the cache and re-scrapes the data.
         """
+
+        # Check for a cached file first
+        cache_file = self._data_dir / self._cache_filename
+        if not force_refresh and cache_file.exists():
+            try:
+                self.df = pd.read_csv(cache_file, index_col='Num')
+                logger.info(f"Loaded cached NOAA ENC data from {cache_file}")
+                return self.df
+            except Exception as e:
+                logger.warning(f"Could not load cached NOAA data from {cache_file}: {e}. Re-scraping.")
+                # Do not return here; fall through to re-scrape.
+
         if self.df is None or force_refresh:
             if force_refresh:
                 logger.info("Forcing a refresh of NOAA ENC data.")
@@ -368,28 +386,27 @@ class NoaaDatabase:
 
         return validated_charts
 
-    def save_to_csv(self, filename: str = "noaa_enc_data"):
+    def save_to_csv(self, filename: Optional[str] = None):
         """
         Saves the DataFrame to a CSV file.
         Automatically appends the .csv extension if it's not already present.
 
         Args:
-            filename (str): The base name for the output file. Defaults to "noaa_enc_data".
+            filename (str): The base name for the output file. Defaults to "noaa_database".
         """
-        # Ensure the dataframe is loaded before saving.
-        if self.df is None:
-            self.get_dataframe()
+        if filename is None:
+            filename = self._cache_filename
 
-        # --- IMPROVEMENT ---
-        # Automatically add the .csv extension if the user hasn't provided it.
+        # Save to the designated data directory and ensure .csv extension.
         if not filename.lower().endswith('.csv'):
             filename += '.csv'
+        output_path = self._data_dir / filename
 
         try:
-            self.df.to_csv(filename)
-            logger.info(f"Successfully saved NOAA ENC data to {filename}")
+            self.df.to_csv(output_path)
+            logger.info(f"Successfully saved NOAA ENC data to {output_path}")
         except IOError as e:
-            logger.error(f"Failed to save CSV file '{filename}': {e}")
+            logger.error(f"Failed to save CSV file '{output_path}': {e}")
             raise
 
     def _scrape_enc_data(self):
@@ -426,7 +443,7 @@ class NoaaDatabase:
 
             df = pd.DataFrame(data_rows, columns=headers)
 
-            # --- THIS IS THE FIX ---
+
             # Remove rows that are just repeated headers from the middle of the data.
             if '#' in df.columns:
                 df = df[df['#'] != '#'].copy()
@@ -439,6 +456,9 @@ class NoaaDatabase:
 
             self.df = df
             logger.info("Successfully scraped and parsed NOAA ENC data.")
+
+            # Cache the newly scraped data
+            self.save_to_csv()
 
         except requests.RequestException as e:
             logger.error(f"Failed to fetch data from NOAA: {e}")

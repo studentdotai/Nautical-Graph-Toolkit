@@ -1,0 +1,27 @@
+NATIONAL GEOSPATIAL-INTELLIGENCE AGENCY
+US4TB1X0 - PALAU - PULO ANNA EAST AND MERIR 
+ 
+INDEX:
+NOTE
+POSITIONS
+CAUTION
+TIDAL INFORMATION
+SUPPLEMENTAL INFORMATION
+
+NOTES: 
+NOTE:
+The original soundings were in fathoms.
+
+POSITIONS:
+This cell has been positioned on the WGS-84 Datum with the use of 2019 orthorectified imagery.
+
+CAUTION:
+Fish Aggregating Devices (FADs), anchored or drifting, are commonly deployed within the waters of many Pacific Islands and may not be charted. Even though many of the installations are temporary in nature, FADs pose significant risk to navigation safety. Prudent mariners should exercise caution in navigating these waters.
+
+TIDAL INFORMATION:
+Refer to Admiralty Total Tides Program for the latest information.
+
+SUPPLEMENTAL INFORMATION:
+Consult National Geospatial-Intelligence Agency Pub. 126, Sailing Directions, for important supplemental information. 
+
+END OF FILE

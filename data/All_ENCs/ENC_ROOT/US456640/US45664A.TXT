@@ -1,0 +1,14 @@
+NATIONAL GEOSPATIAL-INTELLIGENCE AGENCY
+US456640 - APPROACH TO NGULU - FEDERATED STATES OF MICRONESIA
+ 
+INDEX:
+NOTE
+CAUTION
+
+NOTE:
+Coastline derived from imagery sources. With additions from other sources.
+
+CAUTION:
+Soundings and other information on this chart are dated and unreliable. Vessels should navigate with particular caution at all times.
+
+END OF FILE

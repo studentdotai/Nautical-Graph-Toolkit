@@ -1,0 +1,276 @@
+attribute,gpkg,spatialite,notes
+METADATA_LAYER_NAME,navlne,navlne,Layer comparison between gpkg and spatialite
+METADATA_TOTAL_FEATURES,7,7,Total features in each format
+METADATA_TOTAL_COLUMNS,32,29,Total columns in each format
+SEPARATOR_COLUMN_PRESENCE,--- COLUMN PRESENCE ---,--- COLUMN PRESENCE ---,Which columns exist in each format
+COLUMN_PRESENT_agen,YES,YES,Column agen presence
+COLUMN_PRESENT_catnav,YES,YES,Column catnav presence
+COLUMN_PRESENT_datend,YES,YES,Column datend presence
+COLUMN_PRESENT_datsta,YES,YES,Column datsta presence
+COLUMN_PRESENT_dsid_dsnm,YES,YES,Column dsid_dsnm presence
+COLUMN_PRESENT_dsid_edtn,YES,YES,Column dsid_edtn presence
+COLUMN_PRESENT_dsid_updn,YES,YES,Column dsid_updn presence
+COLUMN_PRESENT_ffpt_rind,YES,NO,Column ffpt_rind presence
+COLUMN_PRESENT_fidn,YES,YES,Column fidn presence
+COLUMN_PRESENT_fids,YES,YES,Column fids presence
+COLUMN_PRESENT_grup,YES,YES,Column grup presence
+COLUMN_PRESENT_inform,YES,YES,Column inform presence
+COLUMN_PRESENT_lnam,YES,YES,Column lnam presence
+COLUMN_PRESENT_lnam_refs,YES,NO,Column lnam_refs presence
+COLUMN_PRESENT_ninfom,YES,YES,Column ninfom presence
+COLUMN_PRESENT_ntxtds,YES,YES,Column ntxtds presence
+COLUMN_PRESENT_objl,YES,YES,Column objl presence
+COLUMN_PRESENT_orient,YES,YES,Column orient presence
+COLUMN_PRESENT_perend,YES,YES,Column perend presence
+COLUMN_PRESENT_persta,YES,YES,Column persta presence
+COLUMN_PRESENT_prim,YES,YES,Column prim presence
+COLUMN_PRESENT_rcid,YES,YES,Column rcid presence
+COLUMN_PRESENT_recdat,YES,YES,Column recdat presence
+COLUMN_PRESENT_recind,YES,YES,Column recind presence
+COLUMN_PRESENT_rver,YES,YES,Column rver presence
+COLUMN_PRESENT_scamax,YES,YES,Column scamax presence
+COLUMN_PRESENT_scamin,YES,YES,Column scamin presence
+COLUMN_PRESENT_sordat,YES,YES,Column sordat presence
+COLUMN_PRESENT_sorind,YES,YES,Column sorind presence
+COLUMN_PRESENT_status,YES,NO,Column status presence
+COLUMN_PRESENT_txtdsc,YES,YES,Column txtdsc presence
+SEPARATOR_DATA_TYPES,--- DATA TYPES ---,--- DATA TYPES ---,Data types for each column
+DATATYPE_agen,int32,int32,Data type for agen
+DATATYPE_catnav,float64,float64,Data type for catnav
+DATATYPE_datend,object,object,Data type for datend
+DATATYPE_datsta,object,object,Data type for datsta
+DATATYPE_dsid_dsnm,object,object,Data type for dsid_dsnm
+DATATYPE_dsid_edtn,int32,int32,Data type for dsid_edtn
+DATATYPE_dsid_updn,int32,int32,Data type for dsid_updn
+DATATYPE_fidn,int32,int32,Data type for fidn
+DATATYPE_fids,int32,int32,Data type for fids
+DATATYPE_grup,int32,int32,Data type for grup
+DATATYPE_inform,object,object,Data type for inform
+DATATYPE_lnam,object,object,Data type for lnam
+DATATYPE_ninfom,object,object,Data type for ninfom
+DATATYPE_ntxtds,object,object,Data type for ntxtds
+DATATYPE_objl,int32,int32,Data type for objl
+DATATYPE_orient,float64,float64,Data type for orient
+DATATYPE_perend,object,object,Data type for perend
+DATATYPE_persta,object,object,Data type for persta
+DATATYPE_prim,int32,int32,Data type for prim
+DATATYPE_rcid,int32,int32,Data type for rcid
+DATATYPE_recdat,object,object,Data type for recdat
+DATATYPE_recind,object,object,Data type for recind
+DATATYPE_rver,int32,int32,Data type for rver
+DATATYPE_scamax,float64,float64,Data type for scamax
+DATATYPE_scamin,int32,int32,Data type for scamin
+DATATYPE_sordat,object,object,Data type for sordat
+DATATYPE_sorind,object,object,Data type for sorind
+DATATYPE_txtdsc,object,object,Data type for txtdsc
+SEPARATOR_FEATURE_SAMPLES,--- FEATURE SAMPLES (7) ---,--- FEATURE SAMPLES (7) ---,Sample of 7 features from each format
+SAMPLE_FEATURE_1_SEPARATOR,--- FEATURE 1 ---,--- FEATURE 1 ---,Feature 1 sample
+SAMPLE_F1_agen,550,550,Feature 1 - agen
+SAMPLE_F1_catnav,2.0,2.0,Feature 1 - catnav
+SAMPLE_F1_datend,None,None,Feature 1 - datend
+SAMPLE_F1_datsta,None,None,Feature 1 - datsta
+SAMPLE_F1_dsid_dsnm,US4CA60M,US4CA60M,Feature 1 - dsid_dsnm
+SAMPLE_F1_dsid_edtn,37,37,Feature 1 - dsid_edtn
+SAMPLE_F1_dsid_updn,6,6,Feature 1 - dsid_updn
+SAMPLE_F1_fidn,21845911,21845911,Feature 1 - fidn
+SAMPLE_F1_fids,50,50,Feature 1 - fids
+SAMPLE_F1_geometry,LineString(2),LineString(2),Feature 1 - geometry
+SAMPLE_F1_grup,2,2,Feature 1 - grup
+SAMPLE_F1_inform,None,None,Feature 1 - inform
+SAMPLE_F1_lnam,0226014D57970032,0226014D57970032,Feature 1 - lnam
+SAMPLE_F1_ninfom,None,None,Feature 1 - ninfom
+SAMPLE_F1_ntxtds,None,None,Feature 1 - ntxtds
+SAMPLE_F1_objl,85,85,Feature 1 - objl
+SAMPLE_F1_orient,180.0,180.0,Feature 1 - orient
+SAMPLE_F1_perend,None,None,Feature 1 - perend
+SAMPLE_F1_persta,None,None,Feature 1 - persta
+SAMPLE_F1_prim,2,2,Feature 1 - prim
+SAMPLE_F1_rcid,3697,3697,Feature 1 - rcid
+SAMPLE_F1_recdat,None,None,Feature 1 - recdat
+SAMPLE_F1_recind,None,None,Feature 1 - recind
+SAMPLE_F1_rver,1,1,Feature 1 - rver
+SAMPLE_F1_scamax,nan,nan,Feature 1 - scamax
+SAMPLE_F1_scamin,179999,179999,Feature 1 - scamin
+SAMPLE_F1_sordat,201004,201004,Feature 1 - sordat
+SAMPLE_F1_sorind,"US,US,graph,Chart 18749","US,US,graph,Chart 18749",Feature 1 - sorind
+SAMPLE_F1_txtdsc,None,None,Feature 1 - txtdsc
+SAMPLE_FEATURE_2_SEPARATOR,--- FEATURE 2 ---,--- FEATURE 2 ---,Feature 2 sample
+SAMPLE_F2_agen,550,550,Feature 2 - agen
+SAMPLE_F2_catnav,nan,nan,Feature 2 - catnav
+SAMPLE_F2_datend,None,None,Feature 2 - datend
+SAMPLE_F2_datsta,None,None,Feature 2 - datsta
+SAMPLE_F2_dsid_dsnm,US4CA60M,US4CA60M,Feature 2 - dsid_dsnm
+SAMPLE_F2_dsid_edtn,37,37,Feature 2 - dsid_edtn
+SAMPLE_F2_dsid_updn,6,6,Feature 2 - dsid_updn
+SAMPLE_F2_fidn,21845910,21845910,Feature 2 - fidn
+SAMPLE_F2_fids,50,50,Feature 2 - fids
+SAMPLE_F2_geometry,LineString(2),LineString(2),Feature 2 - geometry
+SAMPLE_F2_grup,2,2,Feature 2 - grup
+SAMPLE_F2_inform,Measured distance = 1 NM,Measured distance = 1 NM,Feature 2 - inform
+SAMPLE_F2_lnam,0226014D57960032,0226014D57960032,Feature 2 - lnam
+SAMPLE_F2_ninfom,None,None,Feature 2 - ninfom
+SAMPLE_F2_ntxtds,None,None,Feature 2 - ntxtds
+SAMPLE_F2_objl,85,85,Feature 2 - objl
+SAMPLE_F2_orient,90.0,90.0,Feature 2 - orient
+SAMPLE_F2_perend,None,None,Feature 2 - perend
+SAMPLE_F2_persta,None,None,Feature 2 - persta
+SAMPLE_F2_prim,2,2,Feature 2 - prim
+SAMPLE_F2_rcid,3698,3698,Feature 2 - rcid
+SAMPLE_F2_recdat,None,None,Feature 2 - recdat
+SAMPLE_F2_recind,None,None,Feature 2 - recind
+SAMPLE_F2_rver,1,1,Feature 2 - rver
+SAMPLE_F2_scamax,nan,nan,Feature 2 - scamax
+SAMPLE_F2_scamin,179999,179999,Feature 2 - scamin
+SAMPLE_F2_sordat,201004,201004,Feature 2 - sordat
+SAMPLE_F2_sorind,"US,US,graph,Chart 18749","US,US,graph,Chart 18749",Feature 2 - sorind
+SAMPLE_F2_txtdsc,None,None,Feature 2 - txtdsc
+SAMPLE_FEATURE_3_SEPARATOR,--- FEATURE 3 ---,--- FEATURE 3 ---,Feature 3 sample
+SAMPLE_F3_agen,550,550,Feature 3 - agen
+SAMPLE_F3_catnav,nan,nan,Feature 3 - catnav
+SAMPLE_F3_datend,None,None,Feature 3 - datend
+SAMPLE_F3_datsta,None,None,Feature 3 - datsta
+SAMPLE_F3_dsid_dsnm,US4CA60M,US4CA60M,Feature 3 - dsid_dsnm
+SAMPLE_F3_dsid_edtn,37,37,Feature 3 - dsid_edtn
+SAMPLE_F3_dsid_updn,6,6,Feature 3 - dsid_updn
+SAMPLE_F3_fidn,4042061,4042061,Feature 3 - fidn
+SAMPLE_F3_fids,4205,4205,Feature 3 - fids
+SAMPLE_F3_geometry,LineString(3),LineString(3),Feature 3 - geometry
+SAMPLE_F3_grup,2,2,Feature 3 - grup
+SAMPLE_F3_inform,Measured distance = 1 NM,Measured distance = 1 NM,Feature 3 - inform
+SAMPLE_F3_lnam,0226003DAD4D106D,0226003DAD4D106D,Feature 3 - lnam
+SAMPLE_F3_ninfom,None,None,Feature 3 - ninfom
+SAMPLE_F3_ntxtds,None,None,Feature 3 - ntxtds
+SAMPLE_F3_objl,85,85,Feature 3 - objl
+SAMPLE_F3_orient,111.37,111.37,Feature 3 - orient
+SAMPLE_F3_perend,None,None,Feature 3 - perend
+SAMPLE_F3_persta,None,None,Feature 3 - persta
+SAMPLE_F3_prim,2,2,Feature 3 - prim
+SAMPLE_F3_rcid,3699,3699,Feature 3 - rcid
+SAMPLE_F3_recdat,None,None,Feature 3 - recdat
+SAMPLE_F3_recind,None,None,Feature 3 - recind
+SAMPLE_F3_rver,1,1,Feature 3 - rver
+SAMPLE_F3_scamax,nan,nan,Feature 3 - scamax
+SAMPLE_F3_scamin,179999,179999,Feature 3 - scamin
+SAMPLE_F3_sordat,200307,200307,Feature 3 - sordat
+SAMPLE_F3_sorind,"US,US,graph,Chart 18754","US,US,graph,Chart 18754",Feature 3 - sorind
+SAMPLE_F3_txtdsc,None,None,Feature 3 - txtdsc
+SAMPLE_FEATURE_4_SEPARATOR,--- FEATURE 4 ---,--- FEATURE 4 ---,Feature 4 sample
+SAMPLE_F4_agen,550,550,Feature 4 - agen
+SAMPLE_F4_catnav,2.0,2.0,Feature 4 - catnav
+SAMPLE_F4_datend,None,None,Feature 4 - datend
+SAMPLE_F4_datsta,None,None,Feature 4 - datsta
+SAMPLE_F4_dsid_dsnm,US4CA60M,US4CA60M,Feature 4 - dsid_dsnm
+SAMPLE_F4_dsid_edtn,37,37,Feature 4 - dsid_edtn
+SAMPLE_F4_dsid_updn,6,6,Feature 4 - dsid_updn
+SAMPLE_F4_fidn,4042080,4042080,Feature 4 - fidn
+SAMPLE_F4_fids,4205,4205,Feature 4 - fids
+SAMPLE_F4_geometry,LineString(4),LineString(4),Feature 4 - geometry
+SAMPLE_F4_grup,2,2,Feature 4 - grup
+SAMPLE_F4_inform,None,None,Feature 4 - inform
+SAMPLE_F4_lnam,0226003DAD60106D,0226003DAD60106D,Feature 4 - lnam
+SAMPLE_F4_ninfom,None,None,Feature 4 - ninfom
+SAMPLE_F4_ntxtds,None,None,Feature 4 - ntxtds
+SAMPLE_F4_objl,85,85,Feature 4 - objl
+SAMPLE_F4_orient,22.0,22.0,Feature 4 - orient
+SAMPLE_F4_perend,None,None,Feature 4 - perend
+SAMPLE_F4_persta,None,None,Feature 4 - persta
+SAMPLE_F4_prim,2,2,Feature 4 - prim
+SAMPLE_F4_rcid,3700,3700,Feature 4 - rcid
+SAMPLE_F4_recdat,None,None,Feature 4 - recdat
+SAMPLE_F4_recind,None,None,Feature 4 - recind
+SAMPLE_F4_rver,1,1,Feature 4 - rver
+SAMPLE_F4_scamax,nan,nan,Feature 4 - scamax
+SAMPLE_F4_scamin,179999,179999,Feature 4 - scamin
+SAMPLE_F4_sordat,200307,200307,Feature 4 - sordat
+SAMPLE_F4_sorind,"US,US,graph,Chart 18754","US,US,graph,Chart 18754",Feature 4 - sorind
+SAMPLE_F4_txtdsc,None,None,Feature 4 - txtdsc
+SAMPLE_FEATURE_5_SEPARATOR,--- FEATURE 5 ---,--- FEATURE 5 ---,Feature 5 sample
+SAMPLE_F5_agen,550,550,Feature 5 - agen
+SAMPLE_F5_catnav,2.0,2.0,Feature 5 - catnav
+SAMPLE_F5_datend,None,None,Feature 5 - datend
+SAMPLE_F5_datsta,None,None,Feature 5 - datsta
+SAMPLE_F5_dsid_dsnm,US4CA60M,US4CA60M,Feature 5 - dsid_dsnm
+SAMPLE_F5_dsid_edtn,37,37,Feature 5 - dsid_edtn
+SAMPLE_F5_dsid_updn,6,6,Feature 5 - dsid_updn
+SAMPLE_F5_fidn,21853421,21853421,Feature 5 - fidn
+SAMPLE_F5_fids,50,50,Feature 5 - fids
+SAMPLE_F5_geometry,LineString(2),LineString(2),Feature 5 - geometry
+SAMPLE_F5_grup,2,2,Feature 5 - grup
+SAMPLE_F5_inform,None,None,Feature 5 - inform
+SAMPLE_F5_lnam,0226014D74ED0032,0226014D74ED0032,Feature 5 - lnam
+SAMPLE_F5_ninfom,None,None,Feature 5 - ninfom
+SAMPLE_F5_ntxtds,None,None,Feature 5 - ntxtds
+SAMPLE_F5_objl,85,85,Feature 5 - objl
+SAMPLE_F5_orient,180.0,180.0,Feature 5 - orient
+SAMPLE_F5_perend,None,None,Feature 5 - perend
+SAMPLE_F5_persta,None,None,Feature 5 - persta
+SAMPLE_F5_prim,2,2,Feature 5 - prim
+SAMPLE_F5_rcid,3701,3701,Feature 5 - rcid
+SAMPLE_F5_recdat,None,None,Feature 5 - recdat
+SAMPLE_F5_recind,None,None,Feature 5 - recind
+SAMPLE_F5_rver,1,1,Feature 5 - rver
+SAMPLE_F5_scamax,nan,nan,Feature 5 - scamax
+SAMPLE_F5_scamin,179999,179999,Feature 5 - scamin
+SAMPLE_F5_sordat,201004,201004,Feature 5 - sordat
+SAMPLE_F5_sorind,"US,US,graph,Chart 18749","US,US,graph,Chart 18749",Feature 5 - sorind
+SAMPLE_F5_txtdsc,None,None,Feature 5 - txtdsc
+SAMPLE_FEATURE_6_SEPARATOR,--- FEATURE 6 ---,--- FEATURE 6 ---,Feature 6 sample
+SAMPLE_F6_agen,550,550,Feature 6 - agen
+SAMPLE_F6_catnav,3.0,3.0,Feature 6 - catnav
+SAMPLE_F6_datend,None,None,Feature 6 - datend
+SAMPLE_F6_datsta,None,None,Feature 6 - datsta
+SAMPLE_F6_dsid_dsnm,US4CA60M,US4CA60M,Feature 6 - dsid_dsnm
+SAMPLE_F6_dsid_edtn,37,37,Feature 6 - dsid_edtn
+SAMPLE_F6_dsid_updn,6,6,Feature 6 - dsid_updn
+SAMPLE_F6_fidn,518394677,518394677,Feature 6 - fidn
+SAMPLE_F6_fids,1,1,Feature 6 - fids
+SAMPLE_F6_geometry,LineString(6),LineString(6),Feature 6 - geometry
+SAMPLE_F6_grup,2,2,Feature 6 - grup
+SAMPLE_F6_inform,None,None,Feature 6 - inform
+SAMPLE_F6_lnam,02261EE613350001,02261EE613350001,Feature 6 - lnam
+SAMPLE_F6_ninfom,None,None,Feature 6 - ninfom
+SAMPLE_F6_ntxtds,None,None,Feature 6 - ntxtds
+SAMPLE_F6_objl,85,85,Feature 6 - objl
+SAMPLE_F6_orient,355.3,355.3,Feature 6 - orient
+SAMPLE_F6_perend,None,None,Feature 6 - perend
+SAMPLE_F6_persta,None,None,Feature 6 - persta
+SAMPLE_F6_prim,2,2,Feature 6 - prim
+SAMPLE_F6_rcid,3702,3702,Feature 6 - rcid
+SAMPLE_F6_recdat,None,None,Feature 6 - recdat
+SAMPLE_F6_recind,None,None,Feature 6 - recind
+SAMPLE_F6_rver,1,1,Feature 6 - rver
+SAMPLE_F6_scamax,nan,nan,Feature 6 - scamax
+SAMPLE_F6_scamin,179999,179999,Feature 6 - scamin
+SAMPLE_F6_sordat,20120925,20120925,Feature 6 - sordat
+SAMPLE_F6_sorind,"US,US,reprt,11thCGD,LNM 39/12","US,US,reprt,11thCGD,LNM 39/12",Feature 6 - sorind
+SAMPLE_F6_txtdsc,None,None,Feature 6 - txtdsc
+SAMPLE_FEATURE_7_SEPARATOR,--- FEATURE 7 ---,--- FEATURE 7 ---,Feature 7 sample
+SAMPLE_F7_agen,550,550,Feature 7 - agen
+SAMPLE_F7_catnav,2.0,2.0,Feature 7 - catnav
+SAMPLE_F7_datend,None,None,Feature 7 - datend
+SAMPLE_F7_datsta,None,None,Feature 7 - datsta
+SAMPLE_F7_dsid_dsnm,US4CA60M,US4CA60M,Feature 7 - dsid_dsnm
+SAMPLE_F7_dsid_edtn,37,37,Feature 7 - dsid_edtn
+SAMPLE_F7_dsid_updn,6,6,Feature 7 - dsid_updn
+SAMPLE_F7_fidn,4042130,4042130,Feature 7 - fidn
+SAMPLE_F7_fids,4205,4205,Feature 7 - fids
+SAMPLE_F7_geometry,LineString(7),LineString(7),Feature 7 - geometry
+SAMPLE_F7_grup,2,2,Feature 7 - grup
+SAMPLE_F7_inform,None,None,Feature 7 - inform
+SAMPLE_F7_lnam,0226003DAD92106D,0226003DAD92106D,Feature 7 - lnam
+SAMPLE_F7_ninfom,None,None,Feature 7 - ninfom
+SAMPLE_F7_ntxtds,None,None,Feature 7 - ntxtds
+SAMPLE_F7_objl,85,85,Feature 7 - objl
+SAMPLE_F7_orient,22.0,22.0,Feature 7 - orient
+SAMPLE_F7_perend,None,None,Feature 7 - perend
+SAMPLE_F7_persta,None,None,Feature 7 - persta
+SAMPLE_F7_prim,2,2,Feature 7 - prim
+SAMPLE_F7_rcid,3703,3703,Feature 7 - rcid
+SAMPLE_F7_recdat,None,None,Feature 7 - recdat
+SAMPLE_F7_recind,None,None,Feature 7 - recind
+SAMPLE_F7_rver,1,1,Feature 7 - rver
+SAMPLE_F7_scamax,nan,nan,Feature 7 - scamax
+SAMPLE_F7_scamin,179999,179999,Feature 7 - scamin
+SAMPLE_F7_sordat,200307,200307,Feature 7 - sordat
+SAMPLE_F7_sorind,"US,US,graph,Chart 18754","US,US,graph,Chart 18754",Feature 7 - sorind
+SAMPLE_F7_txtdsc,None,None,Feature 7 - txtdsc

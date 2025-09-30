@@ -1,0 +1,7 @@
+LOCAL DATUM
+
+SOUNDINGS
+Soundings refers to the low water plane which corresponds to a discharge at the New Savannah Dam (located further north) of 172.7 cubic meter/6,100 cubic feet per second. The Corps of Engineers project depth is 2.7 meters/9 feet at the established low water planes.
+
+OVERHEAD CLEARANCES
+High water clearances refer to a water plane established by a discharge at the New Savannah Dam (located further north) of 1,755.6 cubic meter/62,000 cubic feet per second. Low water clearances refer to a discharge of 172.7 cubic meter/6,100 cubic feet per second.

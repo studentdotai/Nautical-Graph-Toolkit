@@ -1,0 +1,460 @@
+Detailed Table Column Analysis for POSTGIS
+==================================================
+
+Schema: s57_deeptest
+
+Table: lakare (31 columns)
+Columns: ['agen', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'elevat', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'txtdsc', 'veracc', 'verdat', 'wkb_geometry']
+
+Table: unsare (26 columns)
+Columns: ['agen', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'ntxtds', 'objl', 'ogc_fid', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'txtdsc', 'wkb_geometry']
+
+Table: lndare (30 columns)
+Columns: ['agen', 'condtn', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'wkb_geometry']
+
+Table: canals (36 columns)
+Columns: ['agen', 'catcan', 'condtn', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'horacc', 'horclr', 'horwid', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'wkb_geometry']
+
+Table: lndelv (32 columns)
+Columns: ['agen', 'convis', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'elevat', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'txtdsc', 'veracc', 'verdat', 'wkb_geometry']
+
+Table: lndrgn (32 columns)
+Columns: ['agen', 'catlnd', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'natqua', 'natsur', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'txtdsc', 'watlev', 'wkb_geometry']
+
+Table: ctsare (33 columns)
+Columns: ['agen', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'perend', 'persta', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'wkb_geometry']
+
+Table: lndmrk (43 columns)
+Columns: ['agen', 'catlmk', 'colour', 'colpat', 'condtn', 'conrad', 'convis', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'elevat', 'ffpt_rind', 'fidn', 'fids', 'functn', 'grup', 'height', 'inform', 'lnam', 'lnam_refs', 'natcon', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'picrep', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'veracc', 'verdat', 'verlen', 'wkb_geometry']
+
+Table: curent (32 columns)
+Columns: ['agen', 'curvel', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'objl', 'objnam', 'ogc_fid', 'orient', 'perend', 'persta', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'wkb_geometry']
+
+Table: lights (50 columns)
+Columns: ['agen', 'catlit', 'colour', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'exclit', 'ffpt_rind', 'fidn', 'fids', 'grup', 'height', 'inform', 'litchr', 'litvis', 'lnam', 'lnam_refs', 'marsys', 'mltylt', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'orient', 'perend', 'persta', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sectr1', 'sectr2', 'siggrp', 'sigper', 'sigseq', 'sordat', 'sorind', 'status', 'txtdsc', 'valnmr', 'veracc', 'verdat', 'wkb_geometry']
+
+Table: magvar (29 columns)
+Columns: ['agen', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'objl', 'ogc_fid', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'ryrmgv', 'scamax', 'scamin', 'sordat', 'sorind', 'valacm', 'valmag', 'wkb_geometry']
+
+Table: mipare (35 columns)
+Columns: ['agen', 'catmpa', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'perend', 'persta', 'prim', 'rcid', 'recdat', 'recind', 'restrn', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'wkb_geometry']
+
+Table: obstrn (45 columns)
+Columns: ['agen', 'catobs', 'condtn', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'expsou', 'ffpt_rind', 'fidn', 'fids', 'grup', 'height', 'inform', 'lnam', 'lnam_refs', 'natcon', 'natqua', 'natsur', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'prim', 'prodct', 'quasou', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'souacc', 'status', 'tecsou', 'txtdsc', 'valsou', 'veracc', 'verdat', 'verlen', 'watlev', 'wkb_geometry']
+
+Table: pipsol (40 columns)
+Columns: ['agen', 'burdep', 'catpip', 'condtn', 'datend', 'datsta', 'drval1', 'drval2', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'prim', 'prodct', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'veracc', 'verdat', 'verlen', 'wkb_geometry']
+
+Table: rdocal (36 columns)
+Columns: ['agen', 'comcha', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'orient', 'perend', 'persta', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'trafic', 'txtdsc', 'wkb_geometry']
+
+Table: rdosta (39 columns)
+Columns: ['agen', 'calsgn', 'catros', 'comcha', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'estrng', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'orient', 'perend', 'persta', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sigfrq', 'sordat', 'sorind', 'status', 'txtdsc', 'wkb_geometry']
+
+Table: rectrc (42 columns)
+Columns: ['agen', 'cattrk', 'datend', 'datsta', 'drval1', 'drval2', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'orient', 'perend', 'persta', 'prim', 'quasou', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'souacc', 'status', 'tecsou', 'trafic', 'txtdsc', 'verdat', 'wkb_geometry']
+
+Table: resare (35 columns)
+Columns: ['agen', 'catrea', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'perend', 'persta', 'prim', 'rcid', 'recdat', 'recind', 'restrn', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'wkb_geometry']
+
+Table: rivers (29 columns)
+Columns: ['agen', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'wkb_geometry']
+
+Table: seaare (29 columns)
+Columns: ['agen', 'catsea', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'txtdsc', 'wkb_geometry']
+
+Table: sbdare (32 columns)
+Columns: ['agen', 'colour', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'natqua', 'natsur', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'txtdsc', 'watlev', 'wkb_geometry']
+
+Table: slcons (47 columns)
+Columns: ['agen', 'catslc', 'colour', 'colpat', 'condtn', 'conrad', 'convis', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'height', 'horacc', 'horclr', 'horlen', 'horwid', 'inform', 'lnam', 'lnam_refs', 'natcon', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'veracc', 'verdat', 'verlen', 'watlev', 'wkb_geometry']
+
+Table: siltnk (44 columns)
+Columns: ['agen', 'buishp', 'catsil', 'colour', 'colpat', 'condtn', 'conrad', 'convis', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'elevat', 'ffpt_rind', 'fidn', 'fids', 'grup', 'height', 'inform', 'lnam', 'lnam_refs', 'natcon', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'picrep', 'prim', 'prodct', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'veracc', 'verdat', 'verlen', 'wkb_geometry']
+
+Table: slogrd (35 columns)
+Columns: ['agen', 'catslo', 'colour', 'conrad', 'convis', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'natcon', 'natqua', 'natsur', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'txtdsc', 'wkb_geometry']
+
+Table: soundg (35 columns)
+Columns: ['agen', 'depth', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'expsou', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'prim', 'quasou', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'souacc', 'status', 'tecsou', 'txtdsc', 'verdat', 'wkb_geometry']
+
+Table: tesare (28 columns)
+Columns: ['agen', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'nation', 'ninfom', 'ntxtds', 'objl', 'ogc_fid', 'prim', 'rcid', 'recdat', 'recind', 'restrn', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'txtdsc', 'wkb_geometry']
+
+Table: topmar (40 columns)
+Columns: ['agen', 'colour', 'colpat', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'height', 'inform', 'lnam', 'lnam_refs', 'marsys', 'ninfom', 'ntxtds', 'objl', 'ogc_fid', 'perend', 'persta', 'picrep', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'topshp', 'txtdsc', 'veracc', 'verdat', 'verlen', 'wkb_geometry']
+
+Table: tssbnd (30 columns)
+Columns: ['agen', 'cattss', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'ntxtds', 'objl', 'ogc_fid', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'wkb_geometry']
+
+Table: tsslpt (32 columns)
+Columns: ['agen', 'cattss', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'ntxtds', 'objl', 'ogc_fid', 'orient', 'prim', 'rcid', 'recdat', 'recind', 'restrn', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'wkb_geometry']
+
+Table: tsezne (30 columns)
+Columns: ['agen', 'cattss', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'ntxtds', 'objl', 'ogc_fid', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'wkb_geometry']
+
+Table: uwtroc (38 columns)
+Columns: ['agen', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'expsou', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'natqua', 'natsur', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'prim', 'quasou', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'souacc', 'status', 'tecsou', 'txtdsc', 'valsou', 'verdat', 'watlev', 'wkb_geometry']
+
+Table: wattur (29 columns)
+Columns: ['agen', 'catwat', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'txtdsc', 'wkb_geometry']
+
+Table: wedklp (29 columns)
+Columns: ['agen', 'catwed', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'txtdsc', 'wkb_geometry']
+
+Table: wrecks (42 columns)
+Columns: ['agen', 'catwrk', 'conrad', 'convis', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'expsou', 'ffpt_rind', 'fidn', 'fids', 'grup', 'height', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'prim', 'quasou', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'souacc', 'status', 'tecsou', 'txtdsc', 'valsou', 'veracc', 'verdat', 'verlen', 'watlev', 'wkb_geometry']
+
+Table: m_covr (23 columns)
+Columns: ['agen', 'catcov', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'objl', 'ogc_fid', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'sordat', 'sorind', 'wkb_geometry']
+
+Table: m_npub (26 columns)
+Columns: ['agen', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'ntxtds', 'objl', 'ogc_fid', 'picrep', 'prim', 'pubref', 'rcid', 'recdat', 'recind', 'rver', 'sordat', 'sorind', 'txtdsc', 'wkb_geometry']
+
+Table: m_nsys (28 columns)
+Columns: ['agen', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'marsys', 'ninfom', 'ntxtds', 'objl', 'ogc_fid', 'orient', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'txtdsc', 'wkb_geometry']
+
+Table: dsid (37 columns)
+Columns: ['dsid_agen', 'dsid_comt', 'dsid_dsnm', 'dsid_edtn', 'dsid_expp', 'dsid_intu', 'dsid_isdt', 'dsid_pred', 'dsid_prof', 'dsid_prsp', 'dsid_psdn', 'dsid_sted', 'dsid_uadt', 'dsid_updn', 'dspm_comf', 'dspm_comt', 'dspm_coun', 'dspm_cscl', 'dspm_duni', 'dspm_hdat', 'dspm_huni', 'dspm_puni', 'dspm_sdat', 'dspm_somf', 'dspm_vdat', 'dssi_aall', 'dssi_dstr', 'dssi_nall', 'dssi_nocn', 'dssi_nocr', 'dssi_noed', 'dssi_nofa', 'dssi_nogr', 'dssi_noin', 'dssi_nolr', 'dssi_nomr', 'ogc_fid']
+
+Table: m_qual (34 columns)
+Columns: ['agen', 'catqua', 'catzoc', 'drval1', 'drval2', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'ntxtds', 'objl', 'ogc_fid', 'posacc', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'sordat', 'sorind', 'souacc', 'surend', 'sursta', 'tecsou', 'txtdsc', 'verdat', 'wkb_geometry']
+
+Table: c_aggr (28 columns)
+Columns: ['agen', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'picrep', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'txtdsc']
+
+Table: isolatednode (11 columns)
+Columns: ['dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ogc_fid', 'posacc', 'quapos', 'rcid', 'rcnm', 'ruin', 'rver', 'wkb_geometry']
+
+Table: connectednode (11 columns)
+Columns: ['dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ogc_fid', 'posacc', 'quapos', 'rcid', 'rcnm', 'ruin', 'rver', 'wkb_geometry']
+
+Table: c_asso (28 columns)
+Columns: ['agen', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'picrep', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'txtdsc']
+
+Table: fshzne (30 columns)
+Columns: ['agen', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'nation', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'wkb_geometry']
+
+Table: edge (23 columns)
+Columns: ['dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'mask_0', 'mask_1', 'name_rcid_0', 'name_rcid_1', 'name_rcnm_0', 'name_rcnm_1', 'ogc_fid', 'ornt_0', 'ornt_1', 'posacc', 'quapos', 'rcid', 'rcnm', 'ruin', 'rver', 'topi_0', 'topi_1', 'usag_0', 'usag_1', 'wkb_geometry']
+
+Table: face (11 columns)
+Columns: ['dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ogc_fid', 'posacc', 'quapos', 'rcid', 'rcnm', 'ruin', 'rver', 'wkb_geometry']
+
+Table: achare (35 columns)
+Columns: ['agen', 'catach', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'perend', 'persta', 'prim', 'rcid', 'recdat', 'recind', 'restrn', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'wkb_geometry']
+
+Table: cblare (33 columns)
+Columns: ['agen', 'catcbl', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'prim', 'rcid', 'recdat', 'recind', 'restrn', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'wkb_geometry']
+
+Table: admare (31 columns)
+Columns: ['agen', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'jrsdtn', 'lnam', 'lnam_refs', 'nation', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'picrep', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'txtdsc', 'wkb_geometry']
+
+Table: airare (33 columns)
+Columns: ['agen', 'catair', 'condtn', 'convis', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'picrep', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'wkb_geometry']
+
+Table: cblohd (40 columns)
+Columns: ['agen', 'catcbl', 'condtn', 'conrad', 'convis', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'icefac', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'veracc', 'verclr', 'vercsa', 'verdat', 'wkb_geometry']
+
+Table: bcnlat (48 columns)
+Columns: ['agen', 'bcnshp', 'catlam', 'colour', 'colpat', 'condtn', 'conrad', 'convis', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'elevat', 'ffpt_rind', 'fidn', 'fids', 'grup', 'height', 'inform', 'lnam', 'lnam_refs', 'marsys', 'natcon', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'perend', 'persta', 'picrep', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'veracc', 'verdat', 'verlen', 'wkb_geometry']
+
+Table: damcon (41 columns)
+Columns: ['agen', 'catdam', 'colour', 'colpat', 'condtn', 'conrad', 'convis', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'height', 'inform', 'lnam', 'lnam_refs', 'natcon', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'txtdsc', 'veracc', 'verdat', 'verlen', 'wkb_geometry']
+
+Table: bcnspp (48 columns)
+Columns: ['agen', 'bcnshp', 'catspm', 'colour', 'colpat', 'condtn', 'conrad', 'convis', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'elevat', 'ffpt_rind', 'fidn', 'fids', 'grup', 'height', 'inform', 'lnam', 'lnam_refs', 'marsys', 'natcon', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'perend', 'persta', 'picrep', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'veracc', 'verdat', 'verlen', 'wkb_geometry']
+
+Table: fairwy (38 columns)
+Columns: ['agen', 'datend', 'datsta', 'drval1', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'orient', 'prim', 'quasou', 'rcid', 'recdat', 'recind', 'restrn', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'souacc', 'status', 'trafic', 'txtdsc', 'verdat', 'wkb_geometry']
+
+Table: feryrt (34 columns)
+Columns: ['agen', 'catfry', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'perend', 'persta', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'wkb_geometry']
+
+Table: bridge (45 columns)
+Columns: ['agen', 'catbrg', 'colour', 'colpat', 'condtn', 'conrad', 'convis', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'horacc', 'horclr', 'inform', 'lnam', 'lnam_refs', 'natcon', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'picrep', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'txtdsc', 'veracc', 'verccl', 'verclr', 'vercop', 'verdat', 'wkb_geometry']
+
+Table: buisgl (43 columns)
+Columns: ['agen', 'buishp', 'colour', 'colpat', 'condtn', 'conrad', 'convis', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'elevat', 'ffpt_rind', 'fidn', 'fids', 'functn', 'grup', 'height', 'inform', 'lnam', 'lnam_refs', 'natcon', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'picrep', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'veracc', 'verdat', 'verlen', 'wkb_geometry']
+
+Table: marcul (43 columns)
+Columns: ['agen', 'catmfa', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'expsou', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'perend', 'persta', 'prim', 'quasou', 'rcid', 'recdat', 'recind', 'restrn', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'souacc', 'status', 'txtdsc', 'valsou', 'veracc', 'verdat', 'verlen', 'watlev', 'wkb_geometry']
+
+Table: buaare (35 columns)
+Columns: ['agen', 'catbua', 'condtn', 'conrad', 'convis', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'height', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'txtdsc', 'veracc', 'verdat', 'wkb_geometry']
+
+Table: morfac (47 columns)
+Columns: ['agen', 'boyshp', 'catmor', 'colour', 'colpat', 'condtn', 'conrad', 'convis', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'height', 'inform', 'lnam', 'lnam_refs', 'natcon', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'perend', 'persta', 'picrep', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'veracc', 'verdat', 'verlen', 'watlev', 'wkb_geometry']
+
+Table: boylat (43 columns)
+Columns: ['agen', 'boyshp', 'catlam', 'colour', 'colpat', 'conrad', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'marsys', 'natcon', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'perend', 'persta', 'picrep', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'veracc', 'verlen', 'wkb_geometry']
+
+Table: navlne (33 columns)
+Columns: ['agen', 'catnav', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'ntxtds', 'objl', 'ogc_fid', 'orient', 'perend', 'persta', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'wkb_geometry']
+
+Table: boysaw (42 columns)
+Columns: ['agen', 'boyshp', 'colour', 'colpat', 'conrad', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'marsys', 'natcon', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'perend', 'persta', 'picrep', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'veracc', 'verlen', 'wkb_geometry']
+
+Table: ofsplf (44 columns)
+Columns: ['agen', 'catofp', 'colour', 'colpat', 'condtn', 'conrad', 'convis', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'height', 'inform', 'lnam', 'lnam_refs', 'natcon', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'picrep', 'prim', 'prodct', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'veracc', 'verdat', 'verlen', 'wkb_geometry']
+
+Table: boyspp (43 columns)
+Columns: ['agen', 'boyshp', 'catspm', 'colour', 'colpat', 'conrad', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'marsys', 'natcon', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'perend', 'persta', 'picrep', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'veracc', 'verlen', 'wkb_geometry']
+
+Table: pilpnt (39 columns)
+Columns: ['agen', 'catple', 'colour', 'colpat', 'condtn', 'convis', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'height', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'txtdsc', 'veracc', 'verdat', 'verlen', 'wkb_geometry']
+
+Table: cblsub (37 columns)
+Columns: ['agen', 'burdep', 'catcbl', 'condtn', 'datend', 'datsta', 'drval1', 'drval2', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'verdat', 'wkb_geometry']
+
+Table: pilbop (37 columns)
+Columns: ['agen', 'catpil', 'comcha', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'npldst', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'perend', 'persta', 'pildst', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'wkb_geometry']
+
+Table: ctnare (30 columns)
+Columns: ['agen', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'ntxtds', 'objl', 'ogc_fid', 'perend', 'persta', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'txtdsc', 'wkb_geometry']
+
+Table: pipare (35 columns)
+Columns: ['agen', 'catpip', 'condtn', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'prim', 'prodct', 'rcid', 'recdat', 'recind', 'restrn', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'wkb_geometry']
+
+Table: cgusta (33 columns)
+Columns: ['agen', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'perend', 'persta', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'wkb_geometry']
+
+Table: ponton (39 columns)
+Columns: ['agen', 'condtn', 'conrad', 'convis', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'natcon', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'perend', 'persta', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'veracc', 'verlen', 'wkb_geometry']
+
+Table: coalne (36 columns)
+Columns: ['agen', 'catcoa', 'colour', 'conrad', 'convis', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'elevat', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'picrep', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'txtdsc', 'veracc', 'verdat', 'wkb_geometry']
+
+Table: prcare (30 columns)
+Columns: ['agen', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'ntxtds', 'objl', 'ogc_fid', 'prim', 'rcid', 'recdat', 'recind', 'restrn', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'wkb_geometry']
+
+Table: conzne (30 columns)
+Columns: ['agen', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'nation', 'ninfom', 'ntxtds', 'objl', 'ogc_fid', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'wkb_geometry']
+
+Table: rtpbcn (40 columns)
+Columns: ['agen', 'catrtb', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'perend', 'persta', 'prim', 'radwal', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sectr1', 'sectr2', 'siggrp', 'sigseq', 'sordat', 'sorind', 'status', 'txtdsc', 'valmxr', 'wkb_geometry']
+
+Table: daymar (43 columns)
+Columns: ['agen', 'catspm', 'colour', 'colpat', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'elevat', 'ffpt_rind', 'fidn', 'fids', 'grup', 'height', 'inform', 'lnam', 'lnam_refs', 'natcon', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'perend', 'persta', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'topshp', 'txtdsc', 'veracc', 'verdat', 'verlen', 'wkb_geometry']
+
+Table: depare (31 columns)
+Columns: ['agen', 'drval1', 'drval2', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'ntxtds', 'objl', 'ogc_fid', 'prim', 'quasou', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'souacc', 'txtdsc', 'verdat', 'wkb_geometry']
+
+Table: depcnt (29 columns)
+Columns: ['agen', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'hypcat', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'ntxtds', 'objl', 'ogc_fid', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'txtdsc', 'valdco', 'verdat', 'wkb_geometry']
+
+Table: splare (32 columns)
+Columns: ['agen', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'perend', 'persta', 'prim', 'rcid', 'recdat', 'recind', 'restrn', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'wkb_geometry']
+
+Table: dmpgrd (31 columns)
+Columns: ['agen', 'catdpg', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'prim', 'rcid', 'recdat', 'recind', 'restrn', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'wkb_geometry']
+
+Table: exezne (27 columns)
+Columns: ['agen', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'nation', 'ninfom', 'ntxtds', 'objl', 'ogc_fid', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'txtdsc', 'wkb_geometry']
+
+Table: slotop (38 columns)
+Columns: ['agen', 'catslo', 'colour', 'conrad', 'convis', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'elevat', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'natcon', 'natqua', 'natsur', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'txtdsc', 'veracc', 'verdat', 'wkb_geometry']
+
+Table: fogsig (40 columns)
+Columns: ['agen', 'catfog', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'perend', 'persta', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sigfrq', 'siggen', 'siggrp', 'sigper', 'sigseq', 'sordat', 'sorind', 'status', 'txtdsc', 'valmxr', 'wkb_geometry']
+
+Table: hrbfac (36 columns)
+Columns: ['agen', 'cathaf', 'condtn', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'natcon', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'perend', 'persta', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'wkb_geometry']
+
+
+Properties found in tables:
+  catlit: ['lights']
+  sorind: ['lakare', 'unsare', 'lndare', 'canals', 'lndelv', 'lndrgn', 'ctsare', 'lndmrk', 'curent', 'lights', 'magvar', 'mipare', 'obstrn', 'pipsol', 'rdocal', 'rdosta', 'rectrc', 'resare', 'rivers', 'seaare', 'sbdare', 'slcons', 'siltnk', 'slogrd', 'soundg', 'tesare', 'topmar', 'tssbnd', 'tsslpt', 'tsezne', 'uwtroc', 'wattur', 'wedklp', 'wrecks', 'm_covr', 'm_npub', 'm_nsys', 'm_qual', 'c_aggr', 'c_asso', 'fshzne', 'achare', 'cblare', 'admare', 'airare', 'cblohd', 'bcnlat', 'damcon', 'bcnspp', 'fairwy', 'feryrt', 'bridge', 'buisgl', 'marcul', 'buaare', 'morfac', 'boylat', 'navlne', 'boysaw', 'ofsplf', 'boyspp', 'pilpnt', 'cblsub', 'pilbop', 'ctnare', 'pipare', 'cgusta', 'ponton', 'coalne', 'prcare', 'conzne', 'rtpbcn', 'daymar', 'depare', 'depcnt', 'splare', 'dmpgrd', 'exezne', 'slotop', 'fogsig', 'hrbfac']
+  catdam: ['damcon']
+  name_rcid_1: ['edge']
+  catslc: ['slcons']
+  catfry: ['feryrt']
+  catlmk: ['lndmrk']
+  dspm_huni: ['dsid']
+  dsid_dsnm: ['lakare', 'unsare', 'lndare', 'canals', 'lndelv', 'lndrgn', 'ctsare', 'lndmrk', 'curent', 'lights', 'magvar', 'mipare', 'obstrn', 'pipsol', 'rdocal', 'rdosta', 'rectrc', 'resare', 'rivers', 'seaare', 'sbdare', 'slcons', 'siltnk', 'slogrd', 'soundg', 'tesare', 'topmar', 'tssbnd', 'tsslpt', 'tsezne', 'uwtroc', 'wattur', 'wedklp', 'wrecks', 'm_covr', 'm_npub', 'm_nsys', 'dsid', 'm_qual', 'c_aggr', 'isolatednode', 'connectednode', 'c_asso', 'fshzne', 'edge', 'face', 'achare', 'cblare', 'admare', 'airare', 'cblohd', 'bcnlat', 'damcon', 'bcnspp', 'fairwy', 'feryrt', 'bridge', 'buisgl', 'marcul', 'buaare', 'morfac', 'boylat', 'navlne', 'boysaw', 'ofsplf', 'boyspp', 'pilpnt', 'cblsub', 'pilbop', 'ctnare', 'pipare', 'cgusta', 'ponton', 'coalne', 'prcare', 'conzne', 'rtpbcn', 'daymar', 'depare', 'depcnt', 'splare', 'dmpgrd', 'exezne', 'slotop', 'fogsig', 'hrbfac']
+  tecsou: ['obstrn', 'rectrc', 'soundg', 'uwtroc', 'wrecks', 'm_qual']
+  dsid_psdn: ['dsid']
+  catcbl: ['cblare', 'cblohd', 'cblsub']
+  txtdsc: ['lakare', 'unsare', 'lndare', 'canals', 'lndelv', 'lndrgn', 'ctsare', 'lndmrk', 'lights', 'mipare', 'obstrn', 'pipsol', 'rdocal', 'rdosta', 'rectrc', 'resare', 'rivers', 'seaare', 'sbdare', 'slcons', 'siltnk', 'slogrd', 'soundg', 'tesare', 'topmar', 'tssbnd', 'tsslpt', 'tsezne', 'uwtroc', 'wattur', 'wedklp', 'wrecks', 'm_npub', 'm_nsys', 'm_qual', 'c_aggr', 'c_asso', 'fshzne', 'achare', 'cblare', 'admare', 'airare', 'cblohd', 'bcnlat', 'damcon', 'bcnspp', 'fairwy', 'feryrt', 'bridge', 'buisgl', 'marcul', 'buaare', 'morfac', 'boylat', 'navlne', 'boysaw', 'ofsplf', 'boyspp', 'pilpnt', 'cblsub', 'pilbop', 'ctnare', 'pipare', 'cgusta', 'ponton', 'coalne', 'prcare', 'conzne', 'rtpbcn', 'daymar', 'depare', 'depcnt', 'splare', 'dmpgrd', 'exezne', 'slotop', 'fogsig', 'hrbfac']
+  souacc: ['obstrn', 'rectrc', 'soundg', 'uwtroc', 'wrecks', 'm_qual', 'fairwy', 'marcul', 'depare']
+  rcid: ['lakare', 'unsare', 'lndare', 'canals', 'lndelv', 'lndrgn', 'ctsare', 'lndmrk', 'curent', 'lights', 'magvar', 'mipare', 'obstrn', 'pipsol', 'rdocal', 'rdosta', 'rectrc', 'resare', 'rivers', 'seaare', 'sbdare', 'slcons', 'siltnk', 'slogrd', 'soundg', 'tesare', 'topmar', 'tssbnd', 'tsslpt', 'tsezne', 'uwtroc', 'wattur', 'wedklp', 'wrecks', 'm_covr', 'm_npub', 'm_nsys', 'm_qual', 'c_aggr', 'isolatednode', 'connectednode', 'c_asso', 'fshzne', 'edge', 'face', 'achare', 'cblare', 'admare', 'airare', 'cblohd', 'bcnlat', 'damcon', 'bcnspp', 'fairwy', 'feryrt', 'bridge', 'buisgl', 'marcul', 'buaare', 'morfac', 'boylat', 'navlne', 'boysaw', 'ofsplf', 'boyspp', 'pilpnt', 'cblsub', 'pilbop', 'ctnare', 'pipare', 'cgusta', 'ponton', 'coalne', 'prcare', 'conzne', 'rtpbcn', 'daymar', 'depare', 'depcnt', 'splare', 'dmpgrd', 'exezne', 'slotop', 'fogsig', 'hrbfac']
+  horacc: ['canals', 'slcons', 'bridge']
+  ornt_0: ['edge']
+  catzoc: ['m_qual']
+  catnav: ['navlne']
+  catwrk: ['wrecks']
+  prim: ['lakare', 'unsare', 'lndare', 'canals', 'lndelv', 'lndrgn', 'ctsare', 'lndmrk', 'curent', 'lights', 'magvar', 'mipare', 'obstrn', 'pipsol', 'rdocal', 'rdosta', 'rectrc', 'resare', 'rivers', 'seaare', 'sbdare', 'slcons', 'siltnk', 'slogrd', 'soundg', 'tesare', 'topmar', 'tssbnd', 'tsslpt', 'tsezne', 'uwtroc', 'wattur', 'wedklp', 'wrecks', 'm_covr', 'm_npub', 'm_nsys', 'm_qual', 'c_aggr', 'c_asso', 'fshzne', 'achare', 'cblare', 'admare', 'airare', 'cblohd', 'bcnlat', 'damcon', 'bcnspp', 'fairwy', 'feryrt', 'bridge', 'buisgl', 'marcul', 'buaare', 'morfac', 'boylat', 'navlne', 'boysaw', 'ofsplf', 'boyspp', 'pilpnt', 'cblsub', 'pilbop', 'ctnare', 'pipare', 'cgusta', 'ponton', 'coalne', 'prcare', 'conzne', 'rtpbcn', 'daymar', 'depare', 'depcnt', 'splare', 'dmpgrd', 'exezne', 'slotop', 'fogsig', 'hrbfac']
+  scamax: ['lakare', 'unsare', 'lndare', 'canals', 'lndelv', 'lndrgn', 'ctsare', 'lndmrk', 'curent', 'lights', 'magvar', 'mipare', 'obstrn', 'pipsol', 'rdocal', 'rdosta', 'rectrc', 'resare', 'rivers', 'seaare', 'sbdare', 'slcons', 'siltnk', 'slogrd', 'soundg', 'tesare', 'topmar', 'tssbnd', 'tsslpt', 'tsezne', 'uwtroc', 'wattur', 'wedklp', 'wrecks', 'm_nsys', 'c_aggr', 'c_asso', 'fshzne', 'achare', 'cblare', 'admare', 'airare', 'cblohd', 'bcnlat', 'damcon', 'bcnspp', 'fairwy', 'feryrt', 'bridge', 'buisgl', 'marcul', 'buaare', 'morfac', 'boylat', 'navlne', 'boysaw', 'ofsplf', 'boyspp', 'pilpnt', 'cblsub', 'pilbop', 'ctnare', 'pipare', 'cgusta', 'ponton', 'coalne', 'prcare', 'conzne', 'rtpbcn', 'daymar', 'depare', 'depcnt', 'splare', 'dmpgrd', 'exezne', 'slotop', 'fogsig', 'hrbfac']
+  dssi_noin: ['dsid']
+  catpip: ['pipsol', 'pipare']
+  objnam: ['lakare', 'lndare', 'canals', 'lndelv', 'lndrgn', 'ctsare', 'lndmrk', 'curent', 'lights', 'mipare', 'obstrn', 'pipsol', 'rdocal', 'rdosta', 'rectrc', 'resare', 'rivers', 'seaare', 'sbdare', 'slcons', 'siltnk', 'slogrd', 'soundg', 'uwtroc', 'wattur', 'wedklp', 'wrecks', 'c_aggr', 'c_asso', 'fshzne', 'achare', 'cblare', 'admare', 'airare', 'cblohd', 'bcnlat', 'damcon', 'bcnspp', 'fairwy', 'feryrt', 'bridge', 'buisgl', 'marcul', 'buaare', 'morfac', 'boylat', 'boysaw', 'ofsplf', 'boyspp', 'pilpnt', 'cblsub', 'pilbop', 'pipare', 'cgusta', 'ponton', 'coalne', 'rtpbcn', 'daymar', 'splare', 'dmpgrd', 'slotop', 'fogsig', 'hrbfac']
+  buishp: ['siltnk', 'buisgl']
+  pildst: ['pilbop']
+  datend: ['canals', 'ctsare', 'curent', 'lights', 'magvar', 'mipare', 'pipsol', 'rdocal', 'rdosta', 'rectrc', 'resare', 'slcons', 'topmar', 'tssbnd', 'tsslpt', 'tsezne', 'achare', 'cblare', 'cblohd', 'bcnlat', 'damcon', 'bcnspp', 'fairwy', 'feryrt', 'bridge', 'marcul', 'morfac', 'boylat', 'navlne', 'boysaw', 'ofsplf', 'boyspp', 'pilpnt', 'cblsub', 'pilbop', 'ctnare', 'pipare', 'cgusta', 'ponton', 'prcare', 'conzne', 'rtpbcn', 'daymar', 'fogsig', 'hrbfac']
+  catlam: ['bcnlat', 'boylat']
+  dsid_expp: ['dsid']
+  dssi_dstr: ['dsid']
+  cathaf: ['hrbfac']
+  ogc_fid: ['lakare', 'unsare', 'lndare', 'canals', 'lndelv', 'lndrgn', 'ctsare', 'lndmrk', 'curent', 'lights', 'magvar', 'mipare', 'obstrn', 'pipsol', 'rdocal', 'rdosta', 'rectrc', 'resare', 'rivers', 'seaare', 'sbdare', 'slcons', 'siltnk', 'slogrd', 'soundg', 'tesare', 'topmar', 'tssbnd', 'tsslpt', 'tsezne', 'uwtroc', 'wattur', 'wedklp', 'wrecks', 'm_covr', 'm_npub', 'm_nsys', 'dsid', 'm_qual', 'c_aggr', 'isolatednode', 'connectednode', 'c_asso', 'fshzne', 'edge', 'face', 'achare', 'cblare', 'admare', 'airare', 'cblohd', 'bcnlat', 'damcon', 'bcnspp', 'fairwy', 'feryrt', 'bridge', 'buisgl', 'marcul', 'buaare', 'morfac', 'boylat', 'navlne', 'boysaw', 'ofsplf', 'boyspp', 'pilpnt', 'cblsub', 'pilbop', 'ctnare', 'pipare', 'cgusta', 'ponton', 'coalne', 'prcare', 'conzne', 'rtpbcn', 'daymar', 'depare', 'depcnt', 'splare', 'dmpgrd', 'exezne', 'slotop', 'fogsig', 'hrbfac']
+  ornt_1: ['edge']
+  exclit: ['lights']
+  valdco: ['depcnt']
+  recind: ['lakare', 'unsare', 'lndare', 'canals', 'lndelv', 'lndrgn', 'ctsare', 'lndmrk', 'curent', 'lights', 'magvar', 'mipare', 'obstrn', 'pipsol', 'rdocal', 'rdosta', 'rectrc', 'resare', 'rivers', 'seaare', 'sbdare', 'slcons', 'siltnk', 'slogrd', 'soundg', 'tesare', 'topmar', 'tssbnd', 'tsslpt', 'tsezne', 'uwtroc', 'wattur', 'wedklp', 'wrecks', 'm_covr', 'm_npub', 'm_nsys', 'm_qual', 'c_aggr', 'c_asso', 'fshzne', 'achare', 'cblare', 'admare', 'airare', 'cblohd', 'bcnlat', 'damcon', 'bcnspp', 'fairwy', 'feryrt', 'bridge', 'buisgl', 'marcul', 'buaare', 'morfac', 'boylat', 'navlne', 'boysaw', 'ofsplf', 'boyspp', 'pilpnt', 'cblsub', 'pilbop', 'ctnare', 'pipare', 'cgusta', 'ponton', 'coalne', 'prcare', 'conzne', 'rtpbcn', 'daymar', 'depare', 'depcnt', 'splare', 'dmpgrd', 'exezne', 'slotop', 'fogsig', 'hrbfac']
+  dspm_somf: ['dsid']
+  condtn: ['lndare', 'canals', 'lndmrk', 'obstrn', 'pipsol', 'slcons', 'siltnk', 'airare', 'cblohd', 'bcnlat', 'damcon', 'bcnspp', 'bridge', 'buisgl', 'buaare', 'morfac', 'ofsplf', 'pilpnt', 'cblsub', 'pipare', 'ponton', 'hrbfac']
+  convis: ['lndelv', 'lndmrk', 'slcons', 'siltnk', 'slogrd', 'wrecks', 'airare', 'cblohd', 'bcnlat', 'damcon', 'bcnspp', 'bridge', 'buisgl', 'buaare', 'morfac', 'ofsplf', 'pilpnt', 'ponton', 'coalne', 'slotop']
+  dssi_nall: ['dsid']
+  orient: ['curent', 'lights', 'rdocal', 'rdosta', 'rectrc', 'tsslpt', 'm_nsys', 'fairwy', 'navlne']
+  catpil: ['pilbop']
+  verlen: ['lndmrk', 'obstrn', 'pipsol', 'slcons', 'siltnk', 'topmar', 'wrecks', 'bcnlat', 'damcon', 'bcnspp', 'buisgl', 'marcul', 'morfac', 'boylat', 'boysaw', 'ofsplf', 'boyspp', 'pilpnt', 'ponton', 'daymar']
+  dssi_nocr: ['dsid']
+  boyshp: ['morfac', 'boylat', 'boysaw', 'boyspp']
+  topshp: ['topmar', 'daymar']
+  catfog: ['fogsig']
+  dsid_sted: ['dsid']
+  catobs: ['obstrn']
+  catspm: ['bcnspp', 'boyspp', 'daymar']
+  lnam_refs: ['lakare', 'unsare', 'lndare', 'canals', 'lndelv', 'lndrgn', 'ctsare', 'lndmrk', 'curent', 'lights', 'magvar', 'mipare', 'obstrn', 'pipsol', 'rdocal', 'rdosta', 'rectrc', 'resare', 'rivers', 'seaare', 'sbdare', 'slcons', 'siltnk', 'slogrd', 'soundg', 'tesare', 'topmar', 'tssbnd', 'tsslpt', 'tsezne', 'uwtroc', 'wattur', 'wedklp', 'wrecks', 'm_covr', 'm_npub', 'm_nsys', 'm_qual', 'c_aggr', 'c_asso', 'fshzne', 'achare', 'cblare', 'admare', 'airare', 'cblohd', 'bcnlat', 'damcon', 'bcnspp', 'fairwy', 'feryrt', 'bridge', 'buisgl', 'marcul', 'buaare', 'morfac', 'boylat', 'navlne', 'boysaw', 'ofsplf', 'boyspp', 'pilpnt', 'cblsub', 'pilbop', 'ctnare', 'pipare', 'cgusta', 'ponton', 'coalne', 'prcare', 'conzne', 'rtpbcn', 'daymar', 'depare', 'depcnt', 'splare', 'dmpgrd', 'exezne', 'slotop', 'fogsig', 'hrbfac']
+  comcha: ['rdocal', 'rdosta', 'pilbop']
+  dsid_uadt: ['dsid']
+  name_rcnm_1: ['edge']
+  quasou: ['obstrn', 'rectrc', 'soundg', 'uwtroc', 'wrecks', 'fairwy', 'marcul', 'depare']
+  horlen: ['slcons']
+  catmpa: ['mipare']
+  dssi_noed: ['dsid']
+  objl: ['lakare', 'unsare', 'lndare', 'canals', 'lndelv', 'lndrgn', 'ctsare', 'lndmrk', 'curent', 'lights', 'magvar', 'mipare', 'obstrn', 'pipsol', 'rdocal', 'rdosta', 'rectrc', 'resare', 'rivers', 'seaare', 'sbdare', 'slcons', 'siltnk', 'slogrd', 'soundg', 'tesare', 'topmar', 'tssbnd', 'tsslpt', 'tsezne', 'uwtroc', 'wattur', 'wedklp', 'wrecks', 'm_covr', 'm_npub', 'm_nsys', 'm_qual', 'c_aggr', 'c_asso', 'fshzne', 'achare', 'cblare', 'admare', 'airare', 'cblohd', 'bcnlat', 'damcon', 'bcnspp', 'fairwy', 'feryrt', 'bridge', 'buisgl', 'marcul', 'buaare', 'morfac', 'boylat', 'navlne', 'boysaw', 'ofsplf', 'boyspp', 'pilpnt', 'cblsub', 'pilbop', 'ctnare', 'pipare', 'cgusta', 'ponton', 'coalne', 'prcare', 'conzne', 'rtpbcn', 'daymar', 'depare', 'depcnt', 'splare', 'dmpgrd', 'exezne', 'slotop', 'fogsig', 'hrbfac']
+  jrsdtn: ['admare']
+  mask_0: ['edge']
+  catbua: ['buaare']
+  dspm_vdat: ['dsid']
+  natqua: ['lndrgn', 'obstrn', 'sbdare', 'slogrd', 'uwtroc', 'slotop']
+  marsys: ['lights', 'topmar', 'm_nsys', 'bcnlat', 'bcnspp', 'boylat', 'boysaw', 'boyspp']
+  scamin: ['lakare', 'unsare', 'lndare', 'canals', 'lndelv', 'lndrgn', 'ctsare', 'lndmrk', 'curent', 'lights', 'magvar', 'mipare', 'obstrn', 'pipsol', 'rdocal', 'rdosta', 'rectrc', 'resare', 'rivers', 'seaare', 'sbdare', 'slcons', 'siltnk', 'slogrd', 'soundg', 'tesare', 'topmar', 'tssbnd', 'tsslpt', 'tsezne', 'uwtroc', 'wattur', 'wedklp', 'wrecks', 'm_nsys', 'c_aggr', 'c_asso', 'fshzne', 'achare', 'cblare', 'admare', 'airare', 'cblohd', 'bcnlat', 'damcon', 'bcnspp', 'fairwy', 'feryrt', 'bridge', 'buisgl', 'marcul', 'buaare', 'morfac', 'boylat', 'navlne', 'boysaw', 'ofsplf', 'boyspp', 'pilpnt', 'cblsub', 'pilbop', 'ctnare', 'pipare', 'cgusta', 'ponton', 'coalne', 'prcare', 'conzne', 'rtpbcn', 'daymar', 'depare', 'depcnt', 'splare', 'dmpgrd', 'exezne', 'slotop', 'fogsig', 'hrbfac']
+  ffpt_rind: ['lakare', 'unsare', 'lndare', 'canals', 'lndelv', 'lndrgn', 'ctsare', 'lndmrk', 'curent', 'lights', 'magvar', 'mipare', 'obstrn', 'pipsol', 'rdocal', 'rdosta', 'rectrc', 'resare', 'rivers', 'seaare', 'sbdare', 'slcons', 'siltnk', 'slogrd', 'soundg', 'tesare', 'topmar', 'tssbnd', 'tsslpt', 'tsezne', 'uwtroc', 'wattur', 'wedklp', 'wrecks', 'm_covr', 'm_npub', 'm_nsys', 'm_qual', 'c_aggr', 'c_asso', 'fshzne', 'achare', 'cblare', 'admare', 'airare', 'cblohd', 'bcnlat', 'damcon', 'bcnspp', 'fairwy', 'feryrt', 'bridge', 'buisgl', 'marcul', 'buaare', 'morfac', 'boylat', 'navlne', 'boysaw', 'ofsplf', 'boyspp', 'pilpnt', 'cblsub', 'pilbop', 'ctnare', 'pipare', 'cgusta', 'ponton', 'coalne', 'prcare', 'conzne', 'rtpbcn', 'daymar', 'depare', 'depcnt', 'splare', 'dmpgrd', 'exezne', 'slotop', 'fogsig', 'hrbfac']
+  persta: ['ctsare', 'curent', 'lights', 'mipare', 'rdocal', 'rdosta', 'rectrc', 'resare', 'topmar', 'achare', 'bcnlat', 'bcnspp', 'feryrt', 'marcul', 'morfac', 'boylat', 'navlne', 'boysaw', 'boyspp', 'pilbop', 'ctnare', 'cgusta', 'ponton', 'rtpbcn', 'daymar', 'splare', 'fogsig', 'hrbfac']
+  functn: ['lndmrk', 'buisgl']
+  elevat: ['lakare', 'lndelv', 'lndmrk', 'siltnk', 'bcnlat', 'bcnspp', 'buisgl', 'coalne', 'daymar', 'slotop']
+  natcon: ['lndmrk', 'obstrn', 'slcons', 'siltnk', 'slogrd', 'bcnlat', 'damcon', 'bcnspp', 'bridge', 'buisgl', 'morfac', 'boylat', 'boysaw', 'ofsplf', 'boyspp', 'ponton', 'daymar', 'slotop', 'hrbfac']
+  usag_1: ['edge']
+  perend: ['ctsare', 'curent', 'lights', 'mipare', 'rdocal', 'rdosta', 'rectrc', 'resare', 'topmar', 'achare', 'bcnlat', 'bcnspp', 'feryrt', 'marcul', 'morfac', 'boylat', 'navlne', 'boysaw', 'boyspp', 'pilbop', 'ctnare', 'cgusta', 'ponton', 'rtpbcn', 'daymar', 'splare', 'fogsig', 'hrbfac']
+  dsid_prof: ['dsid']
+  estrng: ['rdosta']
+  ryrmgv: ['magvar']
+  catcoa: ['coalne']
+  dspm_coun: ['dsid']
+  bcnshp: ['bcnlat', 'bcnspp']
+  catqua: ['m_qual']
+  dspm_cscl: ['dsid']
+  catofp: ['ofsplf']
+  calsgn: ['rdosta']
+  name_rcid_0: ['edge']
+  surend: ['m_qual']
+  restrn: ['mipare', 'resare', 'tesare', 'tsslpt', 'achare', 'cblare', 'fairwy', 'marcul', 'pipare', 'prcare', 'splare', 'dmpgrd']
+  catair: ['airare']
+  dspm_puni: ['dsid']
+  sectr1: ['lights', 'rtpbcn']
+  colpat: ['lndmrk', 'slcons', 'siltnk', 'topmar', 'bcnlat', 'damcon', 'bcnspp', 'bridge', 'buisgl', 'morfac', 'boylat', 'boysaw', 'ofsplf', 'boyspp', 'pilpnt', 'daymar']
+  mltylt: ['lights']
+  status: ['lndare', 'canals', 'ctsare', 'lndmrk', 'lights', 'mipare', 'obstrn', 'pipsol', 'rdocal', 'rdosta', 'rectrc', 'resare', 'rivers', 'slcons', 'siltnk', 'soundg', 'topmar', 'tssbnd', 'tsslpt', 'tsezne', 'uwtroc', 'wrecks', 'fshzne', 'achare', 'cblare', 'airare', 'cblohd', 'bcnlat', 'bcnspp', 'fairwy', 'feryrt', 'buisgl', 'marcul', 'morfac', 'boylat', 'navlne', 'boysaw', 'ofsplf', 'boyspp', 'cblsub', 'pilbop', 'pipare', 'cgusta', 'ponton', 'prcare', 'conzne', 'rtpbcn', 'daymar', 'splare', 'dmpgrd', 'fogsig', 'hrbfac']
+  catlnd: ['lndrgn']
+  radwal: ['rtpbcn']
+  fids: ['lakare', 'unsare', 'lndare', 'canals', 'lndelv', 'lndrgn', 'ctsare', 'lndmrk', 'curent', 'lights', 'magvar', 'mipare', 'obstrn', 'pipsol', 'rdocal', 'rdosta', 'rectrc', 'resare', 'rivers', 'seaare', 'sbdare', 'slcons', 'siltnk', 'slogrd', 'soundg', 'tesare', 'topmar', 'tssbnd', 'tsslpt', 'tsezne', 'uwtroc', 'wattur', 'wedklp', 'wrecks', 'm_covr', 'm_npub', 'm_nsys', 'm_qual', 'c_aggr', 'c_asso', 'fshzne', 'achare', 'cblare', 'admare', 'airare', 'cblohd', 'bcnlat', 'damcon', 'bcnspp', 'fairwy', 'feryrt', 'bridge', 'buisgl', 'marcul', 'buaare', 'morfac', 'boylat', 'navlne', 'boysaw', 'ofsplf', 'boyspp', 'pilpnt', 'cblsub', 'pilbop', 'ctnare', 'pipare', 'cgusta', 'ponton', 'coalne', 'prcare', 'conzne', 'rtpbcn', 'daymar', 'depare', 'depcnt', 'splare', 'dmpgrd', 'exezne', 'slotop', 'fogsig', 'hrbfac']
+  dspm_comf: ['dsid']
+  drval1: ['pipsol', 'rectrc', 'm_qual', 'fairwy', 'cblsub', 'depare']
+  usag_0: ['edge']
+  curvel: ['curent']
+  fidn: ['lakare', 'unsare', 'lndare', 'canals', 'lndelv', 'lndrgn', 'ctsare', 'lndmrk', 'curent', 'lights', 'magvar', 'mipare', 'obstrn', 'pipsol', 'rdocal', 'rdosta', 'rectrc', 'resare', 'rivers', 'seaare', 'sbdare', 'slcons', 'siltnk', 'slogrd', 'soundg', 'tesare', 'topmar', 'tssbnd', 'tsslpt', 'tsezne', 'uwtroc', 'wattur', 'wedklp', 'wrecks', 'm_covr', 'm_npub', 'm_nsys', 'm_qual', 'c_aggr', 'c_asso', 'fshzne', 'achare', 'cblare', 'admare', 'airare', 'cblohd', 'bcnlat', 'damcon', 'bcnspp', 'fairwy', 'feryrt', 'bridge', 'buisgl', 'marcul', 'buaare', 'morfac', 'boylat', 'navlne', 'boysaw', 'ofsplf', 'boyspp', 'pilpnt', 'cblsub', 'pilbop', 'ctnare', 'pipare', 'cgusta', 'ponton', 'coalne', 'prcare', 'conzne', 'rtpbcn', 'daymar', 'depare', 'depcnt', 'splare', 'dmpgrd', 'exezne', 'slotop', 'fogsig', 'hrbfac']
+  datsta: ['canals', 'ctsare', 'curent', 'lights', 'magvar', 'mipare', 'pipsol', 'rdocal', 'rdosta', 'rectrc', 'resare', 'slcons', 'topmar', 'tssbnd', 'tsslpt', 'tsezne', 'achare', 'cblare', 'cblohd', 'bcnlat', 'damcon', 'bcnspp', 'fairwy', 'feryrt', 'bridge', 'marcul', 'morfac', 'boylat', 'navlne', 'boysaw', 'ofsplf', 'boyspp', 'pilpnt', 'cblsub', 'pilbop', 'ctnare', 'pipare', 'cgusta', 'ponton', 'prcare', 'conzne', 'rtpbcn', 'daymar', 'fogsig', 'hrbfac']
+  catmfa: ['marcul']
+  dsid_comt: ['dsid']
+  dssi_nofa: ['dsid']
+  sigfrq: ['rdosta', 'fogsig']
+  catach: ['achare']
+  inform: ['lakare', 'unsare', 'lndare', 'canals', 'lndelv', 'lndrgn', 'ctsare', 'lndmrk', 'curent', 'lights', 'magvar', 'mipare', 'obstrn', 'pipsol', 'rdocal', 'rdosta', 'rectrc', 'resare', 'rivers', 'seaare', 'sbdare', 'slcons', 'siltnk', 'slogrd', 'soundg', 'tesare', 'topmar', 'tssbnd', 'tsslpt', 'tsezne', 'uwtroc', 'wattur', 'wedklp', 'wrecks', 'm_covr', 'm_npub', 'm_nsys', 'm_qual', 'c_aggr', 'c_asso', 'fshzne', 'achare', 'cblare', 'admare', 'airare', 'cblohd', 'bcnlat', 'damcon', 'bcnspp', 'fairwy', 'feryrt', 'bridge', 'buisgl', 'marcul', 'buaare', 'morfac', 'boylat', 'navlne', 'boysaw', 'ofsplf', 'boyspp', 'pilpnt', 'cblsub', 'pilbop', 'ctnare', 'pipare', 'cgusta', 'ponton', 'coalne', 'prcare', 'conzne', 'rtpbcn', 'daymar', 'depare', 'depcnt', 'splare', 'dmpgrd', 'exezne', 'slotop', 'fogsig', 'hrbfac']
+  verclr: ['cblohd', 'bridge']
+  dspm_sdat: ['dsid']
+  mask_1: ['edge']
+  sectr2: ['lights', 'rtpbcn']
+  rver: ['lakare', 'unsare', 'lndare', 'canals', 'lndelv', 'lndrgn', 'ctsare', 'lndmrk', 'curent', 'lights', 'magvar', 'mipare', 'obstrn', 'pipsol', 'rdocal', 'rdosta', 'rectrc', 'resare', 'rivers', 'seaare', 'sbdare', 'slcons', 'siltnk', 'slogrd', 'soundg', 'tesare', 'topmar', 'tssbnd', 'tsslpt', 'tsezne', 'uwtroc', 'wattur', 'wedklp', 'wrecks', 'm_covr', 'm_npub', 'm_nsys', 'm_qual', 'c_aggr', 'isolatednode', 'connectednode', 'c_asso', 'fshzne', 'edge', 'face', 'achare', 'cblare', 'admare', 'airare', 'cblohd', 'bcnlat', 'damcon', 'bcnspp', 'fairwy', 'feryrt', 'bridge', 'buisgl', 'marcul', 'buaare', 'morfac', 'boylat', 'navlne', 'boysaw', 'ofsplf', 'boyspp', 'pilpnt', 'cblsub', 'pilbop', 'ctnare', 'pipare', 'cgusta', 'ponton', 'coalne', 'prcare', 'conzne', 'rtpbcn', 'daymar', 'depare', 'depcnt', 'splare', 'dmpgrd', 'exezne', 'slotop', 'fogsig', 'hrbfac']
+  ntxtds: ['lakare', 'unsare', 'lndare', 'canals', 'lndelv', 'lndrgn', 'ctsare', 'lndmrk', 'lights', 'mipare', 'obstrn', 'pipsol', 'rdocal', 'rdosta', 'rectrc', 'resare', 'rivers', 'seaare', 'sbdare', 'slcons', 'siltnk', 'slogrd', 'soundg', 'tesare', 'topmar', 'tssbnd', 'tsslpt', 'tsezne', 'uwtroc', 'wattur', 'wedklp', 'wrecks', 'm_npub', 'm_nsys', 'm_qual', 'c_aggr', 'c_asso', 'fshzne', 'achare', 'cblare', 'admare', 'airare', 'cblohd', 'bcnlat', 'damcon', 'bcnspp', 'fairwy', 'feryrt', 'bridge', 'buisgl', 'marcul', 'buaare', 'morfac', 'boylat', 'navlne', 'boysaw', 'ofsplf', 'boyspp', 'pilpnt', 'cblsub', 'pilbop', 'ctnare', 'pipare', 'cgusta', 'ponton', 'coalne', 'prcare', 'conzne', 'rtpbcn', 'daymar', 'depare', 'depcnt', 'splare', 'dmpgrd', 'exezne', 'slotop', 'fogsig', 'hrbfac']
+  colour: ['lndmrk', 'lights', 'sbdare', 'slcons', 'siltnk', 'slogrd', 'topmar', 'bcnlat', 'damcon', 'bcnspp', 'bridge', 'buisgl', 'morfac', 'boylat', 'boysaw', 'ofsplf', 'boyspp', 'pilpnt', 'coalne', 'daymar', 'slotop']
+  hypcat: ['depcnt']
+  dspm_comt: ['dsid']
+  horclr: ['canals', 'slcons', 'bridge']
+  siggen: ['fogsig']
+  dssi_nogr: ['dsid']
+  grup: ['lakare', 'unsare', 'lndare', 'canals', 'lndelv', 'lndrgn', 'ctsare', 'lndmrk', 'curent', 'lights', 'magvar', 'mipare', 'obstrn', 'pipsol', 'rdocal', 'rdosta', 'rectrc', 'resare', 'rivers', 'seaare', 'sbdare', 'slcons', 'siltnk', 'slogrd', 'soundg', 'tesare', 'topmar', 'tssbnd', 'tsslpt', 'tsezne', 'uwtroc', 'wattur', 'wedklp', 'wrecks', 'm_covr', 'm_npub', 'm_nsys', 'm_qual', 'c_aggr', 'c_asso', 'fshzne', 'achare', 'cblare', 'admare', 'airare', 'cblohd', 'bcnlat', 'damcon', 'bcnspp', 'fairwy', 'feryrt', 'bridge', 'buisgl', 'marcul', 'buaare', 'morfac', 'boylat', 'navlne', 'boysaw', 'ofsplf', 'boyspp', 'pilpnt', 'cblsub', 'pilbop', 'ctnare', 'pipare', 'cgusta', 'ponton', 'coalne', 'prcare', 'conzne', 'rtpbcn', 'daymar', 'depare', 'depcnt', 'splare', 'dmpgrd', 'exezne', 'slotop', 'fogsig', 'hrbfac']
+  sigper: ['lights', 'fogsig']
+  dsid_updn: ['lakare', 'unsare', 'lndare', 'canals', 'lndelv', 'lndrgn', 'ctsare', 'lndmrk', 'curent', 'lights', 'magvar', 'mipare', 'obstrn', 'pipsol', 'rdocal', 'rdosta', 'rectrc', 'resare', 'rivers', 'seaare', 'sbdare', 'slcons', 'siltnk', 'slogrd', 'soundg', 'tesare', 'topmar', 'tssbnd', 'tsslpt', 'tsezne', 'uwtroc', 'wattur', 'wedklp', 'wrecks', 'm_covr', 'm_npub', 'm_nsys', 'dsid', 'm_qual', 'c_aggr', 'isolatednode', 'connectednode', 'c_asso', 'fshzne', 'edge', 'face', 'achare', 'cblare', 'admare', 'airare', 'cblohd', 'bcnlat', 'damcon', 'bcnspp', 'fairwy', 'feryrt', 'bridge', 'buisgl', 'marcul', 'buaare', 'morfac', 'boylat', 'navlne', 'boysaw', 'ofsplf', 'boyspp', 'pilpnt', 'cblsub', 'pilbop', 'ctnare', 'pipare', 'cgusta', 'ponton', 'coalne', 'prcare', 'conzne', 'rtpbcn', 'daymar', 'depare', 'depcnt', 'splare', 'dmpgrd', 'exezne', 'slotop', 'fogsig', 'hrbfac']
+  litvis: ['lights']
+  lnam: ['lakare', 'unsare', 'lndare', 'canals', 'lndelv', 'lndrgn', 'ctsare', 'lndmrk', 'curent', 'lights', 'magvar', 'mipare', 'obstrn', 'pipsol', 'rdocal', 'rdosta', 'rectrc', 'resare', 'rivers', 'seaare', 'sbdare', 'slcons', 'siltnk', 'slogrd', 'soundg', 'tesare', 'topmar', 'tssbnd', 'tsslpt', 'tsezne', 'uwtroc', 'wattur', 'wedklp', 'wrecks', 'm_covr', 'm_npub', 'm_nsys', 'm_qual', 'c_aggr', 'c_asso', 'fshzne', 'achare', 'cblare', 'admare', 'airare', 'cblohd', 'bcnlat', 'damcon', 'bcnspp', 'fairwy', 'feryrt', 'bridge', 'buisgl', 'marcul', 'buaare', 'morfac', 'boylat', 'navlne', 'boysaw', 'ofsplf', 'boyspp', 'pilpnt', 'cblsub', 'pilbop', 'ctnare', 'pipare', 'cgusta', 'ponton', 'coalne', 'prcare', 'conzne', 'rtpbcn', 'daymar', 'depare', 'depcnt', 'splare', 'dmpgrd', 'exezne', 'slotop', 'fogsig', 'hrbfac']
+  catple: ['pilpnt']
+  catcov: ['m_covr']
+  nation: ['tesare', 'fshzne', 'admare', 'conzne', 'exezne']
+  catrea: ['resare']
+  watlev: ['lndrgn', 'obstrn', 'sbdare', 'slcons', 'uwtroc', 'wrecks', 'marcul', 'morfac']
+  depth: ['soundg']
+  cattrk: ['rectrc']
+  litchr: ['lights']
+  burdep: ['pipsol', 'cblsub']
+  ninfom: ['lakare', 'unsare', 'lndare', 'canals', 'lndelv', 'lndrgn', 'ctsare', 'lndmrk', 'curent', 'lights', 'magvar', 'mipare', 'obstrn', 'pipsol', 'rdocal', 'rdosta', 'rectrc', 'resare', 'rivers', 'seaare', 'sbdare', 'slcons', 'siltnk', 'slogrd', 'soundg', 'tesare', 'topmar', 'tssbnd', 'tsslpt', 'tsezne', 'uwtroc', 'wattur', 'wedklp', 'wrecks', 'm_covr', 'm_npub', 'm_nsys', 'm_qual', 'c_aggr', 'c_asso', 'fshzne', 'achare', 'cblare', 'admare', 'airare', 'cblohd', 'bcnlat', 'damcon', 'bcnspp', 'fairwy', 'feryrt', 'bridge', 'buisgl', 'marcul', 'buaare', 'morfac', 'boylat', 'navlne', 'boysaw', 'ofsplf', 'boyspp', 'pilpnt', 'cblsub', 'pilbop', 'ctnare', 'pipare', 'cgusta', 'ponton', 'coalne', 'prcare', 'conzne', 'rtpbcn', 'daymar', 'depare', 'depcnt', 'splare', 'dmpgrd', 'exezne', 'slotop', 'fogsig', 'hrbfac']
+  dsid_agen: ['dsid']
+  catbrg: ['bridge']
+  veracc: ['lakare', 'lndelv', 'lndmrk', 'lights', 'obstrn', 'pipsol', 'slcons', 'siltnk', 'topmar', 'wrecks', 'cblohd', 'bcnlat', 'damcon', 'bcnspp', 'bridge', 'buisgl', 'marcul', 'buaare', 'morfac', 'boylat', 'boysaw', 'ofsplf', 'boyspp', 'pilpnt', 'ponton', 'coalne', 'daymar', 'slotop']
+  dssi_nomr: ['dsid']
+  topi_1: ['edge']
+  dsid_intu: ['dsid']
+  valmxr: ['rtpbcn', 'fogsig']
+  dssi_nocn: ['dsid']
+  vercop: ['bridge']
+  catsea: ['seaare']
+  dsid_edtn: ['lakare', 'unsare', 'lndare', 'canals', 'lndelv', 'lndrgn', 'ctsare', 'lndmrk', 'curent', 'lights', 'magvar', 'mipare', 'obstrn', 'pipsol', 'rdocal', 'rdosta', 'rectrc', 'resare', 'rivers', 'seaare', 'sbdare', 'slcons', 'siltnk', 'slogrd', 'soundg', 'tesare', 'topmar', 'tssbnd', 'tsslpt', 'tsezne', 'uwtroc', 'wattur', 'wedklp', 'wrecks', 'm_covr', 'm_npub', 'm_nsys', 'dsid', 'm_qual', 'c_aggr', 'isolatednode', 'connectednode', 'c_asso', 'fshzne', 'edge', 'face', 'achare', 'cblare', 'admare', 'airare', 'cblohd', 'bcnlat', 'damcon', 'bcnspp', 'fairwy', 'feryrt', 'bridge', 'buisgl', 'marcul', 'buaare', 'morfac', 'boylat', 'navlne', 'boysaw', 'ofsplf', 'boyspp', 'pilpnt', 'cblsub', 'pilbop', 'ctnare', 'pipare', 'cgusta', 'ponton', 'coalne', 'prcare', 'conzne', 'rtpbcn', 'daymar', 'depare', 'depcnt', 'splare', 'dmpgrd', 'exezne', 'slotop', 'fogsig', 'hrbfac']
+  dsid_prsp: ['dsid']
+  prodct: ['obstrn', 'pipsol', 'siltnk', 'ofsplf', 'pipare']
+  dssi_nolr: ['dsid']
+  dspm_duni: ['dsid']
+  rcnm: ['isolatednode', 'connectednode', 'edge', 'face']
+  natsur: ['lndrgn', 'obstrn', 'sbdare', 'slogrd', 'uwtroc', 'slotop']
+  catros: ['rdosta']
+  catmor: ['morfac']
+  cattss: ['tssbnd', 'tsslpt', 'tsezne']
+  catcan: ['canals']
+  drval2: ['pipsol', 'rectrc', 'm_qual', 'cblsub', 'depare']
+  sursta: ['m_qual']
+  npldst: ['pilbop']
+  catwat: ['wattur']
+  dsid_isdt: ['dsid']
+  verccl: ['bridge']
+  valsou: ['obstrn', 'uwtroc', 'wrecks', 'marcul']
+  catwed: ['wedklp']
+  vercsa: ['cblohd']
+  conrad: ['lndmrk', 'slcons', 'siltnk', 'slogrd', 'wrecks', 'cblohd', 'bcnlat', 'damcon', 'bcnspp', 'bridge', 'buisgl', 'buaare', 'morfac', 'boylat', 'boysaw', 'ofsplf', 'boyspp', 'ponton', 'coalne', 'slotop']
+  catsil: ['siltnk']
+  icefac: ['cblohd']
+  sordat: ['lakare', 'unsare', 'lndare', 'canals', 'lndelv', 'lndrgn', 'ctsare', 'lndmrk', 'curent', 'lights', 'magvar', 'mipare', 'obstrn', 'pipsol', 'rdocal', 'rdosta', 'rectrc', 'resare', 'rivers', 'seaare', 'sbdare', 'slcons', 'siltnk', 'slogrd', 'soundg', 'tesare', 'topmar', 'tssbnd', 'tsslpt', 'tsezne', 'uwtroc', 'wattur', 'wedklp', 'wrecks', 'm_covr', 'm_npub', 'm_nsys', 'm_qual', 'c_aggr', 'c_asso', 'fshzne', 'achare', 'cblare', 'admare', 'airare', 'cblohd', 'bcnlat', 'damcon', 'bcnspp', 'fairwy', 'feryrt', 'bridge', 'buisgl', 'marcul', 'buaare', 'morfac', 'boylat', 'navlne', 'boysaw', 'ofsplf', 'boyspp', 'pilpnt', 'cblsub', 'pilbop', 'ctnare', 'pipare', 'cgusta', 'ponton', 'coalne', 'prcare', 'conzne', 'rtpbcn', 'daymar', 'depare', 'depcnt', 'splare', 'dmpgrd', 'exezne', 'slotop', 'fogsig', 'hrbfac']
+  height: ['lndmrk', 'lights', 'obstrn', 'slcons', 'siltnk', 'topmar', 'wrecks', 'bcnlat', 'damcon', 'bcnspp', 'buisgl', 'buaare', 'morfac', 'ofsplf', 'pilpnt', 'daymar']
+  topi_0: ['edge']
+  agen: ['lakare', 'unsare', 'lndare', 'canals', 'lndelv', 'lndrgn', 'ctsare', 'lndmrk', 'curent', 'lights', 'magvar', 'mipare', 'obstrn', 'pipsol', 'rdocal', 'rdosta', 'rectrc', 'resare', 'rivers', 'seaare', 'sbdare', 'slcons', 'siltnk', 'slogrd', 'soundg', 'tesare', 'topmar', 'tssbnd', 'tsslpt', 'tsezne', 'uwtroc', 'wattur', 'wedklp', 'wrecks', 'm_covr', 'm_npub', 'm_nsys', 'm_qual', 'c_aggr', 'c_asso', 'fshzne', 'achare', 'cblare', 'admare', 'airare', 'cblohd', 'bcnlat', 'damcon', 'bcnspp', 'fairwy', 'feryrt', 'bridge', 'buisgl', 'marcul', 'buaare', 'morfac', 'boylat', 'navlne', 'boysaw', 'ofsplf', 'boyspp', 'pilpnt', 'cblsub', 'pilbop', 'ctnare', 'pipare', 'cgusta', 'ponton', 'coalne', 'prcare', 'conzne', 'rtpbcn', 'daymar', 'depare', 'depcnt', 'splare', 'dmpgrd', 'exezne', 'slotop', 'fogsig', 'hrbfac']
+  horwid: ['canals', 'slcons']
+  picrep: ['lndmrk', 'siltnk', 'topmar', 'm_npub', 'c_aggr', 'c_asso', 'admare', 'airare', 'bcnlat', 'bcnspp', 'bridge', 'buisgl', 'morfac', 'boylat', 'boysaw', 'ofsplf', 'boyspp', 'coalne']
+  sigseq: ['lights', 'rtpbcn', 'fogsig']
+  recdat: ['lakare', 'unsare', 'lndare', 'canals', 'lndelv', 'lndrgn', 'ctsare', 'lndmrk', 'curent', 'lights', 'magvar', 'mipare', 'obstrn', 'pipsol', 'rdocal', 'rdosta', 'rectrc', 'resare', 'rivers', 'seaare', 'sbdare', 'slcons', 'siltnk', 'slogrd', 'soundg', 'tesare', 'topmar', 'tssbnd', 'tsslpt', 'tsezne', 'uwtroc', 'wattur', 'wedklp', 'wrecks', 'm_covr', 'm_npub', 'm_nsys', 'm_qual', 'c_aggr', 'c_asso', 'fshzne', 'achare', 'cblare', 'admare', 'airare', 'cblohd', 'bcnlat', 'damcon', 'bcnspp', 'fairwy', 'feryrt', 'bridge', 'buisgl', 'marcul', 'buaare', 'morfac', 'boylat', 'navlne', 'boysaw', 'ofsplf', 'boyspp', 'pilpnt', 'cblsub', 'pilbop', 'ctnare', 'pipare', 'cgusta', 'ponton', 'coalne', 'prcare', 'conzne', 'rtpbcn', 'daymar', 'depare', 'depcnt', 'splare', 'dmpgrd', 'exezne', 'slotop', 'fogsig', 'hrbfac']
+  expsou: ['obstrn', 'soundg', 'uwtroc', 'wrecks', 'marcul']
+  valnmr: ['lights']
+  nobjnm: ['lakare', 'lndare', 'canals', 'lndelv', 'lndrgn', 'ctsare', 'lndmrk', 'curent', 'lights', 'mipare', 'obstrn', 'pipsol', 'rdocal', 'rdosta', 'rectrc', 'resare', 'rivers', 'seaare', 'sbdare', 'slcons', 'siltnk', 'slogrd', 'soundg', 'uwtroc', 'wattur', 'wedklp', 'wrecks', 'c_aggr', 'c_asso', 'fshzne', 'achare', 'cblare', 'admare', 'airare', 'cblohd', 'bcnlat', 'damcon', 'bcnspp', 'fairwy', 'feryrt', 'bridge', 'buisgl', 'marcul', 'buaare', 'morfac', 'boylat', 'boysaw', 'ofsplf', 'boyspp', 'pilpnt', 'cblsub', 'pilbop', 'pipare', 'cgusta', 'ponton', 'coalne', 'rtpbcn', 'daymar', 'splare', 'dmpgrd', 'slotop', 'fogsig', 'hrbfac']
+  dsid_pred: ['dsid']
+  pubref: ['m_npub']
+  valmag: ['magvar']
+  catrtb: ['rtpbcn']
+  catslo: ['slogrd', 'slotop']
+  quapos: ['isolatednode', 'connectednode', 'edge', 'face']
+  dssi_aall: ['dsid']
+  siggrp: ['lights', 'rtpbcn', 'fogsig']
+  verdat: ['lakare', 'lndelv', 'lndmrk', 'lights', 'obstrn', 'pipsol', 'rectrc', 'slcons', 'siltnk', 'soundg', 'topmar', 'uwtroc', 'wrecks', 'm_qual', 'cblohd', 'bcnlat', 'damcon', 'bcnspp', 'fairwy', 'bridge', 'buisgl', 'marcul', 'buaare', 'morfac', 'ofsplf', 'pilpnt', 'cblsub', 'coalne', 'daymar', 'depare', 'depcnt', 'slotop']
+  ruin: ['isolatednode', 'connectednode', 'edge', 'face']
+  posacc: ['m_qual', 'isolatednode', 'connectednode', 'edge', 'face']
+  valacm: ['magvar']
+  catdpg: ['dmpgrd']
+  dspm_hdat: ['dsid']
+  trafic: ['rdocal', 'rectrc', 'fairwy']
+  name_rcnm_0: ['edge']

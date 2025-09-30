@@ -1,0 +1,6 @@
+layer_name,format_a_columns,format_b_columns,common_columns,missing_in_a_count,missing_in_b_count,type_mismatches_count,columns_match,missing_in_a,missing_in_b
+edge,23,23,22,1,1,0,True,wkb_geometry,geom
+isolatednode,11,11,10,1,1,0,True,wkb_geometry,geom
+connectednode,11,11,10,1,1,0,True,wkb_geometry,geom
+dsid,38,38,37,1,1,0,True,wkb_geometry,geom
+face,11,11,10,1,1,0,True,wkb_geometry,geom

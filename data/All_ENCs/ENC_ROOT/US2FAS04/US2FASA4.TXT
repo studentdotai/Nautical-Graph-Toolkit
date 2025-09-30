@@ -1,0 +1,35 @@
+NATIONAL GEOSPATIAL-INTELLIGENCE AGENCY
+US2FAS04 - WESTERN PACIFIC OCEAN - SOUTHEAST FEDERATED STATES OF MICRONESIA
+ 
+INDEX:
+CELL ACCURACY
+FISH AGGREGATION DEVICES
+AUTHORITIES
+AIDS TO NAVIGATION
+CAUTION - SUBMARINE PIPELINES and CABLES
+WARNING - PRUDENT MARINER
+SUPPLEMENTAL INFORMATION
+
+
+CELL ACCURACY
+Owing to the age and quality of the source information, some details on this cell may not be positioned accurately. Particular caution is advised when navigating in the vicinity of dangers, even when using an electronic positioning system such as GPS.
+
+FISH AGGREGATION DEVICES
+Fish Aggregating Devices (FADs), anchored or drifting, are commonly deployed within the waters of many Pacific Islands and may not be charted. Even though many of the installations are temporary in nature, FADs pose significant risk to navigation safety. Prudent mariners should exercise caution in navigating these waters.
+
+AUTHORITIES
+Hydrography from UKHO Miscellaneous sources.
+
+AIDS TO NAVIGATION
+Consult NGA List of Lights Pub. 111 for supplemental information concerning aids to navigation.
+
+CAUTION - SUBMARINE PIPELINES and CABLES
+Additional uncharted submarine pipelines and submarine cables may exist within the area of this chart. Not all submarine pipelines and submarine cables are required to be buried, and those that were originally buried may have become exposed. Mariners should use extreme caution when operating vessels in depths of water comparable to their draft in areas where pipelines and cables may exist, and when anchoring, dragging, or trawling. Covered wells may be marked by lighted or unlighted buoys.
+
+WARNING - PRUDENT MARINER
+The prudent mariner will not rely solely on any single aid to navigation, particularly on floating aids.
+
+SUPPLEMENTAL INFORMATION:
+Consult National Geospatial-Intelligence Agency's Sailing Directions: Pub. 120 (Planning Guide) and Pub. 126 (Enroute), for important supplemental information.
+
+END OF FILE

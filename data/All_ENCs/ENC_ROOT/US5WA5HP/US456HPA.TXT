@@ -1,0 +1,110 @@
+NOAA ENC®
+
+NATIONAL OCEANIC AND ATMOSPHERIC ADMINISTRATION
+
+US5WA5HP - SNAKE RIVER
+
+
+INDEX:
+
+NOTE A
+AIDS TO NAVIGATION
+POLLUTION REPORTS
+CAUTION - USE OF RADIO SIGNALS (LIMITATIONS)
+SUPPLEMENTAL INFORMATION
+CAUTION - TEMPORARY CHANGES
+WARNING - PRUDENT MARINER
+ADDITIONAL INFORMATION
+AUTHORITIES
+CAUTION - ALL CRAFT
+CAUTION - DEPTHS
+CAUTION - QUALITY OF BATHYMETRIC DATA
+CAUTION - SMALL CRAFT
+CAUTION - SUBMARINE PIPELINES AND CABLES
+CAUTION - WARNINGS CONCERNING LARGE VESSELS
+MARITIME BOUNDARY
+RADAR REFLECTORS
+SOUNDING DATUM
+WATER LEVELS, CURRENTS, AND TIDES
+COMMENTS REQUESTED
+
+
+NOTES:
+
+NOTE A
+Navigation regulations are published in Chapter 2, U.S. Coast Pilot 10. Additions or revisions to Chapter 2 are published in the Notice to Mariners. Information concerning the regulations may be obtained at the Office of the Commander, 13th Coast Guard District in Seattle, Washington or at the Office of the District Engineer, Corps of Engineers in Seattle, Washington. Refer to charted regulation section numbers.
+
+
+AIDS TO NAVIGATION
+Consult U.S. Coast Guard Light List for supplemental information concerning aids to navigation.
+
+
+POLLUTION REPORTS
+Report all spills of oil and hazardous substances to the National Response Center via 1-800-424-8802 (toll free), or to the nearest U.S. Coast Guard facility if telephone communication is impossible (33 CFR 153).
+
+
+CAUTION - USE OF RADIO SIGNALS (LIMITATIONS)
+Limitations on the radio signals as aids to marine navigation can be found in the U.S. Coast Guard Light Lists and National Geospatial-Intelligence Agency publication 117. Radio direction-finder bearings to commercial broadcasting stations are subject to error and should be used with caution.
+
+
+SUPPLEMENTAL INFORMATION
+Consult U.S. Coast Pilot 10 for important supplemental information.
+
+
+CAUTION - TEMPORARY CHANGES
+Temporary changes or defects in aids to navigation are not indicated. See Local Notice to Mariners.
+
+
+WARNING - PRUDENT MARINER
+The prudent mariner will not rely solely on any single aid to navigation, particularly on floating aids. See U.S. Coast Guard Light List and U.S. Coast Pilot for details.
+
+
+ADDITIONAL INFORMATION
+Additional information can be obtained at nauticalcharts.noaa.gov.
+
+
+AUTHORITIES
+Hydrography and topography by the National Ocean Service, Coast Survey, with additional data from the Corps of Engineers, Geological Survey, and U.S. Coast Guard.
+
+
+CAUTION - ALL CRAFT
+All craft should avoid areas where the skin divers flag, a red square with a diagonal white stripe, is displayed.
+
+
+CAUTION - DEPTHS
+The depths of water have been determined from conditions existing prior to the filling of the pool. Shoaler depths than charted may exist, particularly near the shoreline.
+
+
+CAUTION - QUALITY OF BATHYMETRIC DATA
+The areas represented by the object M_QUAL (Quality of data) are approximate due to generalizing for clarity. Caution is advised, particularly for nearshore navigation or voyage planning. M_QUAL represents areas of uniform quality of bathymetric data. The CATZOC (Category of zone of confidence in data) attribute of M_QUAL provides an assessment of the overall zone of confidence.
+
+
+CAUTION - SMALL CRAFT
+Small craft operators are warned to beware of severe water turbulence caused by large vessels traversing narrow waterways.
+
+
+CAUTION - SUBMARINE PIPELINES AND CABLES
+Additional uncharted submarine pipelines and submarine cables may exist within the area of this chart. Not all submarine pipelines and submarine cables are required to be buried, and those that were originally buried may have become exposed. Mariners should use extreme caution when operating vessels in depths of water comparable to their draft in areas where pipelines and cables may exist, and when anchoring, dragging, or trawling. Covered wells may be marked by lighted or unlighted buoys.
+
+
+CAUTION - WARNINGS CONCERNING LARGE VESSELS
+The "Rules of The Road" state that recreational boats shall not impede the passage of a vessel that can navigate only within a narrow channel or fairway. Large vessels may appear to move slowly due to their large size, but actually transit at speeds in excess of 22 kph / 12 knots, requiring a great distance in which to maneuver or stop. A large vessel's superstructure may block the wind with the result that sailboats and sailboards may unexpectedly find themselves unable to maneuver. Bow and stern waves can be hazardous to small vessels. Large vessels may not be able to see small craft close to their bows.
+
+
+RADAR REFLECTORS
+Radar reflectors have been placed on many floating aids to navigation. Individual radar reflector identification on these aids has been omitted from this chart.
+
+
+SOUNDING DATUM
+Soundings and clearances of bridges and overhead cables in Lower Monumental Reservoir west of Little Goose Lock and Dam are referred to normal pool elevation of 164.6 meters / 540 feet above mean sea level. Soundings in Lake Bryan are referred to 193.5 meters / 635 feet above mean sea level. Normal operating pool range is between 192.9 meters / 633 feet and 194.5 meters / 638 feet above mean sea level and drawn down to 193.5 meters / 635 feet may occur without prior notice. Vertical clearances for overhead cables and bridges are referred to the normal pool level of 194.5 meters / 638 feet above mean sea level.
+
+
+WATER LEVELS, CURRENTS, AND TIDES
+Real-time water levels, tide predictions, and tidal current predictions are available on the internet from NOAA's Center for Operational Oceanographic Products and Services (CO-OPS) at https://tidesandcurrents.noaa.gov/water_level_info.html and https://tidesandcurrents.noaa.gov/currents_info.html.
+
+
+COMMENTS REQUESTED
+NOAA encourages users to submit inquiries, discrepancies, or comments about this chart via NOAA's ASSIST tool at https://www.nauticalcharts.noaa.gov/customer-service/assist/.
+
+
+END OF FILE

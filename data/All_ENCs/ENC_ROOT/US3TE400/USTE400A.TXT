@@ -1,0 +1,55 @@
+NATIONAL GEOSPATIAL-INTELLIGENCE AGENCY
+US3TE400 - MARSHALL ISLANDS - NAMORIK, JALUIT, AILINGLAPALAP, NAMU, LIB, KWAJALEIN, UJAE, WOTHO ATOLLS
+ 
+INDEX:
+POSITIONS
+NOTE 1
+NOTE 2 - Roi-Namur Island
+NOTE 3 - Jaluit Atoll
+CELL ACCURACY
+CAUTION 1
+CAUITON 2
+CAUTION 3
+CAUTION 4
+CAUTION 5
+TIDAL INFORMATION
+SUPPLEMENTAL INFORMATION
+
+NOTES:
+POSITIONS:
+This cell has been positioned on the WGS-84 Datum with the use of orthorectified satellite imagery.
+
+NOTE 1:
+The original soundings were in fathoms.  This note applies to the following atolls: Jaluit, Ailinglapalap, Namu.
+
+NOTE 2:
+Any vessel transiting within a 20nm radius of Roi-Namur Island, part of Kwajalein Atoll, may experience interference with marine VHF communications, especially VHF International Channel 16. Authorized transiting vessels should stay clear of this area.
+
+NOTE 3:
+Beacons marking passes and shoals have been omitted as they are unreliable. (Jaluit Atoll)
+
+CELL ACCURACY:
+Owing to the age and quality of the source information, some details on this cell may not be positioned accurately. Particular caution is advised when navigating in the vicinity of dangers, even when using an electronic positioning system such as GPS.
+
+CAUTION 1:
+Many reefs on this chart have been updated through use of Commercial Satellite Imagery. Such imagery cannot provide reliable detection of all hazards to navigation. Uncharted hazards may exist.
+
+CAUTION 2:
+Pilotage, although not compulsory in this area, is advisable due to uncharted dangers (Kwajalein).
+
+CAUTION 3:
+Uncharted rocks and coral heads, dangerous to navigation, may exist outside the limits of the swept area. Due to the existence of wrecks and cables, vessels are cautioned against anchoring within the atoll without first contacting local authorities.
+
+CAUTION 4:
+WARNING AREA - Reagan Test Site (Kwajalein Atoll): The waters within a circular area with a radius of 200 miles, centered at position 8deg43min N, 167deg43min E, are so designated. Intermittent hazardous missile operations will be conducted within the area 24 hours, on a permanent basis. Normally, operations in the Reagan Test Site are covered by HYDROPAC messages.
+
+CAUTION 5:
+Fish Aggregating Devices (FADs), anchored or drifting, are commonly deployed within the waters of many Pacific Islands and may not be charted. Even though many of the installations are temporary in nature, FADs pose significant risk to navigation safety. Prudent mariners should exercise caution in navigating these waters.
+
+TIDAL INFORMATION:
+Refer to Admiralty Total Tides Program for the latest information.
+
+SUPPLEMENTAL INFORMATION:
+Consult National Geospatial-Intelligence Agency Pub. 126, Sailing Directions, for important supplemental information.
+
+END OF FILE

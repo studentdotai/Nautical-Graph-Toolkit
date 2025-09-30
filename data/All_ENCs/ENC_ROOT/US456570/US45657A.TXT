@@ -1,0 +1,22 @@
+NATIONAL GEOSPATIAL-INTELLIGENCE AGENCY
+US456570 - FEDERATED STATES OF MICRONESIA - APPRAOCH TO KOSRAE ISLAND
+ 
+INDEX:
+GLOSSARY
+LIDAR SURVEYS
+POSITIONS
+
+
+GLOSSARY:
+Finol ... mountain, peak
+Foko ... cape, point (reef point)
+Infal ... stream
+Molsron ... bay, harbor
+
+LIDAR SURVEYS:
+Much of the hydrogrphy on this chart is based on surveys using airborne Light Detection and Ranging, or LIDAR. The ability of LIDAR to detect depths and hazards is limited by water conditions, such as water clarity, depth, and the state of the sea surface. Therefore, certain LIDAR-surveyed areas are not thoroughly examined, particularly in areas with depths greater than 20 meters. In such areas, additional sources may have been used.
+
+POSITIONS:
+Coastline derived from imagery with additions from other sources.
+
+END OF FILE

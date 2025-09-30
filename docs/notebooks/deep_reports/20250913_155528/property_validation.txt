@@ -1,0 +1,61 @@
+Property Validation Analysis (with Database Verification)
+========================================================
+
+Baseline format: GPKG (195 properties)
+
+=== SPATIALITE vs GPKG ===
+Processing coverage: 100.0%
+Actual coverage: 100.0%
+Common properties: 195
+Properties missing from processing: 0
+Verified missing from DB: 0
+Processing artifacts (found in DB): 0
+Extra in spatialite: 1
+
+Extra properties in SPATIALITE:
+  - geometry
+
+=== POSTGIS vs GPKG ===
+Processing coverage: 83.1%
+Actual coverage: 100.0%
+Common properties: 162
+Properties missing from processing: 33
+Verified missing from DB: 0
+Processing artifacts (found in DB): 33
+Extra in postgis: 0
+
+PROCESSING ARTIFACTS (properties found in POSTGIS database but not in processing):
+  - dsid_agen
+  - dsid_comt
+  - dsid_expp
+  - dsid_intu
+  - dsid_isdt
+  - dsid_pred
+  - dsid_prof
+  - dsid_prsp
+  - dsid_psdn
+  - dsid_sted
+  - dsid_uadt
+  - dspm_comf
+  - dspm_comt
+  - dspm_coun
+  - dspm_cscl
+  - dspm_duni
+  - dspm_hdat
+  - dspm_huni
+  - dspm_puni
+  - dspm_sdat
+  - dspm_somf
+  - dspm_vdat
+  - dssi_aall
+  - dssi_dstr
+  - dssi_nall
+  - dssi_nocn
+  - dssi_nocr
+  - dssi_noed
+  - dssi_nofa
+  - dssi_nogr
+  - dssi_noin
+  - dssi_nolr
+  - dssi_nomr
+

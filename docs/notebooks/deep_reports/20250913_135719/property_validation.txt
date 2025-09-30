@@ -1,0 +1,168 @@
+Property Validation Analysis (with Database Verification)
+========================================================
+
+Baseline format: GPKG (195 properties)
+
+=== SPATIALITE vs GPKG ===
+Processing coverage: 100.0%
+Actual coverage: 100.0%
+Common properties: 195
+Properties missing from processing: 0
+Verified missing from DB: 0
+Processing artifacts (found in DB): 0
+Extra in spatialite: 1
+
+Extra properties in SPATIALITE:
+  - GEOMETRY
+
+=== POSTGIS vs GPKG ===
+Processing coverage: 28.2%
+Actual coverage: 100.0%
+Common properties: 55
+Properties missing from processing: 140
+Verified missing from DB: 0
+Processing artifacts (found in DB): 140
+Extra in postgis: 0
+
+PROCESSING ARTIFACTS (properties found in POSTGIS database but not in processing):
+  - agen
+  - bcnshp
+  - boyshp
+  - buishp
+  - burdep
+  - calsgn
+  - catach
+  - catair
+  - catbrg
+  - catbua
+  - catcan
+  - catcbl
+  - catcoa
+  - catcov
+  - catdam
+  - catdpg
+  - catfog
+  - catfry
+  - cathaf
+  - catlam
+  - catlit
+  - catlmk
+  - catlnd
+  - catmfa
+  - catmor
+  - catmpa
+  - catnav
+  - catobs
+  - catofp
+  - catpil
+  - catpip
+  - catple
+  - catqua
+  - catrea
+  - catros
+  - catrtb
+  - catsea
+  - catsil
+  - catslc
+  - catslo
+  - catspm
+  - cattrk
+  - cattss
+  - catwat
+  - catwed
+  - catwrk
+  - catzoc
+  - colour
+  - colpat
+  - comcha
+  - condtn
+  - conrad
+  - convis
+  - curvel
+  - datend
+  - datsta
+  - depth
+  - drval1
+  - drval2
+  - elevat
+  - estrng
+  - exclit
+  - expsou
+  - ffpt_rind
+  - fidn
+  - fids
+  - functn
+  - grup
+  - height
+  - horacc
+  - horclr
+  - horlen
+  - horwid
+  - hypcat
+  - icefac
+  - inform
+  - jrsdtn
+  - litchr
+  - litvis
+  - lnam
+  - lnam_refs
+  - marsys
+  - mltylt
+  - natcon
+  - nation
+  - natqua
+  - natsur
+  - ninfom
+  - nobjnm
+  - npldst
+  - ntxtds
+  - objl
+  - objnam
+  - orient
+  - perend
+  - persta
+  - picrep
+  - pildst
+  - prim
+  - prodct
+  - pubref
+  - quasou
+  - radwal
+  - recdat
+  - recind
+  - restrn
+  - ryrmgv
+  - scamax
+  - scamin
+  - sectr1
+  - sectr2
+  - sigfrq
+  - siggen
+  - siggrp
+  - sigper
+  - sigseq
+  - sordat
+  - sorind
+  - souacc
+  - status
+  - surend
+  - sursta
+  - tecsou
+  - topshp
+  - trafic
+  - txtdsc
+  - valacm
+  - valdco
+  - valmag
+  - valmxr
+  - valnmr
+  - valsou
+  - veracc
+  - verccl
+  - verclr
+  - vercop
+  - vercsa
+  - verdat
+  - verlen
+  - watlev
+

@@ -1,11 +1,35 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="dataSourceStorageLocal" created-in="PY-252.23892.439">
-    <data-source name="WSL2" uuid="da6fb109-e651-4ba8-8a5a-23c4eb37ab79">
-      <database-info product="" version="" jdbc-version="" driver-name="" driver-version="" dbms="POSTGRES" />
+    <data-source name="WSL2_PG16" uuid="da6fb109-e651-4ba8-8a5a-23c4eb37ab79">
+      <database-info product="PostgreSQL" version="16.9 (Ubuntu 16.9-0ubuntu0.24.04.1)" jdbc-version="4.2" driver-name="PostgreSQL JDBC Driver" driver-version="42.7.3" dbms="POSTGRES" exact-version="16.9" exact-driver-version="42.7">
+        <identifier-quote-string>&quot;</identifier-quote-string>
+      </database-info>
+      <case-sensitivity plain-identifiers="lower" quoted-identifiers="exact" />
       <secret-storage>master_key</secret-storage>
       <user-name>postgres</user-name>
-      <schema-mapping />
+      <schema-mapping>
+        <introspection-scope>
+          <node negative="1">
+            <node kind="database" negative="1" />
+            <node kind="database" qname="@">
+              <node kind="schema" qname="@" />
+            </node>
+            <node kind="database" qname="ENC_db">
+              <node kind="schema">
+                <name qname="s57_layers" />
+                <name qname="s57_optimized" />
+                <name qname="us1eez1m" />
+                <name qname="us1gc09m" />
+                <name qname="us1po02m" />
+                <name qname="us2wc12m" />
+                <name qname="us3ca52m" />
+                <name qname="us4ca60m" />
+              </node>
+            </node>
+          </node>
+        </introspection-scope>
+      </schema-mapping>
     </data-source>
     <data-source name="postgres@localhost" uuid="eb67945a-1064-4af5-903e-2eb1d237bdae">
       <database-info product="PostgreSQL" version="16.9 (Ubuntu 16.9-0ubuntu0.24.04.1)" jdbc-version="4.2" driver-name="PostgreSQL JDBC Driver" driver-version="42.7.3" dbms="POSTGRES" exact-version="16.9" exact-driver-version="42.7">
@@ -21,6 +45,12 @@
           </node>
         </introspection-scope>
       </schema-mapping>
+    </data-source>
+    <data-source name="SQLite" uuid="4341cd7d-3cef-4158-89f3-476c4a59ad36">
+      <database-info product="" version="" jdbc-version="" driver-name="" driver-version="" dbms="SQLITE" />
+      <secret-storage>master_key</secret-storage>
+      <auth-provider>no-auth</auth-provider>
+      <schema-mapping />
     </data-source>
   </component>
 </project>

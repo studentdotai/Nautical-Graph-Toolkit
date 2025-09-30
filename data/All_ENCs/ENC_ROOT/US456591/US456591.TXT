@@ -1,0 +1,43 @@
+NATIONAL GEOSPATIAL-INTELLIGENCE AGENCY
+US456591 - FEDERATED STATES OF MICRONESIA - NGATIK ATOLL
+
+INDEX:
+NOTE
+CELL ACCURACY
+POSITIONS
+CAUTION 1
+CAUTION 2
+CAUTION 3
+CAUTION 4
+TIDAL INFORMATION
+SUPPLEMENTAL INFORMATION
+
+
+NOTE:
+The original soundings were in fathoms.
+
+CELL ACCURACY:
+Owing to the age and quality of the source information, some details on this cell may not be positioned accurately. Particular caution is advised when navigating in the vicinity of dangers, even when using an electronic positioning system such as GPS.
+
+POSITIONS:
+This cell has been positioned on the WGS-84 Datum with the use of 2019 orthorectified imagery.
+
+CAUTION 1:
+Many reefs on this chart have been updated through use of Commercial Satellite Imagery. Such imagery cannot provide reliable detection of all hazards to navigation. Uncharted hazards may exist.
+
+CAUTION 2:
+Most features, including bathymetry, are omitted in this area. Depths within the lagoon are reported to be inaccurate, with numerous uncharted and mischarted coral heads being present. The minimal depiction of detail in this area does not support safe navigation.
+
+CAUTION 3:
+Fish Aggregating Devices (FADs), anchored or drifting, are commonly deployed within the waters of many Pacific Islands and may not be charted. Even though many of the installations are temporary in nature, FADs pose significant risk to navigation safety. Prudent mariners should exercise caution in navigating these waters.
+
+CAUTION 4:
+Many of the beacons in the entrance and inside the lagoon have been reported missing.
+
+TIDAL INFORMATION:
+Refer to Admiralty Total Tides Program for the latest information.
+
+SUPPLEMENTAL INFORMATION:
+Consult National Geospatial-Intelligence Agency Pub. 126, Sailing Directions, for important supplemental information. 
+
+END OF FILE

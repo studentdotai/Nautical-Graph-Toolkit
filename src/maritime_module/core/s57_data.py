@@ -11,10 +11,15 @@ This module provides classes for:
 - Utility functions for S-57 attributes and NOAA database scraping.
 """
 
+# --- Standard Library Imports ---
 import argparse
+import json
 import logging
 import os
 import sys
+import time
+from abc import abstractmethod
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Dict, Any, Optional, List, Union
 
@@ -33,13 +38,19 @@ except ImportError:
 # --- Third-party Library Imports ---
 try:
     import fiona
+    import numpy as np
     import pandas as pd
     import geopandas as gpd
-    from shapely.geometry import shape, mapping
-    from sqlalchemy import create_engine, text, inspect
-    from sqlalchemy.orm import sessionmaker, Session
+    import psutil
     import requests
     from bs4 import BeautifulSoup
+    from shapely.geometry import shape, mapping, Polygon, Point, MultiPolygon, LineString
+    from shapely.geometry.base import BaseGeometry
+    from shapely import wkt, wkb, unary_union, contains_xy
+    from shapely.ops import nearest_points
+    from sqlalchemy import create_engine, text, inspect, event
+    from sqlalchemy.orm import sessionmaker, Session
+    from sqlalchemy.exc import SQLAlchemyError
 except ImportError as e:
     print(f"Fatal Error: A required library is missing: {e}", file=sys.stderr)
     print(
@@ -50,9 +61,6 @@ except ImportError as e:
 # --- Local Package Imports ---
 from ..utils.s57_utils import S57Utils, NoaaDatabase
 from ..utils.db_utils import FileDBConnector, PostGISConnector
-
-# --- Standard Library Imports ---
-import json
 
 
 # --- Logging Configuration ---
@@ -298,7 +306,6 @@ class S57AdvancedConfig:
         # Auto-calculate max workers for enterprise safety
         if enable_parallel_processing:
             if max_parallel_workers is None:
-                import os
                 cpu_count = os.cpu_count() or 4
                 # Conservative approach: use max 50% of available cores for enterprise safety
                 self.max_parallel_workers = max(2, min(4, cpu_count // 2))
@@ -471,7 +478,6 @@ class S57AdvancedConfig:
     def _get_available_memory_mb(self) -> float:
         """Get available system memory in MB."""
         try:
-            import psutil
             memory = psutil.virtual_memory()
             available_mb = memory.available / (1024 * 1024)
             return available_mb
@@ -665,7 +671,7 @@ class S57Advanced:
         else:
             raise ValueError(f"No connector available for format: {fmt}")
         
-    def convert_to_layers(self):
+    def convert_to_layers(self, progress_callback: Optional[callable] = None):
         """Optimized layer conversion with auto-tuning and adaptive batching."""
         # Temporarily set LIST_AS_STRING to OFF. This ensures the S-57 driver
         # provides list-like fields as their native OGR types (e.g., StringList), which
@@ -708,12 +714,38 @@ class S57Advanced:
             
             # 3. Prepare destination
             self.connector.check_and_prepare(overwrite=self.base_converter.overwrite)
-            
+
+            # --- For progress and ETC reporting ---
+            total_layers = len(all_layers_schema)
+            processed_layers = 0
+            start_time = time.time()
+            etc_seconds = None
+
             # 4. Process each layer with optimized batching
             for layer_name, schema in all_layers_schema.items():
+                layer_start_time = time.time()
                 logger.info(f"Processing layer: {layer_name}")
                 self._process_layer_optimized(layer_name, schema)
-                
+                processed_layers += 1
+
+                # --- ETC Calculation ---
+                # Start calculating after 5 layers for better accuracy
+                if processed_layers >= 5:
+                    elapsed_time = time.time() - start_time
+                    avg_time_per_layer = elapsed_time / processed_layers
+                    remaining_layers = total_layers - processed_layers
+                    etc_seconds = remaining_layers * avg_time_per_layer
+
+                # --- Progress Callback ---
+                if progress_callback:
+                    progress_data = {
+                        'progress': int((processed_layers / total_layers) * 100),
+                        'etc_seconds': etc_seconds,
+                        'layers_processed': processed_layers,
+                        'total_layers': total_layers
+                    }
+                    progress_callback(progress_data)
+
         finally:
             gdal.SetConfigOption('OGR_S57_LIST_AS_STRING', original_list_as_string)
             self._cleanup_cache()
@@ -1084,8 +1116,6 @@ class S57Advanced:
             self.base_converter.find_s57_files()
             return self.base_converter.s57_files
         
-        from concurrent.futures import ThreadPoolExecutor, as_completed
-        import os
         
         try:
             if self.config.enable_debug_logging:
@@ -1167,7 +1197,6 @@ class S57Advanced:
             # Fallback to sequential preprocessing
             return self._sequential_preprocess_files()
         
-        from concurrent.futures import ThreadPoolExecutor, as_completed
         
         try:
             if self.config.enable_debug_logging:
@@ -2757,8 +2786,6 @@ class S57Updater:
         Returns:
             str: Path to the generated report file
         """
-        import json
-        from pathlib import Path
 
         # Create report directory
         report_path = Path(report_dir)
@@ -3047,10 +3074,18 @@ class ENCDataFactory:
         unified_gdf.columns = [c.lower() for c in unified_gdf.columns]
 
         # --- 4. Parse list-like string columns ---
-        # Get all possible S-57 attributes that are lists
+        # Only process list attributes that already exist in the dataframe
+        # Don't add irrelevant attributes from other object types
+        existing_list_attrs = []
         all_list_attrs = s57_utils.get_attributes_by_type('L')
 
         for col_acronym in all_list_attrs:
+            col = col_acronym.lower()
+            if col in unified_gdf.columns:
+                existing_list_attrs.append(col_acronym)
+
+        # Process only the existing list attributes
+        for col_acronym in existing_list_attrs:
             # --- FIX: Ensure list-type columns exist before trying to parse them ---
             # If a list column is missing from a source (e.g., lnam_refs in SpatiaLite),
             # create it and fill with empty lists for schema consistency.
@@ -3228,6 +3263,102 @@ class ENCDataFactory:
         logger.info(f"Factory: Getting bounding boxes for {len(enc_names)} ENCs...")
         return self.manager.get_enc_bounding_boxes(enc_names=enc_names)
 
+    def get_encs_by_boundary(self, boundary_geom: BaseGeometry) -> List[str]:
+        """
+        Filters ENCs to only those whose bounding boxes intersect with a given boundary.
+
+        This is a key optimization step to reduce the dataset to a specific area of
+        interest (e.g., a port boundary) before performing more intensive operations
+        like graph creation.
+
+        Args:
+            boundary_geom (BaseGeometry): A Shapely geometry representing the
+                                          area of interest.
+
+        Returns:
+            List[str]: A list of ENC names that are fully or partially inside
+                       the provided boundary.
+        """
+        logger.info("Factory: Filtering ENCs by boundary...")
+
+        # 1. Get the bounding boxes of ALL available ENCs.
+        all_encs_summary = self.get_enc_summary()
+        if all_encs_summary.empty or 'enc_name' not in all_encs_summary.columns:
+            logger.warning("No ENCs found in the data source to filter.")
+            return []
+        # Clean ENC names to remove extensions like .000 before querying bounding boxes.
+        all_enc_names = all_encs_summary['enc_name'].str.replace(r'\.000$', '', regex=True, case=False).tolist()
+        enc_bboxes_gdf = self.get_enc_bounding_boxes(all_enc_names)
+
+
+        if enc_bboxes_gdf.empty:
+            logger.info("No bounding boxes found for any ENCs.")
+            return []
+
+        # --- FIX: Ensure both geometries have the same CRS before intersection ---
+        # Set the CRS for the bounding box GeoDataFrame if it's not already set.
+        if enc_bboxes_gdf.crs is None:
+            enc_bboxes_gdf.set_crs("EPSG:4326", inplace=True)
+
+        # 2. Perform spatial filtering to find ENCs that either intersect with
+        #    the boundary or are completely contained within it. This is more
+        #    robust than just checking for intersection.
+        intersecting_mask = enc_bboxes_gdf.intersects(boundary_geom)
+        within_mask = enc_bboxes_gdf.within(boundary_geom)
+
+        intersecting_encs_gdf = enc_bboxes_gdf[intersecting_mask | within_mask]
+
+        # 3. Return the list of ENC names.
+        return intersecting_encs_gdf['dsid_dsnm'].tolist()
+
+    def create_s57_grid(self, port_boundary: Polygon, departure_point: Point, arrival_point: Point,
+                        main_grid_layer: str, extra_grid_layers: List[str],
+                        reduce_distance_nm: float) -> Dict[str, Any]:
+        """
+        Creates a comprehensive maritime grid by combining various layers, adjusting points,
+        and returning the resulting geometries. This operation should be optimized for the
+        specific backend.
+        """
+        return self.manager.create_s57_grid(
+            port_boundary=port_boundary,
+            departure_point=departure_point,
+            arrival_point=arrival_point,
+            main_grid_layer=main_grid_layer,
+            extra_grid_layers=extra_grid_layers,
+            reduce_distance_nm=reduce_distance_nm
+        )
+
+    def save_route(self, route_geom: LineString, route_name: str, **kwargs):
+        """
+        Saves a route to the underlying data manager.
+
+        This method is a facade that calls the appropriate implementation on the
+        underlying data manager (PostGIS, GPKG, or SpatiaLite).
+
+        Args:
+            route_geom (LineString): The route geometry to save.
+            route_name (str): The name for the route.
+            **kwargs: Additional arguments passed to the underlying manager.
+        """
+        return self.manager.save_route(route_geom, route_name, **kwargs)
+
+    def load_route(self, route_name: str, **kwargs) -> Optional[LineString]:
+        """
+        Loads a route from the underlying data manager.
+
+        This method is a facade that calls the appropriate implementation on the
+        underlying data manager (PostGIS, GPKG, or SpatiaLite).
+
+        Args:
+            route_name (str): The name of the route to load.
+            **kwargs: Additional arguments passed to the underlying manager.
+
+        Returns:
+            Optional[LineString]: The loaded route geometry, or None if not found.
+        """
+        return self.manager.load_route(route_name, **kwargs)
+
+
 # ==============================================================================
 # DATABASE ANALYSIS CLASS
 # ==============================================================================
@@ -3282,6 +3413,15 @@ class PostGISManager:
         # 3. GeoPandas (via SQLAlchemy) receives the query and the parameters separately.
         #    It safely combines them at the database level, preventing injection.
         return gpd.read_postgis(sql, self.engine, params=params, geom_col='wkb_geometry')
+
+    def check_and_prepare(self, overwrite: bool = False):
+        """
+        Ensures the target schema exists. If overwrite is True, drops and recreates it.
+        """
+
+        # Create a PostGISConnector instance to handle schema management
+        connector = PostGISConnector(self.db_params, self.schema)
+        connector.check_and_prepare(overwrite=overwrite)
 
     def get_layers_summary(self, include_empty: bool = False) -> pd.DataFrame:
         """
@@ -3617,15 +3757,492 @@ class PostGISManager:
             
         return results_df
 
+    def create_s57_grid(self, port_boundary: Polygon, departure_point: Point, arrival_point: Point,
+                        main_grid_layer: str, extra_grid_layers: List[str],
+                        reduce_distance_nm: float) -> Dict[str, Any]:
+        """
+        Creates a maritime grid using optimized PostGIS spatial functions.
+        """
+        reduce_distance_deg = reduce_distance_nm / 60.0
+
+        # Build dynamic UNION ALL query for extra grids (simplified from working code)
+        extra_grid_union = " UNION ALL ".join(
+            [f'SELECT "{table}".wkb_geometry AS geom, "{table}".dsid_dsnm FROM "{self.schema}"."{table}"'
+             for table in extra_grid_layers]
+        )
+
+        # Use the working query structure from SourceCode/GRAPH.py
+        grid_query = text(f"""
+        WITH grid_enc AS (
+            SELECT ST_Union(s.wkb_geometry) AS grid_geom
+            FROM "{self.schema}"."{main_grid_layer}" s
+            WHERE substring(s.dsid_dsnm from 3 for 1) IN ('1','2')
+              AND ST_Intersects(s.wkb_geometry, ST_GeomFromText(:port_boundary_wkt, 4326))
+        ), reduced_grid AS (
+            SELECT CASE
+                     WHEN :reduce_distance > 0 THEN ST_Buffer(grid_geom, -:reduce_distance)
+                     ELSE grid_geom
+                   END AS grid_geom
+            FROM grid_enc
+        ), extra_grid AS (
+            SELECT 'extra' AS grid_name, ST_Union(tbl.geom) AS grid_geom
+            FROM (
+                {extra_grid_union}
+            ) tbl
+            WHERE substring(tbl.dsid_dsnm from 3 for 1) IN ('4','3')
+              AND ST_Intersects(tbl.geom, ST_GeomFromText(:port_boundary_wkt, 4326))
+            GROUP BY grid_name
+        ), land_areas AS (
+            -- --- FIX: Subtract land areas to ensure navigability ---
+            -- This CTE unions all relevant land areas within the boundary.
+            SELECT ST_Union(l.wkb_geometry) as geom
+            FROM "{self.schema}"."lndare" l
+            WHERE substring(l.dsid_dsnm from 3 for 1) IN ('3','4','5')
+              AND ST_Intersects(l.wkb_geometry, ST_GeomFromText(:port_boundary_wkt, 4326))
+        ), grid_minus_land AS (
+            -- Subtract the land from the reduced main grid.
+            SELECT ST_Difference(
+                (SELECT grid_geom FROM reduced_grid),
+                (SELECT geom FROM land_areas)
+            ) as grid_geom
+        ), combined_grid AS (
+            -- Combine the land-free grid with the extra grids
+            SELECT ST_Union(gml.grid_geom, eg.grid_geom) AS grid_geom
+            FROM grid_minus_land gml, extra_grid eg
+        ), dumped AS (
+            SELECT (dp).geom AS comp
+            FROM (SELECT ST_Dump(combined_grid.grid_geom) AS dp FROM combined_grid) d
+        ), connected AS (
+            SELECT d1.comp
+            FROM dumped d1
+            WHERE EXISTS (
+                 SELECT 1 FROM dumped d2
+                 WHERE ST_DWithin(d1.comp, d2.comp, 0.0001) AND ST_Area(d1.comp) > 0.01
+            )
+        ), filtered_grid AS (
+            SELECT ST_Union(comp) AS pre_clipped_geom
+            FROM connected
+        ), final_clipped_grid AS (
+            SELECT ST_Intersection(fg.pre_clipped_geom, ST_GeomFromText(:port_boundary_wkt, 4326)) as grid_geom
+            FROM filtered_grid fg
+        ), adjusted_points AS ( -- Adjust points to the final clipped grid
+            SELECT
+                CASE
+                    WHEN ST_Contains(fg.grid_geom, ST_GeomFromText(:departure_point_wkt, 4326))
+                      THEN ST_GeomFromText(:departure_point_wkt, 4326)
+                    ELSE ST_ClosestPoint(fg.grid_geom, ST_GeomFromText(:departure_point_wkt, 4326))
+                END AS start_point,
+                CASE
+                    WHEN ST_Contains(fg.grid_geom, ST_GeomFromText(:arrival_point_wkt, 4326))
+                      THEN ST_GeomFromText(:arrival_point_wkt, 4326)
+                    ELSE ST_ClosestPoint(fg.grid_geom, ST_GeomFromText(:arrival_point_wkt, 4326))
+                END AS end_point,
+                fg.grid_geom
+            FROM final_clipped_grid fg
+        )
+        SELECT
+            ST_AsGeoJSON(ST_GeomFromText(:departure_point_wkt, 4326)) AS departure_point,
+            ST_AsGeoJSON(ap.start_point) AS start_point,
+            ST_AsGeoJSON(ap.end_point) AS end_point,
+            ST_AsGeoJSON(ST_GeomFromText(:arrival_point_wkt, 4326)) AS arrival_point,
+            ST_AsGeoJSON(rg.grid_geom) AS main_grid_geojson,
+            ST_AsGeoJSON(COALESCE(ST_Union(eg.grid_geom), ST_GeomFromText('POINT EMPTY', 4326))) AS extra_grid,
+            ST_AsGeoJSON(ap.grid_geom) AS combined_grid
+        FROM adjusted_points ap, reduced_grid rg, extra_grid eg
+        GROUP BY departure_point, ap.start_point, ap.end_point, arrival_point, rg.grid_geom, ap.grid_geom;
+        """)
+
+        params = {
+            'port_boundary_wkt': port_boundary.wkt,
+            'reduce_distance': reduce_distance_deg,
+            'departure_point_wkt': departure_point.wkt,
+            'arrival_point_wkt': arrival_point.wkt,
+        }
+
+        try:
+            with self.engine.connect() as conn:
+                result = conn.execute(grid_query, params).fetchone()
+
+            if not result:
+                logger.warning("PostGIS grid creation query returned no results.")
+                return {}
+
+            # Helper to load GeoJSON string into a Shapely geometry
+            def load_geojson(json_str):
+                if not json_str:
+                    return None
+                try:
+                    return shape(json.loads(json_str))
+                except (json.JSONDecodeError, TypeError):
+                    return None
+
+            # Structure the result to match the expected format from create_base_grid
+            # The new query returns GeoJSON directly, no need for WKB conversion
+            return {
+                "start_point": load_geojson(result.start_point),
+                "end_point": load_geojson(result.end_point),
+                "main_grid": load_geojson(result.main_grid_geojson),
+                "extra_grid": load_geojson(result.extra_grid),
+                "combined_grid": load_geojson(result.combined_grid),
+            }
+
+        except SQLAlchemyError as e:
+            logger.error(f"Error executing PostGIS grid creation: {e}")
+            return {}
+
+    def create_grid_graph_nodes_and_edges(self, polygon: Union[Polygon, MultiPolygon], spacing: float, max_edge_factor: float = 2.0, max_points: int = 1000000) -> Dict[str, Any]:
+        """
+        Creates graph nodes and edges using PostGIS spatial operations with spatial subdivision for large grids.
+        Returns nodes and edges data that can be used to construct a NetworkX graph.
+
+        Args:
+            polygon: The polygon/multipolygon to create grid within
+            spacing: Grid spacing in degrees
+            max_edge_factor: Maximum edge length as multiple of spacing
+            max_points: Maximum points per subdivision to avoid memory issues
+        """
+
+        minx, miny, maxx, maxy = polygon.bounds
+        max_edge_length = spacing * max_edge_factor
+
+        # Calculate expected grid size
+        expected_points = int((maxx - minx) / spacing) * int((maxy - miny) / spacing)
+
+        logger.info("Executing database-side graph creation...")
+        logger.info(f"  - Bounding Box: ({minx:.4f}, {miny:.4f}) to ({maxx:.4f}, {maxy:.4f})")
+        logger.info(f"  - Spacing: {spacing:.6f} degrees, Max Edge Length: {max_edge_length:.6f} degrees")
+        logger.info(f"  - Expected points: {expected_points:,}")
+
+        # Use spatial subdivision for large grids
+        if expected_points > max_points:
+            logger.info(f"Using spatial subdivision (threshold: {max_points:,} points)")
+            return self._create_grid_graph_subdivided(polygon, spacing, max_edge_factor, max_points)
+        else:
+            logger.info("Using single-query approach")
+            return self._create_grid_graph_single(polygon, spacing, max_edge_factor)
+
+    def _create_grid_graph_single(self, polygon: Union[Polygon, MultiPolygon], spacing: float, max_edge_factor: float) -> Dict[str, Any]:
+        """
+        Creates graph nodes and edges for a single polygon using PostGIS.
+        """
+        minx, miny, maxx, maxy = polygon.bounds
+        max_edge_length = spacing * max_edge_factor
+
+        # Optimized SQL query that mimics numpy approach by using explicit directional offsets
+        # This avoids the expensive O(n²) cartesian join and creates edges more efficiently
+        grid_query = text("""
+        WITH grid_points AS (
+            SELECT
+                series_x.x,
+                series_y.y,
+                ST_SetSRID(ST_MakePoint(series_x.x, series_y.y), 4326) AS geom
+            FROM (
+                SELECT generate_series(CAST(:minx AS numeric), CAST(:maxx AS numeric), CAST(:spacing AS numeric)) AS x
+            ) series_x
+            CROSS JOIN (
+                SELECT generate_series(CAST(:miny AS numeric), CAST(:maxy AS numeric), CAST(:spacing AS numeric)) AS y
+            ) series_y
+        ),
+        valid_points AS (
+            SELECT x, y, geom
+            FROM grid_points
+            WHERE ST_Contains(ST_GeomFromText(:polygon_wkt, 4326), geom)
+        ),
+        -- Define 8 directional offsets (like numpy approach)
+        directions AS (
+            VALUES
+                (CAST(:spacing AS numeric), 0),                      -- East
+                (0, CAST(:spacing AS numeric)),                      -- North
+                (-CAST(:spacing AS numeric), 0),                     -- West
+                (0, -CAST(:spacing AS numeric)),                     -- South
+                (CAST(:spacing AS numeric), CAST(:spacing AS numeric)),    -- Northeast
+                (CAST(:spacing AS numeric), -CAST(:spacing AS numeric)),   -- Southeast
+                (-CAST(:spacing AS numeric), CAST(:spacing AS numeric)),   -- Northwest
+                (-CAST(:spacing AS numeric), -CAST(:spacing AS numeric))   -- Southwest
+        ),
+        graph_edges AS (
+            SELECT DISTINCT
+                p1.x AS source_x, p1.y AS source_y,
+                (p1.x + d.column1) AS target_x, (p1.y + d.column2) AS target_y,
+                SQRT(POWER(d.column1, 2) + POWER(d.column2, 2)) AS weight
+            FROM valid_points p1
+            CROSS JOIN (VALUES
+                (CAST(:spacing AS numeric), 0),
+                (0, CAST(:spacing AS numeric)),
+                (-CAST(:spacing AS numeric), 0),
+                (0, -CAST(:spacing AS numeric)),
+                (CAST(:spacing AS numeric), CAST(:spacing AS numeric)),
+                (CAST(:spacing AS numeric), -CAST(:spacing AS numeric)),
+                (-CAST(:spacing AS numeric), CAST(:spacing AS numeric)),
+                (-CAST(:spacing AS numeric), -CAST(:spacing AS numeric))
+            ) AS d(column1, column2)
+            WHERE EXISTS (
+                SELECT 1 FROM valid_points p2
+                WHERE p2.x = p1.x + d.column1 AND p2.y = p1.y + d.column2
+            )
+            AND SQRT(POWER(d.column1, 2) + POWER(d.column2, 2)) <= CAST(:max_edge_length AS numeric)
+        )
+        SELECT
+            (SELECT json_agg(json_build_object('x', x, 'y', y)) FROM valid_points) AS nodes,
+            (SELECT json_agg(json_build_object('source_x', source_x, 'source_y', source_y, 'target_x', target_x, 'target_y', target_y, 'weight', weight)) FROM graph_edges) AS edges
+        """)
+
+        try:
+            with self.engine.connect() as conn:
+                result = conn.execute(grid_query, {
+                    'minx': minx,
+                    'miny': miny,
+                    'maxx': maxx,
+                    'maxy': maxy,
+                    'spacing': spacing, # This is already a float
+                    'max_edge_length': max_edge_length,
+                    'polygon_wkt': polygon.wkt
+                }).fetchone()
+
+                if not result:
+                    logger.warning("PostGIS graph creation query returned no results.")
+                    return {'nodes': [], 'edges': []}
+
+                nodes_json = result[0] or []
+                edges_json = result[1] or []
+                logger.info(f"Database query complete. Found {len(nodes_json):,} nodes and {len(edges_json):,} edges.")
+
+                return {
+                    'nodes': nodes_json,
+                    'edges': edges_json
+                }
+
+        except SQLAlchemyError as e:
+            logger.error(f"Error executing PostGIS graph creation: {e}")
+            return {'nodes': [], 'edges': []}
+
+    def _create_grid_graph_subdivided(self, polygon: Union[Polygon, MultiPolygon], spacing: float, max_edge_factor: float, max_points: int) -> Dict[str, Any]:
+        """
+        Creates graph nodes and edges using spatial subdivision for large polygons.
+        """
+        from shapely.geometry import box
+
+        minx, miny, maxx, maxy = polygon.bounds
+        expected_points = int((maxx - minx) / spacing) * int((maxy - miny) / spacing)
+
+        # Calculate subdivision factor based on expected points
+        subdivision_factor = max(2, int((expected_points / max_points) ** 0.5) + 1)
+        subdivision_factor = min(subdivision_factor, 4)  # Cap at 4x4 = 16 subdivisions
+
+        logger.info(f"Subdividing into {subdivision_factor}x{subdivision_factor} grid ({subdivision_factor**2} regions)")
+
+        # Create subdivision grid
+        x_step = (maxx - minx) / subdivision_factor
+        y_step = (maxy - miny) / subdivision_factor
+
+        all_nodes = []
+        all_edges = []
+        processed_regions = 0
+
+        for i in range(subdivision_factor):
+            for j in range(subdivision_factor):
+                # Create subdivision bounds
+                sub_minx = minx + i * x_step
+                sub_maxx = minx + (i + 1) * x_step
+                sub_miny = miny + j * y_step
+                sub_maxy = miny + (j + 1) * y_step
+
+                # Create subdivision box and intersect with original polygon
+                sub_box = box(sub_minx, sub_miny, sub_maxx, sub_maxy)
+                sub_polygon = polygon.intersection(sub_box)
+
+                # Skip empty intersections
+                if sub_polygon.is_empty or sub_polygon.area < spacing**2:
+                    continue
+
+                processed_regions += 1
+                logger.info(f"Processing region {processed_regions}/{subdivision_factor**2}: "
+                          f"({sub_minx:.4f}, {sub_miny:.4f}) to ({sub_maxx:.4f}, {sub_maxy:.4f})")
+
+                # Process this subdivision
+                result = self._create_grid_graph_single(sub_polygon, spacing, max_edge_factor)
+
+                if result['nodes']:
+                    all_nodes.extend(result['nodes'])
+                if result['edges']:
+                    all_edges.extend(result['edges'])
+
+        logger.info(f"Processed {processed_regions} regions. Total: {len(all_nodes):,} nodes, {len(all_edges):,} edges")
+
+        # Connect boundary nodes between adjacent regions
+        if len(all_nodes) > 0:
+            logger.info("Connecting boundary nodes between regions...")
+            boundary_edges = self._connect_boundary_nodes(all_nodes, spacing, max_edge_factor)
+            all_edges.extend(boundary_edges)
+            logger.info(f"Added {len(boundary_edges):,} boundary connections")
+
+        return {
+            'nodes': all_nodes,
+            'edges': all_edges
+        }
+
+    def _connect_boundary_nodes(self, nodes: List[Dict], spacing: float, max_edge_factor: float) -> List[Dict]:
+        """
+        Connects nodes at subdivision boundaries to maintain graph connectivity.
+        """
+        from collections import defaultdict
+        import math
+
+        if not nodes:
+            return []
+
+        max_edge_length = spacing * max_edge_factor
+        boundary_edges = []
+
+        # Create spatial index for efficient neighbor finding
+        # Group nodes by approximate grid coordinates
+        node_grid = defaultdict(list)
+        for node in nodes:
+            grid_x = round(node['x'] / spacing)
+            grid_y = round(node['y'] / spacing)
+            node_grid[(grid_x, grid_y)].append(node)
+
+        # For each node, check adjacent grid cells for potential connections
+        processed_pairs = set()
+
+        for (grid_x, grid_y), grid_nodes in node_grid.items():
+            # Check 8 adjacent grid cells
+            for dx in [-1, 0, 1]:
+                for dy in [-1, 0, 1]:
+                    if dx == 0 and dy == 0:
+                        continue
+
+                    adjacent_key = (grid_x + dx, grid_y + dy)
+                    if adjacent_key not in node_grid:
+                        continue
+
+                    # Connect nodes between these grid cells
+                    for node1 in grid_nodes:
+                        for node2 in node_grid[adjacent_key]:
+                            # Create unique pair key (ordered)
+                            pair_key = tuple(sorted([
+                                (node1['x'], node1['y']),
+                                (node2['x'], node2['y'])
+                            ]))
+
+                            if pair_key in processed_pairs:
+                                continue
+                            processed_pairs.add(pair_key)
+
+                            # Calculate distance
+                            distance = math.sqrt(
+                                (node1['x'] - node2['x'])**2 +
+                                (node1['y'] - node2['y'])**2
+                            )
+
+                            # Add edge if within max distance
+                            if distance <= max_edge_length:
+                                boundary_edges.append({
+                                    'source_x': node1['x'],
+                                    'source_y': node1['y'],
+                                    'target_x': node2['x'],
+                                    'target_y': node2['y'],
+                                    'weight': distance
+                                })
+
+        return boundary_edges
+
+    def save_route(self, route_geom: LineString, route_name: str, schema_name: str = "routes", table_name: str = "routes", overwrite: bool = False):
+        """
+        Saves a route to a specified table in the PostGIS database.
+
+        Args:
+            route_geom (LineString): The route geometry to save.
+            route_name (str): The name for the route.
+            schema_name (str): The schema to save the route in. Defaults to "routes".
+            table_name (str): The name of the table to save routes in.
+            overwrite (bool): If True, overwrite an existing route with the same name.
+        """
+        create_schema_sql = text(f'CREATE SCHEMA IF NOT EXISTS "{schema_name}";')
+
+        create_table_sql = text(f"""
+             CREATE TABLE IF NOT EXISTS "{schema_name}"."{table_name}" (
+                id SERIAL PRIMARY KEY,
+                route_name VARCHAR(255) UNIQUE,
+                geom GEOMETRY(LineString, 4326)
+            );
+        """)
+
+        with self.engine.connect() as conn:
+            conn.execute(create_schema_sql)
+            conn.execute(create_table_sql)
+
+            if overwrite:
+                # Use an "upsert" for overwriting
+                upsert_sql = text(f"""
+                    INSERT INTO "{schema_name}"."{table_name}" (route_name, geom)
+                    VALUES (:route_name, ST_GeomFromText(:wkt, 4326))
+                    ON CONFLICT (route_name) DO UPDATE
+                    SET geom = EXCLUDED.geom;
+                """)
+                conn.execute(upsert_sql, {"route_name": route_name, "wkt": route_geom.wkt})
+            else:
+                # Standard insert, will fail if route_name exists due to UNIQUE constraint
+                insert_sql = text(f"""
+                    INSERT INTO "{schema_name}"."{table_name}" (route_name, geom)
+                    VALUES (:route_name, ST_GeomFromText(:wkt, 4326));
+                """)
+                try:
+                    conn.execute(insert_sql, {"route_name": route_name, "wkt": route_geom.wkt})
+                except SQLAlchemyError as e:
+                    if "unique constraint" in str(e).lower():
+                        logger.error(f"Route '{route_name}' already exists. Use overwrite=True to replace it.")
+                        raise e
+                    else:
+                        raise e
+            conn.commit()
+        logger.info(f"Route '{route_name}' saved successfully to PostGIS.")
+
+    def load_route(self, route_name: str, schema_name: str = "routes", table_name: str = "routes") -> Optional[LineString]:
+        """
+        Loads a route from a specified table in the PostGIS database.
+
+        Args:
+            route_name (str): The name of the route to load.
+            schema_name (str): The schema where the route is stored. Defaults to "routes".
+            table_name (str): The name of the table where routes are stored.
+
+        Returns:
+            Optional[LineString]: The loaded route geometry, or None if not found.
+        """
+        query = text(f"""
+            SELECT ST_AsText(geom)
+            FROM "{schema_name}"."{table_name}"
+            WHERE route_name = :route_name
+        """)
+
+        try:
+            with self.engine.connect() as conn:
+                result = conn.execute(query, {"route_name": route_name}).fetchone()
+                if result and result[0]:
+                    return wkt.loads(result[0])
+                else:
+                    logger.warning(f"Route '{route_name}' not found in PostGIS table '{table_name}'.")
+                    return None
+        except SQLAlchemyError as e:
+            logger.error(f"Could not load route '{route_name}' from PostGIS: {e}")
+            return None
+
 
 class SpatiaLiteManager:
     """
     Provides tools to query and analyze ENC data stored in a SpatiaLite database.
     """
 
-    def __init__(self, db_path: Union[str, Path]):
+    def __init__(self, db_path: Union[str, Path], routes_db_path: Optional[Union[str, Path]] = None):
         self.db_path = Path(db_path).resolve()
         self.engine = None
+        if routes_db_path:
+            self.routes_db_path = Path(routes_db_path).resolve()
+        else:
+            # Default to a separate GeoPackage routes file in the same directory
+            self.routes_db_path = self.db_path.with_name("maritime_routes.gpkg")
+        logger.info(f"Routes will be managed in: {self.routes_db_path}")
         self.connect()
 
     def connect(self):
@@ -3633,12 +4250,23 @@ class SpatiaLiteManager:
         if self.engine:
             return
         try:
+
             # Ensure parent directory exists
             self.db_path.parent.mkdir(parents=True, exist_ok=True)
             
             conn_str = f"sqlite:///{str(self.db_path)}"
             self.engine = create_engine(conn_str)
+
+            # --- FIX: Load SpatiaLite extension on each connection ---
+            # This ensures that spatial functions like MakePoint and ST_Contains are available.
+            @event.listens_for(self.engine, "connect")
+            def load_spatialite(dbapi_conn, connection_record):
+                # The path to mod_spatialite can vary. None is often sufficient.
+                dbapi_conn.enable_load_extension(True)
+                dbapi_conn.load_extension('mod_spatialite')
+
             logger.info(f"Successfully connected to SpatiaLite database '{self.db_path.name}'")
+
         except Exception as e:
             logger.error(f"SpatiaLite database connection failed: {e}")
             raise
@@ -3743,36 +4371,50 @@ class SpatiaLiteManager:
         if not enc_names:
             return gpd.GeoDataFrame()
 
-        # For file-based dbs, we use the fiona engine which handles the WHERE clause differently.
-        # We build a simple string-based WHERE clause.
-        enc_list_str = ", ".join([f"'{enc}'" for enc in enc_names])
-        where_clause = f"catcov = 1 AND dsid_dsnm IN ({enc_list_str})"
+        batch_size = 200  # Process 200 ENCs at a time to avoid overly long SQL queries
+        all_gdfs = []
 
-        try:
-            gdf = gpd.read_file(
-                self.db_path,
-                layer='m_covr',
-                where=where_clause,
-                engine='fiona'
-            )
-            # Fiona engine uses 'geom' as the default geometry column name.
-            # We rename it here for consistency with the PostGIS manager's output.
-            if 'geom' in gdf.columns:
-                gdf = gdf.rename_geometry('wkb_geometry')
+        for i in range(0, len(enc_names), batch_size):
+            batch_encs = enc_names[i:i + batch_size]
+            enc_list_str = ", ".join([f"'{enc}'" for enc in batch_encs])
+            where_clause = f"catcov = 1 AND dsid_dsnm IN ({enc_list_str})"
 
-            # --- FIX: Standardize output to only include essential columns ---
-            if not gdf.empty:
-                gdf = gdf[['dsid_dsnm', gdf.geometry.name]]
+            try:
+                gdf = gpd.read_file(
+                    self.db_path,
+                    layer='m_covr',
+                    where=where_clause,
+                    engine='fiona'
+                )
+                # Fiona engine uses 'geom' as the default geometry column name.
+                # We rename it here for consistency with the PostGIS manager's output.
+                if 'geom' in gdf.columns:
+                    gdf = gdf.rename_geometry('wkb_geometry')
 
-            return gdf.sort_values(by='dsid_dsnm').reset_index(drop=True)
-        except Exception as e:
-            # This can happen if 'm_covr' layer doesn't exist or has no matching features.
-            logger.warning(f"Could not retrieve bounding boxes from SpatiaLite: {e}")
+                # --- FIX: Standardize output to only include essential columns ---
+                if not gdf.empty:
+                    gdf = gdf[['dsid_dsnm', gdf.geometry.name]]
+                    all_gdfs.append(gdf)
+
+            except Exception as e:
+                # This can happen if 'm_covr' layer doesn't exist or has no matching features.
+                # Check if the error is due to no features found, which is not a critical error.
+                if "does not match any features" in str(e):
+                    logger.debug(f"No bounding boxes found for batch starting with {batch_encs[0]}.")
+                else:
+                    logger.warning(f"Could not retrieve bounding boxes for a batch: {e}")
+
+        if not all_gdfs:
+            logger.warning("No bounding boxes found for any of the provided ENCs.")
             return gpd.GeoDataFrame(
                 columns=['dsid_dsnm', 'wkb_geometry'],
                 geometry='wkb_geometry',
                 crs="EPSG:4326"
             )
+
+        # Concatenate all batch results into a single GeoDataFrame
+        final_gdf = pd.concat(all_gdfs, ignore_index=True)
+        return final_gdf.sort_values(by='dsid_dsnm').reset_index(drop=True)
 
     def get_enc_summary(self, check_noaa: bool = False) -> pd.DataFrame:
         """
@@ -4003,15 +4645,254 @@ class SpatiaLiteManager:
             
         return results_df
 
+    def create_s57_grid(self, port_boundary: Polygon, departure_point: Point, arrival_point: Point,
+                        main_grid_layer: str, extra_grid_layers: List[str],
+                        reduce_distance_nm: float) -> Dict[str, Any]:
+        """
+        Creates a maritime grid using in-memory GeoPandas operations for SpatiaLite.
+        This is a fallback since SpatiaLite's SQL capabilities are less extensive than PostGIS.
+        """
+        logger.info("Performing in-memory grid creation for SpatiaLite data source.")
+
+        # This implementation is identical to GPKGManager's in-memory approach.
+        # For brevity, we can assume the logic is the same.
+        # 1. Get ENCs within the port boundary
+        all_encs_summary = self.get_enc_summary()
+        if all_encs_summary.empty: return {}
+        all_enc_names = all_encs_summary['ENC_Name'].str.replace('.000', '', case=False).tolist()
+        enc_bboxes_gdf = self.get_enc_bounding_boxes(all_enc_names)
+        if enc_bboxes_gdf.empty: return {}
+
+        intersecting_encs_gdf = enc_bboxes_gdf[enc_bboxes_gdf.intersects(port_boundary)]
+        if intersecting_encs_gdf.empty: return {}
+        enc_names = intersecting_encs_gdf['dsid_dsnm'].tolist()
+
+        # 2. Fetch main grid layer and apply buffer
+        main_grid_gdf = self.get_layer(main_grid_layer, filter_by_enc=enc_names)
+        if main_grid_gdf.empty:
+             logger.warning(f"Main grid layer '{main_grid_layer}' is empty or not found.")
+             return {}
+
+        # Filter main grid by usage bands (mirroring PostGIS logic)
+        main_grid_gdf = main_grid_gdf[main_grid_gdf['dsid_dsnm'].str[2].isin(['1', '2'])]
+        if main_grid_gdf.empty:
+            logger.warning(f"Main grid layer '{main_grid_layer}' has no features in usage bands 1 or 2.")
+            return {}
+
+        main_grid_geom = unary_union(main_grid_gdf[main_grid_gdf.intersects(port_boundary)].geometry)
+        if reduce_distance_nm > 0:
+            main_grid_geom = main_grid_geom.buffer(-(reduce_distance_nm / 60.0))
+
+        # 3. Fetch and combine extra grids
+        extra_grid_geoms = []
+        for layer in extra_grid_layers:
+            gdf = self.get_layer(layer, filter_by_enc=enc_names)
+            if not gdf.empty:
+                # Filter extra grids by usage bands (mirroring PostGIS logic)
+                gdf = gdf[gdf['dsid_dsnm'].str[2].isin(['3', '4'])]
+                if gdf.empty:
+                    continue
+                gdf = gdf[gdf.intersects(port_boundary)]
+                if not gdf.empty:
+                    extra_grid_geoms.append(unary_union(gdf.geometry))
+
+        # Subtract land areas from the main grid BEFORE combining with extra grids
+        logger.info("Subtracting land areas from the grid...")
+        land_gdf = self.get_layer('lndare', filter_by_enc=enc_names)
+        land_geom_to_subtract = None
+        if not land_gdf.empty:
+            # Filter land that intersects the boundary and union it
+            land_gdf_filtered = land_gdf[land_gdf['dsid_dsnm'].str[2].isin(['3', '4', '5'])]
+            land_within_boundary = land_gdf_filtered[land_gdf_filtered.intersects(port_boundary)]
+            if not land_within_boundary.empty:
+                land_geom_to_subtract = unary_union(land_within_boundary.geometry)
+
+        # Perform the land subtraction from the main grid first
+        if land_geom_to_subtract:
+            logger.debug("Performing difference operation to remove land from the main grid.")
+            main_grid_geom = main_grid_geom.difference(land_geom_to_subtract)
+
+
+        # 4. Combine main and extra grids
+        combined_extra_geom = None
+        if extra_grid_geoms:
+            combined_extra_geom = unary_union(extra_grid_geoms)
+            combined_grid_geom = main_grid_geom.union(combined_extra_geom)
+            # Union the land-free main grid with the extra grids
+            combined_grid_geom = main_grid_geom.union(combined_extra_geom) if main_grid_geom else combined_extra_geom
+        else:
+            combined_grid_geom = main_grid_geom
+
+
+        if combined_grid_geom.is_empty: return {}
+
+
+
+        final_grid_geom = combined_grid_geom.intersection(port_boundary)
+
+        start_point = nearest_points(departure_point, final_grid_geom)[1] if not final_grid_geom.contains(departure_point) else departure_point
+        end_point = nearest_points(arrival_point, final_grid_geom)[1] if not final_grid_geom.contains(arrival_point) else arrival_point
+
+        return {
+            "start_point": start_point,
+            "end_point": end_point,
+            "main_grid": main_grid_geom,
+            "extra_grid": combined_extra_geom,
+            "combined_grid": final_grid_geom,
+        }
+
+    def create_grid_graph_nodes_and_edges(self, polygon: Union[Polygon, MultiPolygon], spacing: float, max_edge_factor: float = 2.0) -> Dict[str, Any]:
+        """
+        Creates graph nodes and edges using optimized in-memory operations for SpatiaLite.
+        Since SpatiaLite has limited spatial SQL capabilities compared to PostGIS,
+        this uses the same high-performance numpy/shapely approach as GPKG.
+        """
+
+        minx, miny, maxx, maxy = polygon.bounds
+        max_edge_length = spacing * max_edge_factor
+
+        # 1. Generate grid points using numpy vectorized arrays
+        logger.info("Generating mesh grid for polygon...")
+        x_coords, y_coords = np.meshgrid(
+            np.arange(minx, maxx + spacing, spacing),
+            np.arange(miny, maxy + spacing, spacing)
+        )
+        points = np.column_stack([x_coords.ravel(), y_coords.ravel()])
+
+        # 2. Use shapely.contains_xy for a massive performance boost over iterating
+        logger.info(f"Filtering {len(points):,} potential points against polygon...")
+        mask = contains_xy(polygon, points[:, 0], points[:, 1])
+        valid_points = points[mask]
+
+        if len(valid_points) == 0:
+            logger.warning("No valid grid points found within the polygon.")
+            return {'nodes': [], 'edges': []}
+
+        logger.info(f"Found {len(valid_points):,} valid nodes.")
+
+        # 3. Create a set of node tuples for fast neighbor lookups (O(1) average time complexity)
+        node_set = {tuple(pt) for pt in valid_points}
+
+        # 4. Define 8 neighbor directions for efficient edge creation
+        directions = np.array([
+            (-spacing, 0), (spacing, 0),
+            (0, -spacing), (0, spacing),
+            (-spacing, -spacing), (-spacing, spacing),
+            (spacing, -spacing), (spacing, spacing)
+        ])
+
+        # 5. Efficiently generate edges by checking for neighbors in the set
+        logger.info("Generating edges...")
+        edges = []
+        for (x, y) in valid_points:
+            # Calculate potential neighbors and filter for those that actually exist in our node_set
+            neighbors = [(x + dx, y + dy) for dx, dy in directions if (x + dx, y + dy) in node_set]
+
+            # Create edges to valid neighbors
+            for nx, ny in neighbors:
+                # To avoid duplicate edges (e.g., A->B and B->A), only add edge if source node is "smaller"
+                if (x, y) < (nx, ny):
+                    dist = np.sqrt((x - nx)**2 + (y - ny)**2)
+                    if dist <= max_edge_length:
+                        edges.append({'source_x': x, 'source_y': y, 'target_x': nx, 'target_y': ny, 'weight': dist})
+
+        return {
+            'nodes': [{'x': p[0], 'y': p[1]} for p in valid_points],
+            'edges': edges
+        }
+
+    def save_route(self, route_geom: LineString, route_name: str, table_name: str = "routes", overwrite: bool = False):
+        """
+        Saves a route to a specified layer in a GeoPackage file.
+
+        Args:
+            route_geom (LineString): The route geometry to save.
+            route_name (str): The name for the route.
+            table_name (str): The name of the layer to save routes in.
+            overwrite (bool): If True, overwrite an existing route with the same name.
+        """
+        routes_gdf = gpd.GeoDataFrame([{'route_name': route_name, 'geometry': route_geom}], crs="EPSG:4326")
+
+        try:
+            # Ensure the directory for the routes file exists
+            self.routes_db_path.parent.mkdir(parents=True, exist_ok=True)
+            # Check if the layer exists
+            existing_layers = fiona.listlayers(self.routes_db_path) if self.routes_db_path.exists() else []
+            if table_name in existing_layers:
+                if overwrite:
+                    # Read existing, filter out the one we're overwriting, then append
+                    existing_gdf = gpd.read_file(self.routes_db_path, layer=table_name, engine='fiona')
+                    existing_gdf = existing_gdf[existing_gdf['route_name'] != route_name]
+                    updated_gdf = pd.concat([existing_gdf, routes_gdf], ignore_index=True).reset_index(drop=True)
+                    updated_gdf.to_file(self.routes_db_path, layer=table_name, driver='GPKG', if_exists='replace', engine='fiona')
+                else:
+                    # Append without checking for duplicates
+                    routes_gdf.to_file(self.routes_db_path, layer=table_name, driver='GPKG', mode='a')
+            else:
+                # Layer doesn't exist, create it
+                routes_gdf.to_file(self.routes_db_path, layer=table_name, driver='GPKG')
+
+            logger.info(f"Route '{route_name}' saved successfully to GeoPackage: {self.routes_db_path}")
+        except Exception as e:
+            logger.error(f"Failed to save route '{route_name}' to GeoPackage: {e}")
+            raise
+
+    def load_route(self, route_name: str, table_name: str = "routes") -> Optional[LineString]:
+        """
+         Loads a route from a specified layer in the GeoPackage file.
+
+        Args:
+            route_name (str): The name of the route to load.
+            ttable_name (str): The name of the layer where routes are stored.
+
+        Returns:
+            Optional[LineString]: The loaded route geometry, or None if not found.
+        """
+        try:
+            if not self.routes_db_path.exists():
+                logger.warning(f"Routes GeoPackage '{self.routes_db_path}' not found.")
+                return None
+            existing_layers = fiona.listlayers(self.routes_db_path)
+            if table_name not in existing_layers:
+                logger.warning(f"Route table '{table_name}' not found in GeoPackage file.")
+                return None
+
+            routes_gdf = gpd.read_file(
+                self.routes_db_path,
+                layer=table_name,
+                engine='fiona'
+            )
+            routes_gdf = routes_gdf[routes_gdf['route_name'] == route_name]
+
+            if not routes_gdf.empty:
+                return routes_gdf.iloc[0].geometry
+            else:
+                logger.warning(f"Route '{route_name}' not found in GeoPackage layer '{table_name}'.")
+                return None
+        except Exception as e:
+            # Fiona might raise an error if the WHERE clause finds nothing.
+             if "does not match any features" in str(e):
+                 logger.warning(f"Route '{route_name}' not found in GeoPackage layer '{table_name}'.")
+                 return None
+             logger.error(f"Could not load route '{route_name}' from GeoPackage: {e}")
+             return None
+
+
 
 class GPKGManager:
     """
     Provides tools to query and analyze ENC data stored in a GeoPackage file.
     """
 
-    def __init__(self, gpkg_path: Union[str, Path]):
+    def __init__(self, gpkg_path: Union[str, Path], routes_db_path: Optional[Union[str, Path]] = None):
         self.gpkg_path = Path(gpkg_path).resolve()
         self.engine = None
+        if routes_db_path:
+            self.routes_db_path = Path(routes_db_path).resolve()
+        else:
+            # Default to a separate routes file in the same directory
+            self.routes_db_path = self.gpkg_path.with_name("maritime_routes.gpkg")
+        logger.info(f"Routes will be managed in: {self.routes_db_path}")
         self.connect()
 
     def connect(self):
@@ -4038,6 +4919,11 @@ class GPKGManager:
         # it corresponds to an actual, existing table before being used in a query.
         inspector = inspect(self.engine)
         safe_layer_name = layer_name.lower()
+
+        # --- FIX: GPKG uses uppercase layer names, so we check for both cases ---
+        if not inspector.has_table(safe_layer_name):
+            safe_layer_name = layer_name.upper()
+
         if not inspector.has_table(safe_layer_name):
             logger.warning(f"Layer '{layer_name}' not found in GeoPackage.")
             return gpd.GeoDataFrame()  # Return empty dataframe if table doesn't exist
@@ -4050,7 +4936,14 @@ class GPKGManager:
             where_clause = f"DSID_DSNM IN ({enc_list_str})"
 
         # Use fiona engine for consistent handling of StringList/IntegerList fields across formats
-        return gpd.read_file(self.gpkg_path, layer=safe_layer_name, where=where_clause, engine='fiona')
+        gdf = gpd.read_file(self.gpkg_path, layer=safe_layer_name, where=where_clause, engine='fiona')
+
+        # --- FIX: Standardize column names to lowercase for consistency ---
+        # This ensures that subsequent operations (like filtering by 'dsid_dsnm')
+        # work regardless of the source's original casing.
+        if not gdf.empty:
+            gdf.columns = [col.lower() for col in gdf.columns]
+        return gdf
 
     def get_layers_summary(self, include_empty: bool = False) -> pd.DataFrame:
         """
@@ -4440,3 +5333,253 @@ class GPKGManager:
             logger.info(f"Feature update status verification complete: {dict(status_counts)}")
             
         return results_df
+
+    def create_s57_grid(self, port_boundary: Polygon, departure_point: Point, arrival_point: Point,
+                        main_grid_layer: str, extra_grid_layers: List[str],
+                        reduce_distance_nm: float) -> Dict[str, Any]:
+        """
+        Creates a maritime grid using in-memory GeoPandas operations.
+        This implementation is for file-based sources like GeoPackage and SpatiaLite
+        that do not support advanced SQL-based spatial operations.
+        """
+        logger.info("Performing in-memory grid creation for file-based data source.")
+
+        # 1. Get ENCs within the port boundary
+        # Get the bounding boxes of ALL available ENCs.
+        all_encs_summary = self.get_enc_summary()
+        if all_encs_summary.empty:
+            logger.warning("No ENCs found in the database.")
+            return {}
+
+        # Get bounding boxes for all ENCs
+        all_enc_names = all_encs_summary['ENC_Name'].str.replace('.000', '', case=False).tolist()
+        enc_bboxes_gdf = self.get_enc_bounding_boxes(all_enc_names)
+        if enc_bboxes_gdf.empty:
+            logger.warning("No ENC bounding boxes found.")
+            return {}
+
+        # Filter to ENCs that intersect with the boundary
+        intersecting_encs_gdf = enc_bboxes_gdf[enc_bboxes_gdf.intersects(port_boundary)]
+        if intersecting_encs_gdf.empty:
+            logger.warning("No ENCs found within the provided port boundary.")
+            return {}
+
+        enc_names = intersecting_encs_gdf['dsid_dsnm'].tolist()
+
+        # 2. Fetch main grid layer and apply buffer
+        main_grid_gdf = self.get_layer(main_grid_layer, filter_by_enc=enc_names)
+        if main_grid_gdf.empty:
+            logger.warning(f"Main grid layer '{main_grid_layer}' is empty or not found.")
+            return {}
+
+        # Filter main grid by usage bands (mirroring PostGIS logic)
+        main_grid_gdf = main_grid_gdf[main_grid_gdf['dsid_dsnm'].str[2].isin(['1', '2'])]
+        if main_grid_gdf.empty:
+            logger.warning(f"Main grid layer '{main_grid_layer}' has no features in usage bands 1 or 2.")
+            return {}
+
+        main_grid_geom = unary_union(main_grid_gdf[main_grid_gdf.intersects(port_boundary)].geometry)
+
+        if reduce_distance_nm > 0:
+                reduce_dist_deg = reduce_distance_nm / 60.0
+                main_grid_geom = main_grid_geom.buffer(-reduce_dist_deg)
+
+        # 3. Fetch and combine extra grids
+        extra_grid_geoms = []
+        for layer in extra_grid_layers:
+            gdf = self.get_layer(layer, filter_by_enc=enc_names)
+            if not gdf.empty:
+                # --- FIX: Filter extra grids by usage bands (mirroring PostGIS logic) ---
+                gdf = gdf[gdf['dsid_dsnm'].str[2].isin(['3', '4'])]
+                if gdf.empty:
+                    continue
+                gdf = gdf[gdf.intersects(port_boundary)]
+                if not gdf.empty:
+                    extra_grid_geoms.append(unary_union(gdf.geometry))
+
+        # Subtract land areas from the main grid BEFORE combining with extra grids
+        logger.info("Subtracting land areas from the grid...")
+        land_gdf = self.get_layer('lndare', filter_by_enc=enc_names)
+        land_geom_to_subtract = None
+        if not land_gdf.empty:
+            land_gdf_filtered = land_gdf[land_gdf['dsid_dsnm'].str[2].isin(['3', '4', '5'])]
+            land_within_boundary = land_gdf_filtered[land_gdf_filtered.intersects(port_boundary)]
+            if not land_within_boundary.empty:
+                land_geom_to_subtract = unary_union(land_within_boundary.geometry)
+
+        # Perform the land subtraction from the main grid first
+        if land_geom_to_subtract:
+            logger.debug("Performing difference operation to remove land from the main grid.")
+            main_grid_geom = main_grid_geom.difference(land_geom_to_subtract)
+
+        # 4. Combine main and extra grids
+        combined_extra_geom = None
+        if extra_grid_geoms:
+            combined_extra_geom = unary_union(extra_grid_geoms)
+            combined_grid_geom = main_grid_geom.union(combined_extra_geom)
+        else:
+            combined_grid_geom = main_grid_geom
+
+        if combined_grid_geom.is_empty:
+            logger.error("Combined grid is empty. Cannot proceed.")
+            return {}
+
+        # Slice the final combined grid by the port boundary for accuracy
+        # This ensures the grid doesn't extend beyond the defined area of interest.
+        final_grid_geom = combined_grid_geom.intersection(port_boundary)
+
+
+        # 5. Adjust start/end points
+        if combined_grid_geom.contains(departure_point):
+            start_point = departure_point
+        else:
+            start_point = nearest_points(departure_point, combined_grid_geom)[1]
+
+        if combined_grid_geom.contains(arrival_point):
+            end_point = arrival_point
+        else:
+            end_point = nearest_points(arrival_point, combined_grid_geom)[1]
+
+        return {
+            "start_point": start_point,
+            "end_point": end_point,
+            "main_grid": main_grid_geom,
+            "extra_grid": combined_extra_geom,
+            "combined_grid": final_grid_geom,
+        }
+
+    def create_grid_graph_nodes_and_edges(self, polygon: Union[Polygon, MultiPolygon], spacing: float, max_edge_factor: float = 2.0) -> Dict[str, Any]:
+        """
+        Creates graph nodes and edges using in-memory operations for GPKG.
+        Since GPKG has limited spatial SQL capabilities compared to PostGIS,
+        this uses a Python-based approach similar to the memory fallback.
+        """
+
+        minx, miny, maxx, maxy = polygon.bounds
+        max_edge_length = spacing * max_edge_factor
+
+        # 1. Generate grid points using numpy vectorized arrays
+        logger.info("Generating mesh grid for polygon...")
+        x_coords, y_coords = np.meshgrid(
+            np.arange(minx, maxx + spacing, spacing),
+            np.arange(miny, maxy + spacing, spacing)
+        )
+        points = np.column_stack([x_coords.ravel(), y_coords.ravel()])
+
+        # 2. Use shapely.contains_xy for a massive performance boost over iterating
+        logger.info(f"Filtering {len(points):,} potential points against polygon...")
+        mask = contains_xy(polygon, points[:, 0], points[:, 1])
+        valid_points = points[mask]
+
+        if len(valid_points) == 0:
+            logger.warning("No valid grid points found within the polygon.")
+            return {'nodes': [], 'edges': []}
+
+        logger.info(f"Found {len(valid_points):,} valid nodes.")
+
+        # 3. Create a set of node tuples for fast neighbor lookups (O(1) average time complexity)
+        node_set = {tuple(pt) for pt in valid_points}
+
+        # 4. Define 8 neighbor directions for efficient edge creation
+        directions = np.array([
+            (-spacing, 0), (spacing, 0),
+            (0, -spacing), (0, spacing),
+            (-spacing, -spacing), (-spacing, spacing),
+            (spacing, -spacing), (spacing, spacing)
+        ])
+
+        # 5. Efficiently generate edges by checking for neighbors in the set
+        logger.info("Generating edges...")
+        edges = []
+        for (x, y) in valid_points:
+            # Calculate potential neighbors and filter for those that actually exist in our node_set
+            neighbors = [(x + dx, y + dy) for dx, dy in directions if (x + dx, y + dy) in node_set]
+
+            # Create edges to valid neighbors
+            for nx, ny in neighbors:
+                # To avoid duplicate edges (e.g., A->B and B->A), only add edge if source node is "smaller"
+                if (x, y) < (nx, ny):
+                    dist = np.sqrt((x - nx)**2 + (y - ny)**2)
+                    if dist <= max_edge_length:
+                        edges.append({'source_x': x, 'source_y': y, 'target_x': nx, 'target_y': ny, 'weight': dist})
+
+        return {
+            'nodes': [{'x': p[0], 'y': p[1]} for p in valid_points],
+            'edges': edges
+        }
+
+    def save_route(self, route_geom: LineString, route_name: str, table_name: str = "routes", overwrite: bool = False):
+        """
+        Saves a route to a specified layer in the GeoPackage file.
+
+        Args:
+            route_geom (LineString): The route geometry to save.
+            route_name (str): The name for the route.
+            table_name (str): The name of the layer to save routes in.
+            overwrite (bool): If True, overwrite an existing route with the same name.
+        """
+        routes_gdf = gpd.GeoDataFrame([{'route_name': route_name, 'geometry': route_geom}], crs="EPSG:4326")
+
+        try:
+            # Ensure the directory for the routes file exists
+            self.routes_db_path.parent.mkdir(parents=True, exist_ok=True)
+            # Check if the layer exists
+            existing_layers = fiona.listlayers(self.routes_db_path) if self.routes_db_path.exists() else []
+            if table_name in existing_layers:
+                if overwrite:
+                    # Read existing, filter out the one we're overwriting, then append
+                    existing_gdf = gpd.read_file(self.routes_db_path, layer=table_name, engine='fiona')
+                    existing_gdf = existing_gdf[existing_gdf['route_name'] != route_name]
+                    updated_gdf = pd.concat([existing_gdf, routes_gdf], ignore_index=True).reset_index(drop=True)
+                    updated_gdf.to_file(self.routes_db_path, layer=table_name, driver='GPKG', if_exists='replace', engine='fiona')
+                else:
+                    # Append without checking for duplicates
+                    routes_gdf.to_file(self.routes_db_path, layer=table_name, driver='GPKG', mode='a')
+            else:
+                # Layer doesn't exist, create it
+                routes_gdf.to_file(self.routes_db_path, layer=table_name, driver='GPKG')
+
+            logger.info(f"Route '{route_name}' saved successfully to GeoPackage.")
+        except Exception as e:
+            logger.error(f"Failed to save route '{route_name}' to GeoPackage: {e}")
+            raise
+
+    def load_route(self, route_name: str, table_name: str = "routes") -> Optional[LineString]:
+        """
+        Loads a route from a specified layer in the GeoPackage file.
+
+        Args:
+            route_name (str): The name of the route to load.
+            table_name (str): The name of the layer where routes are stored.
+
+        Returns:
+            Optional[LineString]: The loaded route geometry, or None if not found.
+        """
+        try:
+            if not self.routes_db_path.exists():
+                logger.warning(f"Routes database '{self.routes_db_path}' not found.")
+                return None
+            existing_layers = fiona.listlayers(self.routes_db_path)
+            if table_name not in existing_layers:
+                logger.warning(f"Route layer '{table_name}' not found in GeoPackage.")
+                return None
+
+            routes_gdf = gpd.read_file(
+                self.routes_db_path,
+                layer=table_name,
+                engine='fiona'
+            )
+            routes_gdf = routes_gdf[routes_gdf['route_name'] == route_name]
+
+            if not routes_gdf.empty:
+                return routes_gdf.iloc[0].geometry
+            else:
+                logger.warning(f"Route '{route_name}' not found in GeoPackage layer '{table_name}'.")
+                return None
+        except Exception as e:
+            # Fiona might raise an error if the WHERE clause finds nothing.
+            if "does not match any features" in str(e):
+                logger.warning(f"Route '{route_name}' not found in GeoPackage layer '{table_name}'.")
+                return None
+            logger.error(f"Could not load route '{route_name}' from GeoPackage: {e}")
+            return None

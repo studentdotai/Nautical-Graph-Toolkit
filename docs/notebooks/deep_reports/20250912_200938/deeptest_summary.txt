@@ -1,0 +1,46 @@
+
+================================================================================
+🔍 DEEPTEST COMPREHENSIVE REPORT
+📊 Test Level: 3 (Deep)
+================================================================================
+
+📊 TEST SUMMARY:
+   • Total Tests: 3
+   • Initial Imports: 3/3 successful
+     Formats: gpkg, spatialite, postgis
+   • Update Tests: None performed
+   • Comparisons: 3
+
+🗃️  IMPORT RESULTS:
+   ✅ GPKG: success
+      Duration: 26.1s
+      Features: 21539
+      Layers: 86
+      Properties: 199 unique (3296 total)
+      Completeness: 448,077 filled / 817,308 total (369,231 empty)
+   ✅ SPATIALITE: success
+      Duration: 10.2s
+      Features: 21539
+      Layers: 86
+      Properties: 166 unique (2558 total)
+      Completeness: 335,108 filled / 613,111 total (278,003 empty)
+   ✅ POSTGIS: success
+      Duration: 21.3s
+      Features: 21539
+      Layers: 86
+      Properties: 168 unique (3279 total)
+      Completeness: 239,116 filled / 418,429 total (179,313 empty)
+
+📊 DATA COMPARISON RESULTS:
+   • gpkg_vs_spatialite: 0.0% consistent
+     Layers: 83, Differences: 0
+   • gpkg_vs_postgis: 0.0% consistent
+     Layers: 83, Differences: 1229
+   • spatialite_vs_postgis: 0.0% consistent
+     Layers: 83, Differences: 1229
+
+💡 RECOMMENDATIONS:
+   1. Import Performance: SPATIALITE is fastest (10.2s), GPKG is slowest (26.1s)
+   2. Data Consistency Warning: Average consistency is 0.0%. Review format-specific processing differences.
+
+================================================================================

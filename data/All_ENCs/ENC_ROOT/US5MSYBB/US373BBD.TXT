@@ -1,0 +1,2 @@
+MISSISSIPPI RIVER BRIDGE CALCULATION
+Vertical clearances for bridges are in feet above the appropriate reference gage zero reading. To obtain actual bridge clearance the mariner must subtract the appropriate river gage stage reading from the bridge clearance given.

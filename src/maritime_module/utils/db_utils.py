@@ -55,6 +55,7 @@ class PostGISConnector(DatabaseConnector):
         """
         Ensures the target schema exists. If overwrite is True, drops and recreates it.
         """
+
         self.connect()
         # Use an explicit transaction block to ensure DDL commands are committed.
         with self.engine.connect() as connection:

@@ -1,0 +1,34 @@
+NATIONAL GEOSPATIAL-INTELLIGENCE AGENCY
+US5PK4Q2 - HAITI - ANSE D'HAINAULT
+
+INDEX:
+GLOSSARY
+POSITIONS
+CAUTION 1 - QUALITY OF BATHYMETRIC DATA
+CAUTION 2
+TIDAL INFORMATION
+SUPPLEMENTAL INFORMATION
+
+NOTES:
+GLOSSARY:
+Anse...cove
+Baie...bay
+Ile...island
+Pointe...point
+
+POSITIONS:
+This cell has been positioned on the WGS-84 Datum and enhanced through the use of orthorectified imagery to 2018.
+
+CAUTION 1 - QUALITY OF BATHYMETRIC DATA
+The areas represented by the object M_QUAL (Quality of data) are approximate due to generalizing for clarity. Caution is advised, particularly for nearshore navigation or voyage planning. M_QUAL represents areas of uniform quality of bathymetric data. The CATZOC (Category of zone of confidence in data) attribute of M_QUAL provides an assessment of the overall zone of confidence.
+
+CAUTION 2:
+Lights in Haiti have been reported extinguished or unreliable and buoys are frequently out of position.
+
+TIDAL INFORMATION:
+Refer to Admiralty Total Tides Program for the latest information.
+
+SUPPLEMENTAL INFORMATION:
+Consult National Geospatial-Intelligence Agency Pub. 147, Sailing Directions, for important supplemental information.
+
+END OF FILE

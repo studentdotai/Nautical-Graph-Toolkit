@@ -1,0 +1,163 @@
+NOAA ENC®
+
+NATIONAL OCEANIC AND ATMOSPHERIC ADMINISTRATION
+
+US4FL2OE - PALMO COVE TO BRIDGEPORT - SAINT JOHNS RIVER AND SAINT AUGUSTINE INLET
+
+
+INDEX:
+
+NOTE A
+AIDS TO NAVIGATION
+POLLUTION REPORTS
+CAUTION - USE OF RADIO SIGNALS (LIMITATIONS)
+SUPPLEMENTAL INFORMATION
+CAUTION - TEMPORARY CHANGES
+WARNING - PRUDENT MARINER
+ADDITIONAL INFORMATION
+AUTHORITIES
+ADMINISTRATION AREA
+BROADCASTS OF MARINE WEATHER FORECASTS AND WARNINGS BY MARINE RADIOTELEPHONE STATIONS
+CAUTION - FISH TRAPS
+CAUTION - QUALITY OF BATHYMETRIC DATA
+CAUTION - SMALL CRAFT
+CAUTION - SUBMARINE PIPELINES AND CABLES
+CAUTION - DREDGED AREAS
+CAUTION - USACE HYDROGRAPHIC SURVEYS
+FISHING AND HUNTING STRUCTURES
+HURRICANES AND TROPICAL STORMS
+MARINE WEATHER FORECASTS
+NOAA WEATHER RADIO BROADCASTS
+PUBLIC BOATING INSTRUCTION PROGRAMS
+RACING BUOYS
+RADAR REFLECTORS
+RULES OF THE ROAD (ABRIDGED)
+WATER LEVELS, CURRENTS, AND TIDES
+COMMENTS REQUESTED
+
+
+NOTES:
+
+NOTE A
+Navigation regulations are published in Chapter 2, U.S. Coast Pilot 4. Additions or revisions to Chapter 2 are published in the Notice to Mariners. Information concerning the regulations may be obtained at the Office of the Commander, 7th Coast Guard District in Miami, FL, or at the Office of the District Engineer, Corps of Engineers in Jacksonville, FL. Refer to charted regulation section numbers.
+
+
+AIDS TO NAVIGATION
+Consult U.S. Coast Guard Light List for supplemental information concerning aids to navigation.
+
+
+POLLUTION REPORTS
+Report all spills of oil and hazardous substances to the National Response Center via 1-800-424-8802 (toll free), or to the nearest U.S. Coast Guard facility if telephone communication is impossible (33 CFR 153).
+
+
+CAUTION - USE OF RADIO SIGNALS (LIMITATIONS)
+Limitations on the use of radio signals as aids to marine navigation can be found in the U.S. Coast Guard Light Lists and National Geospatial-Intelligence Agency Publication 117. Radio direction-finder bearings to commercial broadcasting stations are subject to error and should be used with caution.
+
+
+SUPPLEMENTAL INFORMATION
+Consult U.S. Coast Pilot 4 for important supplemental information.
+
+
+CAUTION - TEMPORARY CHANGES
+Temporary changes or defects in aids to navigation are not indicated. See Local Notice to Mariners.
+
+
+WARNING - PRUDENT MARINER
+The prudent mariner will not rely solely on any single aid to navigation, particularly on floating aids. See U.S. Coast Guard Light List and U.S. Coast Pilot for details.
+
+
+ADDITIONAL INFORMATION
+Additional information can be obtained at www.nauticalcharts.noaa.gov.
+
+
+AUTHORITIES
+Hydrography and topography by the National Ocean Service, Coast Survey, with additional data from the Corps of Engineers, Geological Survey, U.S. Coast Guard, and National Geospatial-Intelligence Agency.
+
+
+ADMINISTRATION AREA
+The entire extent of this ENC cell falls within the limits of an Administration Area. This area covers land, internal waters, and territorial sea. The territorial sea is a maritime zone over which the United States exercises sovereignty extending to the airspace as well as to its bed and subsoil. For more information, please refer to the Coast Pilot.
+
+
+BROADCASTS OF MARINE WEATHER FORECASTS AND WARNINGS BY MARINE RADIOTELEPHONE STATIONS
+CITY            STATION     FREQUENCY        DAILY BROADCAST-EST     SPECIAL WARNING
+Mayport, FL     NMA-10      2670.000 kHz     1:20 AM & PM            *On receipt
+                            0157.100 MHz     7:15 AM, 5:15 PM        *On receipt
+
+*Preceded by announcement on 2182 kHz/156.800 MHz
+Distress calls for small craft are made on 2182 kHz or channel 16 (156.800 MHz) VHF.
+
+
+CAUTION - FISH TRAPS
+Numerous fish traps, stakes, and piles are located within the area. Some may be submerged. Small craft should use caution when operating outside the main channel.
+
+
+CAUTION - QUALITY OF BATHYMETRIC DATA
+The areas represented by the object M_QUAL (Quality of data) are approximate due to generalizing for clarity. Caution is advised, particularly for nearshore navigation or voyage planning. M_QUAL represents areas of uniform quality of bathymetric data. The CATZOC (Category of zone of confidence in data) attribute of M_QUAL provides an assessment of the overall zone of confidence.
+
+
+CAUTION - SMALL CRAFT
+Small craft should stay clear of large commercial and government vessels even if small craft have the right-of-way. All craft should avoid areas where the skin divers flag, a red square with a diagonal white stripe, is displayed.
+
+
+CAUTION - SUBMARINE PIPELINES AND CABLES
+Additional uncharted submarine pipelines and submarine cables may exist within the area of this chart. Not all submarine pipelines and submarine cables are required to be buried, and those that were originally buried may have become exposed. Mariners should use extreme caution when operating vessels in depths of water comparable to their draft in areas where pipelines and cables may exist, and when anchoring, dragging, or trawling. Covered wells may be marked by lighted or unlighted buoys.
+
+
+CAUTION - DREDGED AREAS
+Improved channels are subject to shoaling, particularly at the edges.
+
+
+CAUTION - USACE HYDROGRAPHIC SURVEYS
+USACE conducts hydrographic surveys to monitor navigation conditions. These surveys are not intended to detect underwater features. Undetected features hazardous to surface navigation may exist in federal channels, as might shoaling, particularly along the edges of channels. For more information visit https://navigation.usace.army.mil/Survey/Hydro/.
+
+
+FISHING AND HUNTING STRUCTURES
+Uncharted fish and wildlife harvesting devices and structures such as fish traps, pound nets, crab traps, and duck blinds, some submerged, may exist in the area of this chart, particularly in the near shore area. Mariners should proceed with caution.
+
+
+HURRICANES AND TROPICAL STORMS
+Hurricanes, tropical storms and other major storms may cause considerable damage to marine structures, aids to navigation and moored vessels, resulting in submerged debris in unknown locations. Charted soundings, channel depths and shoreline may not reflect actual conditions following these storms. Fixed aids to navigation may have been damaged or destroyed. Buoys may have been moved from their charted positions, damaged, sunk, extinguished or otherwise made inoperative. Mariners should not rely upon the position or operation of an aid to navigation. Wrecks and submerged obstructions may have been displaced from charted locations. Pipelines may have become uncovered or moved. Mariners are urged to exercise extreme caution and are requested to report aids to navigation discrepancies and hazards to navigation to the nearest United States Coast Guard unit.
+
+
+MARINE WEATHER FORECASTS
+NATIONAL WEATHER SERVICE     TELEPHONE NUMBERS      OFFICE HOURS
+Jacksonville, FL             *(904) 741-4311        8:30 AM-5:00 PM (Mon-Fri)
+Melbourne, FL                *(321) 255-0212        8:00 AM-4:00 PM (Mon-Fri)
+Miami, FL                    (305) 229-4522         24 Hours daily
+
+*Recorded (24 Hours daily)
+
+
+NOAA WEATHER RADIO BROADCASTS
+The NOAA Weather Radio Stations listed below provide continuous weather broadcasts. The reception range is typically 20 to 40 nautical miles from the antenna site, but can be as much as 100 nautical miles for stations at high elevations.
+
+Daytona Beach, FL      KIH-26      162.400 MHz
+Palatka, FL            WNG-522     162.425 MHz
+Jacksonville, FL       KHB-39      162.550 MHz
+
+
+PUBLIC BOATING INSTRUCTION PROGRAMS
+The Americas Boating Club®, United States Power Squadrons®, and U.S. Coast Guard Auxiliary (USCGAUX) conduct extensive boating instruction programs in communities throughout the United States. For information regarding these educational courses, and finding a course near you, click on the following public sources: https://www.americasboatingclub.org/index.php/learn and https://www.cgaux.org/boatinged/ .
+
+
+RACING BUOYS
+Racing buoys within the limits of this chart are not shown hereon. Information may be obtained from the U.S. Coast Guard District Office as racing and other private buoys are not all listed in the U.S. Coast Guard Light List.
+
+
+RADAR REFLECTORS
+Radar reflectors have been placed on many floating aids to navigation. Individual radar reflector identification on these aids has been omitted from this chart.
+
+
+RULES OF THE ROAD (ABRIDGED)
+Motorless craft have the right-of-way in almost all cases. Sailing vessels and motorboats less than 20 meters / 65 feet in length shall not hamper, in a narrow channel, the safe passage of a vessel which can navigate only inside that channel. A motorboat being overtaken has the right-of-way. Motorboats approaching head to head or nearly so should pass port to port. When motorboats approach each other at right angles or obliquely, the boat on the right has the right-of-way in most cases. Motorboats must keep to the right in narrow channels when safe and practicable. Mariners are urged to become familiar with the complete text of the Rules of the Road in U.S. Coast Guard publication "Amalgamated International & U.S. Inland Navigation Rules".
+
+
+WATER LEVELS, CURRENTS, AND TIDES
+Real-time water levels, tide predictions, and tidal current predictions are available on the internet from NOAA's Center for Operational Oceanographic Products and Services (CO-OPS) at https://tidesandcurrents.noaa.gov/water_level_info.html and https://tidesandcurrents.noaa.gov/currents_info.html.
+
+
+COMMENTS REQUESTED
+NOAA encourages users to submit inquiries, discrepancies, or comments about this chart via NOAA's ASSIST tool at https://www.nauticalcharts.noaa.gov/customer-service/assist/.
+
+
+END OF FILE

@@ -1,0 +1,24 @@
+attribute,gpkg,spatialite,notes
+METADATA_LAYER_NAME,isolatednode,isolatednode,Layer comparison between gpkg and spatialite
+METADATA_TOTAL_FEATURES,0,0,Total features in each format
+METADATA_TOTAL_COLUMNS,10,10,Total columns in each format
+SEPARATOR_COLUMN_PRESENCE,--- COLUMN PRESENCE ---,--- COLUMN PRESENCE ---,Which columns exist in each format
+COLUMN_PRESENT_dsid_dsnm,YES,YES,Column dsid_dsnm presence
+COLUMN_PRESENT_dsid_edtn,YES,YES,Column dsid_edtn presence
+COLUMN_PRESENT_dsid_updn,YES,YES,Column dsid_updn presence
+COLUMN_PRESENT_posacc,YES,YES,Column posacc presence
+COLUMN_PRESENT_quapos,YES,YES,Column quapos presence
+COLUMN_PRESENT_rcid,YES,YES,Column rcid presence
+COLUMN_PRESENT_rcnm,YES,YES,Column rcnm presence
+COLUMN_PRESENT_ruin,YES,YES,Column ruin presence
+COLUMN_PRESENT_rver,YES,YES,Column rver presence
+SEPARATOR_DATA_TYPES,--- DATA TYPES ---,--- DATA TYPES ---,Data types for each column
+DATATYPE_dsid_dsnm,object,object,Data type for dsid_dsnm
+DATATYPE_dsid_edtn,int32,int32,Data type for dsid_edtn
+DATATYPE_dsid_updn,int32,int32,Data type for dsid_updn
+DATATYPE_posacc,float64,float64,Data type for posacc
+DATATYPE_quapos,int32,int32,Data type for quapos
+DATATYPE_rcid,int32,int32,Data type for rcid
+DATATYPE_rcnm,int32,int32,Data type for rcnm
+DATATYPE_ruin,int32,int32,Data type for ruin
+DATATYPE_rver,int32,int32,Data type for rver

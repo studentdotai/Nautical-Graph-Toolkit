@@ -1,0 +1,7 @@
+enc_name,data_root_edition,data_root_update,update_root_edition,update_root_update,is_newer,version_comparison,recommendation
+US1EEZ1M.000,9,0,9,0,False,"Same version (Edition 9, Update 0)",NO_UPDATE
+US1GC09M.000,65,5,71,1,True,Newer edition available (65 → 71),UPDATE
+US1PO02M.000,21,1,21,1,False,"Same version (Edition 21, Update 1)",NO_UPDATE
+US2WC12M.000,27,8,27,12,True,Newer update available (Ed.27 Update 8 → 12),UPDATE
+US3CA52M.000,31,0,31,7,True,Newer update available (Ed.31 Update 0 → 7),UPDATE
+US4CA60M.000,37,6,38,2,True,Newer edition available (37 → 38),UPDATE

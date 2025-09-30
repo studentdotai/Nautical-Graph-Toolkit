@@ -1,0 +1,18 @@
+NATIONAL GEOSPATIAL-INTELLIGENCE AGENCY
+US5PP2U4 - BAHAMAS - CAY SAL
+ 
+INDEX:
+CAUTION
+LIDAR SURVEYS
+SUPPLEMENTAL INFORMATION
+
+CAUTION:
+The shallow waters around the entire island of Cay Sal contain numerous coral heads and coral reef areas. Many of these coral heads and coral reef areas are not shown in this chart. Use extreme caution when anchoring in the vicinity of these shallow waters. See Sailing Directions for further information.
+
+LIDAR SURVEYS: 
+Much of the hydrography on this chart is based on surveys using Laser Image Detection and Ranging, or LIDAR. The ability of LIDAR to detect depths and hazards is limited by water conditions, such as water clarity, depth and the state of the sea surface. Therefore, certain LIDAR-surveyed areas are not thoroughly examined, particularly in areas with depths greater than 20 meters. In such areas, additional sources may have been used. See M_QUAL for detailed limits of survey areas.
+
+SUPPLEMENTAL INFORMATION:
+Consult National Geospatial-Intelligence Agency Pub. 147, Sailing Directions, for important supplemental information.
+
+END OF FILE

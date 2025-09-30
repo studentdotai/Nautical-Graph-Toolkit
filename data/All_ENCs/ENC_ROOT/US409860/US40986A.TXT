@@ -1,0 +1,34 @@
+NATIONAL GEOSPATIAL-INTELLIGENCE AGENCY
+US409860 - PANAMA - APPROACHES TO CRISTOBAL
+ 
+INDEX:
+MARINE FARMS
+SUBMARINE CABLES
+GLOSSARY
+
+
+NOTES:
+MARINE FARMS:
+Numerous marine farms exist, charted and uncharted, in the area covered by this chart. Their positions may change frequently and without notice. Marine farms may be marked by lit or unlit buoys or beacons. Mariners are advised to navigate with catuion in areas where marine farms may be present.
+
+SUBMARINE CABLES:
+Mariners are advised not to anchor, trawl or fish in the vicinity of submarine cables.
+
+GLOSSARY:
+Bahia ... bay
+Boca ... bay, cove
+Castillo ... castle
+Cerro ... hill
+Cordillera ... mountain range
+Ensenada ... bay, cove, inlet
+Fuerte ... fort
+Isla(s) ... island(s)
+Lago ... lake
+Loma ... hill
+Piedra ... rock
+Puerto ... harbor
+Punta ... cape, point
+Quebrada ... stream
+Rio ... stream
+
+END OF FILE

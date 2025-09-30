@@ -1,0 +1,45 @@
+NATIONAL GEOSPATIAL-INTELLIGENCE AGENCY
+US456660 - PALAU - APPROACHES TO MALAKAL HARBOR
+ 
+INDEX:
+GLOSSARY
+LIDAR SURVEYS
+SURVEY SOUNDING DATUM
+DEPTH CURVES
+POSITIONS
+CAUTION 1
+TOACHEL MLENGUI
+TIDAL INFORMATION
+SUPPLEMENTAL INFORMATION
+
+NOTES: 
+GLOSSARY:
+Rael ... channel
+Rois ... mountain
+Toachel ... channel
+
+LIDAR SURVEYS:
+Much of the hydrography on this chart is based on surveys using airborne Laser Image Detection and Ranging, or LIDAR. The ability of LIDAR to detect depths and hazards is limited by water conditions, such as water clarity, depth, and the state of the sea surface. Therefore, certain LIDAR-surveyed areas are not thoroughly examined, particularly in areas with depths greater than 30 meters. In such areas, additional sources may have been used. See source diagram for detailed limits of survey areas.
+
+SURVEY SOUNDING DATUM:
+0.3 meters below Mean Low Water Springs.
+
+DEPTH CURVES:
+The 30-meter curve does not appear in areas based only on former Japanese charts.
+
+POSITIONS:
+This cell has been positioned on the WGS-84 Datum with the use of 2011 orthorectified imagery.
+
+CAUTION 1:
+Fish Aggregating Devices (FADs), anchored or drifting, are commonly deployed within the waters of many Pacific Islands and may not be charted. Even though many of the installations are temporary in nature, FADs pose significant risk to navigation safety. Prudent mariners should exercise caution in navigating these waters.
+
+TOACHEL MLENGUI:
+Toachel Mlengui is closed to all navigation from sunset to sunrise.
+
+TIDAL INFORMATION:
+Refer to Admiralty Total Tides Program for the latest information.
+
+SUPPLEMENTAL INFORMATION:
+Consult National Geospatial-Intelligence Agency Pub. 126, Sailing Directions, for important supplemental information.
+
+END OF FILE

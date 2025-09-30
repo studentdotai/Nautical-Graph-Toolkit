@@ -1,0 +1,7 @@
+=== COMPARISON DEBUG: gpkg_vs_spatialite ===
+Common layers: 86
+Matching layers: 86
+Consistency: 100.0%
+Geometry differences: 0
+Non-matching layers sample: []
+

@@ -1,0 +1,450 @@
+attribute,spatialite,postgis,notes
+METADATA_LAYER_NAME,boylat,boylat,Layer comparison between spatialite and postgis
+METADATA_TOTAL_FEATURES,28,28,Total features in each format
+METADATA_TOTAL_COLUMNS,36,48,Total columns in each format
+SEPARATOR_COLUMN_PRESENCE,--- COLUMN PRESENCE ---,--- COLUMN PRESENCE ---,Which columns exist in each format
+COLUMN_PRESENT_agen,YES,YES,Column agen presence
+COLUMN_PRESENT_boyshp,YES,YES,Column boyshp presence
+COLUMN_PRESENT_catlam,YES,YES,Column catlam presence
+COLUMN_PRESENT_colour,NO,YES,Column colour presence
+COLUMN_PRESENT_colpat,NO,YES,Column colpat presence
+COLUMN_PRESENT_conrad,YES,YES,Column conrad presence
+COLUMN_PRESENT_datend,YES,YES,Column datend presence
+COLUMN_PRESENT_datsta,YES,YES,Column datsta presence
+COLUMN_PRESENT_dsid_dsnm,YES,YES,Column dsid_dsnm presence
+COLUMN_PRESENT_dsid_edtn,YES,YES,Column dsid_edtn presence
+COLUMN_PRESENT_dsid_updn,YES,YES,Column dsid_updn presence
+COLUMN_PRESENT_ffpt_rind,NO,YES,Column ffpt_rind presence
+COLUMN_PRESENT_fidn,YES,YES,Column fidn presence
+COLUMN_PRESENT_fids,YES,YES,Column fids presence
+COLUMN_PRESENT_grup,YES,YES,Column grup presence
+COLUMN_PRESENT_inform,YES,YES,Column inform presence
+COLUMN_PRESENT_lnam,YES,YES,Column lnam presence
+COLUMN_PRESENT_lnam_refs,NO,YES,Column lnam_refs presence
+COLUMN_PRESENT_marsys,YES,YES,Column marsys presence
+COLUMN_PRESENT_mask,NO,YES,Column mask presence
+COLUMN_PRESENT_name_rcid,NO,YES,Column name_rcid presence
+COLUMN_PRESENT_name_rcnm,NO,YES,Column name_rcnm presence
+COLUMN_PRESENT_natcon,NO,YES,Column natcon presence
+COLUMN_PRESENT_ninfom,YES,YES,Column ninfom presence
+COLUMN_PRESENT_nobjnm,YES,YES,Column nobjnm presence
+COLUMN_PRESENT_ntxtds,YES,YES,Column ntxtds presence
+COLUMN_PRESENT_objl,YES,YES,Column objl presence
+COLUMN_PRESENT_objnam,YES,YES,Column objnam presence
+COLUMN_PRESENT_ogc_fid,NO,YES,Column ogc_fid presence
+COLUMN_PRESENT_ornt,NO,YES,Column ornt presence
+COLUMN_PRESENT_perend,YES,YES,Column perend presence
+COLUMN_PRESENT_persta,YES,YES,Column persta presence
+COLUMN_PRESENT_picrep,YES,YES,Column picrep presence
+COLUMN_PRESENT_prim,YES,YES,Column prim presence
+COLUMN_PRESENT_rcid,YES,YES,Column rcid presence
+COLUMN_PRESENT_recdat,YES,YES,Column recdat presence
+COLUMN_PRESENT_recind,YES,YES,Column recind presence
+COLUMN_PRESENT_rver,YES,YES,Column rver presence
+COLUMN_PRESENT_scamax,YES,YES,Column scamax presence
+COLUMN_PRESENT_scamin,YES,YES,Column scamin presence
+COLUMN_PRESENT_sordat,YES,YES,Column sordat presence
+COLUMN_PRESENT_sorind,YES,YES,Column sorind presence
+COLUMN_PRESENT_status,NO,YES,Column status presence
+COLUMN_PRESENT_txtdsc,YES,YES,Column txtdsc presence
+COLUMN_PRESENT_usag,NO,YES,Column usag presence
+COLUMN_PRESENT_veracc,YES,YES,Column veracc presence
+COLUMN_PRESENT_verlen,YES,YES,Column verlen presence
+COLUMN_PRESENT_wkb_geometry,NO,YES,Column wkb_geometry presence
+SEPARATOR_DATA_TYPES,--- DATA TYPES ---,--- DATA TYPES ---,Data types for each column
+DATATYPE_agen,int32,float64,Data type for agen - MISMATCH!
+DATATYPE_boyshp,int32,int64,Data type for boyshp - MISMATCH!
+DATATYPE_catlam,int32,int64,Data type for catlam - MISMATCH!
+DATATYPE_conrad,float64,object,Data type for conrad - MISMATCH!
+DATATYPE_datend,object,object,Data type for datend
+DATATYPE_datsta,object,object,Data type for datsta
+DATATYPE_dsid_dsnm,object,object,Data type for dsid_dsnm
+DATATYPE_dsid_edtn,int32,int64,Data type for dsid_edtn - MISMATCH!
+DATATYPE_dsid_updn,int32,int64,Data type for dsid_updn - MISMATCH!
+DATATYPE_fidn,int32,float64,Data type for fidn - MISMATCH!
+DATATYPE_fids,int32,float64,Data type for fids - MISMATCH!
+DATATYPE_grup,int32,float64,Data type for grup - MISMATCH!
+DATATYPE_inform,object,object,Data type for inform
+DATATYPE_lnam,object,object,Data type for lnam
+DATATYPE_marsys,float64,object,Data type for marsys - MISMATCH!
+DATATYPE_ninfom,object,object,Data type for ninfom
+DATATYPE_nobjnm,object,object,Data type for nobjnm
+DATATYPE_ntxtds,object,object,Data type for ntxtds
+DATATYPE_objl,int32,float64,Data type for objl - MISMATCH!
+DATATYPE_objnam,object,object,Data type for objnam
+DATATYPE_perend,object,object,Data type for perend
+DATATYPE_persta,object,object,Data type for persta
+DATATYPE_picrep,object,object,Data type for picrep
+DATATYPE_prim,int32,float64,Data type for prim - MISMATCH!
+DATATYPE_rcid,int32,float64,Data type for rcid - MISMATCH!
+DATATYPE_recdat,object,object,Data type for recdat
+DATATYPE_recind,object,object,Data type for recind
+DATATYPE_rver,int32,float64,Data type for rver - MISMATCH!
+DATATYPE_scamax,float64,object,Data type for scamax - MISMATCH!
+DATATYPE_scamin,int32,int64,Data type for scamin - MISMATCH!
+DATATYPE_sordat,object,object,Data type for sordat
+DATATYPE_sorind,object,object,Data type for sorind
+DATATYPE_txtdsc,object,object,Data type for txtdsc
+DATATYPE_veracc,float64,object,Data type for veracc - MISMATCH!
+DATATYPE_verlen,float64,object,Data type for verlen - MISMATCH!
+SEPARATOR_FEATURE_SAMPLES,--- FEATURE SAMPLES (10) ---,--- FEATURE SAMPLES (10) ---,Sample of 10 features from each format
+SAMPLE_FEATURE_1_SEPARATOR,--- FEATURE 1 ---,--- FEATURE 1 ---,Feature 1 sample
+SAMPLE_F1_agen,550,550.0,Feature 1 - agen - VALUES DIFFER!
+SAMPLE_F1_boyshp,4,4,Feature 1 - boyshp
+SAMPLE_F1_catlam,2,2,Feature 1 - catlam
+SAMPLE_F1_conrad,nan,None,Feature 1 - conrad - VALUES DIFFER!
+SAMPLE_F1_datend,None,None,Feature 1 - datend
+SAMPLE_F1_datsta,None,None,Feature 1 - datsta
+SAMPLE_F1_dsid_dsnm,US3CA52M,US3CA52M,Feature 1 - dsid_dsnm
+SAMPLE_F1_dsid_edtn,31,31,Feature 1 - dsid_edtn
+SAMPLE_F1_dsid_updn,0,0,Feature 1 - dsid_updn
+SAMPLE_F1_fidn,3821104,3821104.0,Feature 1 - fidn - VALUES DIFFER!
+SAMPLE_F1_fids,4205,4205.0,Feature 1 - fids - VALUES DIFFER!
+SAMPLE_F1_grup,2,2.0,Feature 1 - grup - VALUES DIFFER!
+SAMPLE_F1_inform,None,None,Feature 1 - inform
+SAMPLE_F1_lnam,0226003A4E30106D,0226003A4E30106D,Feature 1 - lnam
+SAMPLE_F1_marsys,nan,None,Feature 1 - marsys - VALUES DIFFER!
+SAMPLE_F1_ninfom,None,None,Feature 1 - ninfom
+SAMPLE_F1_nobjnm,None,None,Feature 1 - nobjnm
+SAMPLE_F1_ntxtds,None,None,Feature 1 - ntxtds
+SAMPLE_F1_objl,17,17.0,Feature 1 - objl - VALUES DIFFER!
+SAMPLE_F1_objnam,Pillar Point Harbor Entrance Lighted Buoy 2,Pillar Point Harbor Entrance Lighted Buoy 2,Feature 1 - objnam
+SAMPLE_F1_perend,None,None,Feature 1 - perend
+SAMPLE_F1_persta,None,None,Feature 1 - persta
+SAMPLE_F1_picrep,None,None,Feature 1 - picrep
+SAMPLE_F1_prim,1,1.0,Feature 1 - prim - VALUES DIFFER!
+SAMPLE_F1_rcid,7,7.0,Feature 1 - rcid - VALUES DIFFER!
+SAMPLE_F1_recdat,None,None,Feature 1 - recdat
+SAMPLE_F1_recind,None,None,Feature 1 - recind
+SAMPLE_F1_rver,1,1.0,Feature 1 - rver - VALUES DIFFER!
+SAMPLE_F1_scamax,nan,None,Feature 1 - scamax - VALUES DIFFER!
+SAMPLE_F1_scamin,499999,499999,Feature 1 - scamin
+SAMPLE_F1_sordat,200311,200311,Feature 1 - sordat
+SAMPLE_F1_sorind,"US,US,graph,Chart 18682","US,US,graph,Chart 18682",Feature 1 - sorind
+SAMPLE_F1_txtdsc,None,None,Feature 1 - txtdsc
+SAMPLE_F1_veracc,nan,None,Feature 1 - veracc - VALUES DIFFER!
+SAMPLE_F1_verlen,nan,None,Feature 1 - verlen - VALUES DIFFER!
+SAMPLE_FEATURE_2_SEPARATOR,--- FEATURE 2 ---,--- FEATURE 2 ---,Feature 2 sample
+SAMPLE_F2_agen,550,550.0,Feature 2 - agen - VALUES DIFFER!
+SAMPLE_F2_boyshp,4,4,Feature 2 - boyshp
+SAMPLE_F2_catlam,2,2,Feature 2 - catlam
+SAMPLE_F2_conrad,nan,None,Feature 2 - conrad - VALUES DIFFER!
+SAMPLE_F2_datend,None,None,Feature 2 - datend
+SAMPLE_F2_datsta,None,None,Feature 2 - datsta
+SAMPLE_F2_dsid_dsnm,US3CA52M,US3CA52M,Feature 2 - dsid_dsnm
+SAMPLE_F2_dsid_edtn,31,31,Feature 2 - dsid_edtn
+SAMPLE_F2_dsid_updn,0,0,Feature 2 - dsid_updn
+SAMPLE_F2_fidn,4291374,4291374.0,Feature 2 - fidn - VALUES DIFFER!
+SAMPLE_F2_fids,3914,3914.0,Feature 2 - fids - VALUES DIFFER!
+SAMPLE_F2_grup,2,2.0,Feature 2 - grup - VALUES DIFFER!
+SAMPLE_F2_inform,None,None,Feature 2 - inform
+SAMPLE_F2_lnam,022600417B2E0F4A,022600417B2E0F4A,Feature 2 - lnam
+SAMPLE_F2_marsys,nan,None,Feature 2 - marsys - VALUES DIFFER!
+SAMPLE_F2_ninfom,None,None,Feature 2 - ninfom
+SAMPLE_F2_nobjnm,None,None,Feature 2 - nobjnm
+SAMPLE_F2_ntxtds,None,None,Feature 2 - ntxtds
+SAMPLE_F2_objl,17,17.0,Feature 2 - objl - VALUES DIFFER!
+SAMPLE_F2_objnam,Monterey Bay Lighted Bell Buoy 4,Monterey Bay Lighted Bell Buoy 4,Feature 2 - objnam
+SAMPLE_F2_perend,None,None,Feature 2 - perend
+SAMPLE_F2_persta,None,None,Feature 2 - persta
+SAMPLE_F2_picrep,None,None,Feature 2 - picrep
+SAMPLE_F2_prim,1,1.0,Feature 2 - prim - VALUES DIFFER!
+SAMPLE_F2_rcid,8,8.0,Feature 2 - rcid - VALUES DIFFER!
+SAMPLE_F2_recdat,None,None,Feature 2 - recdat
+SAMPLE_F2_recind,None,None,Feature 2 - recind
+SAMPLE_F2_rver,1,1.0,Feature 2 - rver - VALUES DIFFER!
+SAMPLE_F2_scamax,nan,None,Feature 2 - scamax - VALUES DIFFER!
+SAMPLE_F2_scamin,499999,499999,Feature 2 - scamin
+SAMPLE_F2_sordat,200509,200509,Feature 2 - sordat
+SAMPLE_F2_sorind,"US,US,graph,Chart 18685","US,US,graph,Chart 18685",Feature 2 - sorind
+SAMPLE_F2_txtdsc,None,None,Feature 2 - txtdsc
+SAMPLE_F2_veracc,nan,None,Feature 2 - veracc - VALUES DIFFER!
+SAMPLE_F2_verlen,nan,None,Feature 2 - verlen - VALUES DIFFER!
+SAMPLE_FEATURE_3_SEPARATOR,--- FEATURE 3 ---,--- FEATURE 3 ---,Feature 3 sample
+SAMPLE_F3_agen,550,550.0,Feature 3 - agen - VALUES DIFFER!
+SAMPLE_F3_boyshp,4,4,Feature 3 - boyshp
+SAMPLE_F3_catlam,2,2,Feature 3 - catlam
+SAMPLE_F3_conrad,nan,None,Feature 3 - conrad - VALUES DIFFER!
+SAMPLE_F3_datend,None,None,Feature 3 - datend
+SAMPLE_F3_datsta,None,None,Feature 3 - datsta
+SAMPLE_F3_dsid_dsnm,US3CA52M,US3CA52M,Feature 3 - dsid_dsnm
+SAMPLE_F3_dsid_edtn,31,31,Feature 3 - dsid_edtn
+SAMPLE_F3_dsid_updn,0,0,Feature 3 - dsid_updn
+SAMPLE_F3_fidn,18685570,18685570.0,Feature 3 - fidn - VALUES DIFFER!
+SAMPLE_F3_fids,50,50.0,Feature 3 - fids - VALUES DIFFER!
+SAMPLE_F3_grup,2,2.0,Feature 3 - grup - VALUES DIFFER!
+SAMPLE_F3_inform,None,None,Feature 3 - inform
+SAMPLE_F3_lnam,0226011D1E820032,0226011D1E820032,Feature 3 - lnam
+SAMPLE_F3_marsys,nan,None,Feature 3 - marsys - VALUES DIFFER!
+SAMPLE_F3_ninfom,None,None,Feature 3 - ninfom
+SAMPLE_F3_nobjnm,None,None,Feature 3 - nobjnm
+SAMPLE_F3_ntxtds,None,None,Feature 3 - ntxtds
+SAMPLE_F3_objl,17,17.0,Feature 3 - objl - VALUES DIFFER!
+SAMPLE_F3_objnam,Ano Nuevo Island Lighted Whistle Buoy 24,Ano Nuevo Island Lighted Whistle Buoy 24,Feature 3 - objnam
+SAMPLE_F3_perend,None,None,Feature 3 - perend
+SAMPLE_F3_persta,None,None,Feature 3 - persta
+SAMPLE_F3_picrep,None,None,Feature 3 - picrep
+SAMPLE_F3_prim,1,1.0,Feature 3 - prim - VALUES DIFFER!
+SAMPLE_F3_rcid,9,9.0,Feature 3 - rcid - VALUES DIFFER!
+SAMPLE_F3_recdat,None,None,Feature 3 - recdat
+SAMPLE_F3_recind,None,None,Feature 3 - recind
+SAMPLE_F3_rver,1,1.0,Feature 3 - rver - VALUES DIFFER!
+SAMPLE_F3_scamax,nan,None,Feature 3 - scamax - VALUES DIFFER!
+SAMPLE_F3_scamin,499999,499999,Feature 3 - scamin
+SAMPLE_F3_sordat,201305,201305,Feature 3 - sordat
+SAMPLE_F3_sorind,"US,US,graph,Chart 18680","US,US,graph,Chart 18680",Feature 3 - sorind
+SAMPLE_F3_txtdsc,None,None,Feature 3 - txtdsc
+SAMPLE_F3_veracc,nan,None,Feature 3 - veracc - VALUES DIFFER!
+SAMPLE_F3_verlen,nan,None,Feature 3 - verlen - VALUES DIFFER!
+SAMPLE_FEATURE_4_SEPARATOR,--- FEATURE 4 ---,--- FEATURE 4 ---,Feature 4 sample
+SAMPLE_F4_agen,550,550.0,Feature 4 - agen - VALUES DIFFER!
+SAMPLE_F4_boyshp,4,4,Feature 4 - boyshp
+SAMPLE_F4_catlam,1,1,Feature 4 - catlam
+SAMPLE_F4_conrad,nan,None,Feature 4 - conrad - VALUES DIFFER!
+SAMPLE_F4_datend,None,None,Feature 4 - datend
+SAMPLE_F4_datsta,None,None,Feature 4 - datsta
+SAMPLE_F4_dsid_dsnm,US3CA52M,US3CA52M,Feature 4 - dsid_dsnm
+SAMPLE_F4_dsid_edtn,31,31,Feature 4 - dsid_edtn
+SAMPLE_F4_dsid_updn,0,0,Feature 4 - dsid_updn
+SAMPLE_F4_fidn,3821106,3821106.0,Feature 4 - fidn - VALUES DIFFER!
+SAMPLE_F4_fids,4205,4205.0,Feature 4 - fids - VALUES DIFFER!
+SAMPLE_F4_grup,2,2.0,Feature 4 - grup - VALUES DIFFER!
+SAMPLE_F4_inform,None,None,Feature 4 - inform
+SAMPLE_F4_lnam,0226003A4E32106D,0226003A4E32106D,Feature 4 - lnam
+SAMPLE_F4_marsys,nan,None,Feature 4 - marsys - VALUES DIFFER!
+SAMPLE_F4_ninfom,None,None,Feature 4 - ninfom
+SAMPLE_F4_nobjnm,None,None,Feature 4 - nobjnm
+SAMPLE_F4_ntxtds,None,None,Feature 4 - ntxtds
+SAMPLE_F4_objl,17,17.0,Feature 4 - objl - VALUES DIFFER!
+SAMPLE_F4_objnam,Pillar Point Harbor Entrance Lighted Bell Buoy 3,Pillar Point Harbor Entrance Lighted Bell Buoy 3,Feature 4 - objnam
+SAMPLE_F4_perend,None,None,Feature 4 - perend
+SAMPLE_F4_persta,None,None,Feature 4 - persta
+SAMPLE_F4_picrep,None,None,Feature 4 - picrep
+SAMPLE_F4_prim,1,1.0,Feature 4 - prim - VALUES DIFFER!
+SAMPLE_F4_rcid,10,10.0,Feature 4 - rcid - VALUES DIFFER!
+SAMPLE_F4_recdat,None,None,Feature 4 - recdat
+SAMPLE_F4_recind,None,None,Feature 4 - recind
+SAMPLE_F4_rver,1,1.0,Feature 4 - rver - VALUES DIFFER!
+SAMPLE_F4_scamax,nan,None,Feature 4 - scamax - VALUES DIFFER!
+SAMPLE_F4_scamin,499999,499999,Feature 4 - scamin
+SAMPLE_F4_sordat,200311,200311,Feature 4 - sordat
+SAMPLE_F4_sorind,"US,US,graph,Chart 18682","US,US,graph,Chart 18682",Feature 4 - sorind
+SAMPLE_F4_txtdsc,None,None,Feature 4 - txtdsc
+SAMPLE_F4_veracc,nan,None,Feature 4 - veracc - VALUES DIFFER!
+SAMPLE_F4_verlen,nan,None,Feature 4 - verlen - VALUES DIFFER!
+SAMPLE_FEATURE_5_SEPARATOR,--- FEATURE 5 ---,--- FEATURE 5 ---,Feature 5 sample
+SAMPLE_F5_agen,550,550.0,Feature 5 - agen - VALUES DIFFER!
+SAMPLE_F5_boyshp,4,4,Feature 5 - boyshp
+SAMPLE_F5_catlam,2,2,Feature 5 - catlam
+SAMPLE_F5_conrad,nan,None,Feature 5 - conrad - VALUES DIFFER!
+SAMPLE_F5_datend,None,None,Feature 5 - datend
+SAMPLE_F5_datsta,None,None,Feature 5 - datsta
+SAMPLE_F5_dsid_dsnm,US3CA52M,US3CA52M,Feature 5 - dsid_dsnm
+SAMPLE_F5_dsid_edtn,31,31,Feature 5 - dsid_edtn
+SAMPLE_F5_dsid_updn,0,0,Feature 5 - dsid_updn
+SAMPLE_F5_fidn,4291377,4291377.0,Feature 5 - fidn - VALUES DIFFER!
+SAMPLE_F5_fids,3914,3914.0,Feature 5 - fids - VALUES DIFFER!
+SAMPLE_F5_grup,2,2.0,Feature 5 - grup - VALUES DIFFER!
+SAMPLE_F5_inform,None,None,Feature 5 - inform
+SAMPLE_F5_lnam,022600417B310F4A,022600417B310F4A,Feature 5 - lnam
+SAMPLE_F5_marsys,nan,None,Feature 5 - marsys - VALUES DIFFER!
+SAMPLE_F5_ninfom,None,None,Feature 5 - ninfom
+SAMPLE_F5_nobjnm,None,None,Feature 5 - nobjnm
+SAMPLE_F5_ntxtds,None,None,Feature 5 - ntxtds
+SAMPLE_F5_objl,17,17.0,Feature 5 - objl - VALUES DIFFER!
+SAMPLE_F5_objnam,Point Pinos Lighted Bell Buoy 2,Point Pinos Lighted Bell Buoy 2,Feature 5 - objnam
+SAMPLE_F5_perend,None,None,Feature 5 - perend
+SAMPLE_F5_persta,None,None,Feature 5 - persta
+SAMPLE_F5_picrep,None,None,Feature 5 - picrep
+SAMPLE_F5_prim,1,1.0,Feature 5 - prim - VALUES DIFFER!
+SAMPLE_F5_rcid,11,11.0,Feature 5 - rcid - VALUES DIFFER!
+SAMPLE_F5_recdat,None,None,Feature 5 - recdat
+SAMPLE_F5_recind,None,None,Feature 5 - recind
+SAMPLE_F5_rver,1,1.0,Feature 5 - rver - VALUES DIFFER!
+SAMPLE_F5_scamax,nan,None,Feature 5 - scamax - VALUES DIFFER!
+SAMPLE_F5_scamin,499999,499999,Feature 5 - scamin
+SAMPLE_F5_sordat,20170418,20170418,Feature 5 - sordat
+SAMPLE_F5_sorind,"US,US,reprt,11thCGD,LNM 16/17","US,US,reprt,11thCGD,LNM 16/17",Feature 5 - sorind
+SAMPLE_F5_txtdsc,None,None,Feature 5 - txtdsc
+SAMPLE_F5_veracc,nan,None,Feature 5 - veracc - VALUES DIFFER!
+SAMPLE_F5_verlen,nan,None,Feature 5 - verlen - VALUES DIFFER!
+SAMPLE_FEATURE_6_SEPARATOR,--- FEATURE 6 ---,--- FEATURE 6 ---,Feature 6 sample
+SAMPLE_F6_agen,550,550.0,Feature 6 - agen - VALUES DIFFER!
+SAMPLE_F6_boyshp,4,4,Feature 6 - boyshp
+SAMPLE_F6_catlam,2,2,Feature 6 - catlam
+SAMPLE_F6_conrad,nan,None,Feature 6 - conrad - VALUES DIFFER!
+SAMPLE_F6_datend,None,None,Feature 6 - datend
+SAMPLE_F6_datsta,None,None,Feature 6 - datsta
+SAMPLE_F6_dsid_dsnm,US3CA52M,US3CA52M,Feature 6 - dsid_dsnm
+SAMPLE_F6_dsid_edtn,31,31,Feature 6 - dsid_edtn
+SAMPLE_F6_dsid_updn,0,0,Feature 6 - dsid_updn
+SAMPLE_F6_fidn,4291343,4291343.0,Feature 6 - fidn - VALUES DIFFER!
+SAMPLE_F6_fids,3914,3914.0,Feature 6 - fids - VALUES DIFFER!
+SAMPLE_F6_grup,2,2.0,Feature 6 - grup - VALUES DIFFER!
+SAMPLE_F6_inform,None,None,Feature 6 - inform
+SAMPLE_F6_lnam,022600417B0F0F4A,022600417B0F0F4A,Feature 6 - lnam
+SAMPLE_F6_marsys,nan,None,Feature 6 - marsys - VALUES DIFFER!
+SAMPLE_F6_ninfom,None,None,Feature 6 - ninfom
+SAMPLE_F6_nobjnm,None,None,Feature 6 - nobjnm
+SAMPLE_F6_ntxtds,None,None,Feature 6 - ntxtds
+SAMPLE_F6_objl,17,17.0,Feature 6 - objl - VALUES DIFFER!
+SAMPLE_F6_objnam,Cypress Point Lighted Gong Buoy 22,Cypress Point Lighted Gong Buoy 22,Feature 6 - objnam
+SAMPLE_F6_perend,None,None,Feature 6 - perend
+SAMPLE_F6_persta,None,None,Feature 6 - persta
+SAMPLE_F6_picrep,None,None,Feature 6 - picrep
+SAMPLE_F6_prim,1,1.0,Feature 6 - prim - VALUES DIFFER!
+SAMPLE_F6_rcid,12,12.0,Feature 6 - rcid - VALUES DIFFER!
+SAMPLE_F6_recdat,None,None,Feature 6 - recdat
+SAMPLE_F6_recind,None,None,Feature 6 - recind
+SAMPLE_F6_rver,1,1.0,Feature 6 - rver - VALUES DIFFER!
+SAMPLE_F6_scamax,nan,None,Feature 6 - scamax - VALUES DIFFER!
+SAMPLE_F6_scamin,499999,499999,Feature 6 - scamin
+SAMPLE_F6_sordat,20071113,20071113,Feature 6 - sordat
+SAMPLE_F6_sorind,"US,US,reprt,11thCGD,LNM 46/07","US,US,reprt,11thCGD,LNM 46/07",Feature 6 - sorind
+SAMPLE_F6_txtdsc,None,None,Feature 6 - txtdsc
+SAMPLE_F6_veracc,nan,None,Feature 6 - veracc - VALUES DIFFER!
+SAMPLE_F6_verlen,nan,None,Feature 6 - verlen - VALUES DIFFER!
+SAMPLE_FEATURE_7_SEPARATOR,--- FEATURE 7 ---,--- FEATURE 7 ---,Feature 7 sample
+SAMPLE_F7_agen,550,550.0,Feature 7 - agen - VALUES DIFFER!
+SAMPLE_F7_boyshp,4,4,Feature 7 - boyshp
+SAMPLE_F7_catlam,1,1,Feature 7 - catlam
+SAMPLE_F7_conrad,nan,None,Feature 7 - conrad - VALUES DIFFER!
+SAMPLE_F7_datend,None,None,Feature 7 - datend
+SAMPLE_F7_datsta,None,None,Feature 7 - datsta
+SAMPLE_F7_dsid_dsnm,US3CA52M,US3CA52M,Feature 7 - dsid_dsnm
+SAMPLE_F7_dsid_edtn,31,31,Feature 7 - dsid_edtn
+SAMPLE_F7_dsid_updn,0,0,Feature 7 - dsid_updn
+SAMPLE_F7_fidn,3821101,3821101.0,Feature 7 - fidn - VALUES DIFFER!
+SAMPLE_F7_fids,4205,4205.0,Feature 7 - fids - VALUES DIFFER!
+SAMPLE_F7_grup,2,2.0,Feature 7 - grup - VALUES DIFFER!
+SAMPLE_F7_inform,None,None,Feature 7 - inform
+SAMPLE_F7_lnam,0226003A4E2D106D,0226003A4E2D106D,Feature 7 - lnam
+SAMPLE_F7_marsys,nan,None,Feature 7 - marsys - VALUES DIFFER!
+SAMPLE_F7_ninfom,None,None,Feature 7 - ninfom
+SAMPLE_F7_nobjnm,None,None,Feature 7 - nobjnm
+SAMPLE_F7_ntxtds,None,None,Feature 7 - ntxtds
+SAMPLE_F7_objl,17,17.0,Feature 7 - objl - VALUES DIFFER!
+SAMPLE_F7_objnam,Southeast Reef Southern End Lighted Gong Buoy 1S,Southeast Reef Southern End Lighted Gong Buoy 1S,Feature 7 - objnam
+SAMPLE_F7_perend,None,None,Feature 7 - perend
+SAMPLE_F7_persta,None,None,Feature 7 - persta
+SAMPLE_F7_picrep,None,None,Feature 7 - picrep
+SAMPLE_F7_prim,1,1.0,Feature 7 - prim - VALUES DIFFER!
+SAMPLE_F7_rcid,13,13.0,Feature 7 - rcid - VALUES DIFFER!
+SAMPLE_F7_recdat,None,None,Feature 7 - recdat
+SAMPLE_F7_recind,None,None,Feature 7 - recind
+SAMPLE_F7_rver,1,1.0,Feature 7 - rver - VALUES DIFFER!
+SAMPLE_F7_scamax,nan,None,Feature 7 - scamax - VALUES DIFFER!
+SAMPLE_F7_scamin,499999,499999,Feature 7 - scamin
+SAMPLE_F7_sordat,200311,200311,Feature 7 - sordat
+SAMPLE_F7_sorind,"US,US,graph,Chart 18682","US,US,graph,Chart 18682",Feature 7 - sorind
+SAMPLE_F7_txtdsc,None,None,Feature 7 - txtdsc
+SAMPLE_F7_veracc,nan,None,Feature 7 - veracc - VALUES DIFFER!
+SAMPLE_F7_verlen,nan,None,Feature 7 - verlen - VALUES DIFFER!
+SAMPLE_FEATURE_8_SEPARATOR,--- FEATURE 8 ---,--- FEATURE 8 ---,Feature 8 sample
+SAMPLE_F8_agen,550,550.0,Feature 8 - agen - VALUES DIFFER!
+SAMPLE_F8_boyshp,4,4,Feature 8 - boyshp
+SAMPLE_F8_catlam,1,1,Feature 8 - catlam
+SAMPLE_F8_conrad,nan,None,Feature 8 - conrad - VALUES DIFFER!
+SAMPLE_F8_datend,None,None,Feature 8 - datend
+SAMPLE_F8_datsta,None,None,Feature 8 - datsta
+SAMPLE_F8_dsid_dsnm,US3CA52M,US3CA52M,Feature 8 - dsid_dsnm
+SAMPLE_F8_dsid_edtn,31,31,Feature 8 - dsid_edtn
+SAMPLE_F8_dsid_updn,0,0,Feature 8 - dsid_updn
+SAMPLE_F8_fidn,3821103,3821103.0,Feature 8 - fidn - VALUES DIFFER!
+SAMPLE_F8_fids,4205,4205.0,Feature 8 - fids - VALUES DIFFER!
+SAMPLE_F8_grup,2,2.0,Feature 8 - grup - VALUES DIFFER!
+SAMPLE_F8_inform,None,None,Feature 8 - inform
+SAMPLE_F8_lnam,0226003A4E2F106D,0226003A4E2F106D,Feature 8 - lnam
+SAMPLE_F8_marsys,nan,None,Feature 8 - marsys - VALUES DIFFER!
+SAMPLE_F8_ninfom,None,None,Feature 8 - ninfom
+SAMPLE_F8_nobjnm,None,None,Feature 8 - nobjnm
+SAMPLE_F8_ntxtds,None,None,Feature 8 - ntxtds
+SAMPLE_F8_objl,17,17.0,Feature 8 - objl - VALUES DIFFER!
+SAMPLE_F8_objnam,Pillar Point Harbor Entrance Lighted Gong Buoy 1,Pillar Point Harbor Entrance Lighted Gong Buoy 1,Feature 8 - objnam
+SAMPLE_F8_perend,None,None,Feature 8 - perend
+SAMPLE_F8_persta,None,None,Feature 8 - persta
+SAMPLE_F8_picrep,None,None,Feature 8 - picrep
+SAMPLE_F8_prim,1,1.0,Feature 8 - prim - VALUES DIFFER!
+SAMPLE_F8_rcid,14,14.0,Feature 8 - rcid - VALUES DIFFER!
+SAMPLE_F8_recdat,None,None,Feature 8 - recdat
+SAMPLE_F8_recind,None,None,Feature 8 - recind
+SAMPLE_F8_rver,1,1.0,Feature 8 - rver - VALUES DIFFER!
+SAMPLE_F8_scamax,nan,None,Feature 8 - scamax - VALUES DIFFER!
+SAMPLE_F8_scamin,499999,499999,Feature 8 - scamin
+SAMPLE_F8_sordat,200311,200311,Feature 8 - sordat
+SAMPLE_F8_sorind,"US,US,graph,Chart 18682","US,US,graph,Chart 18682",Feature 8 - sorind
+SAMPLE_F8_txtdsc,None,None,Feature 8 - txtdsc
+SAMPLE_F8_veracc,nan,None,Feature 8 - veracc - VALUES DIFFER!
+SAMPLE_F8_verlen,nan,None,Feature 8 - verlen - VALUES DIFFER!
+SAMPLE_FEATURE_9_SEPARATOR,--- FEATURE 9 ---,--- FEATURE 9 ---,Feature 9 sample
+SAMPLE_F9_agen,550,550.0,Feature 9 - agen - VALUES DIFFER!
+SAMPLE_F9_boyshp,4,4,Feature 9 - boyshp
+SAMPLE_F9_catlam,1,1,Feature 9 - catlam
+SAMPLE_F9_conrad,nan,None,Feature 9 - conrad - VALUES DIFFER!
+SAMPLE_F9_datend,None,None,Feature 9 - datend
+SAMPLE_F9_datsta,None,None,Feature 9 - datsta
+SAMPLE_F9_dsid_dsnm,US4CA60M,US4CA60M,Feature 9 - dsid_dsnm
+SAMPLE_F9_dsid_edtn,37,37,Feature 9 - dsid_edtn
+SAMPLE_F9_dsid_updn,6,6,Feature 9 - dsid_updn
+SAMPLE_F9_fidn,4134691,4134691.0,Feature 9 - fidn - VALUES DIFFER!
+SAMPLE_F9_fids,4205,4205.0,Feature 9 - fids - VALUES DIFFER!
+SAMPLE_F9_grup,2,2.0,Feature 9 - grup - VALUES DIFFER!
+SAMPLE_F9_inform,None,None,Feature 9 - inform
+SAMPLE_F9_lnam,0226003F1723106D,0226003F1723106D,Feature 9 - lnam
+SAMPLE_F9_marsys,nan,None,Feature 9 - marsys - VALUES DIFFER!
+SAMPLE_F9_ninfom,None,None,Feature 9 - ninfom
+SAMPLE_F9_nobjnm,None,None,Feature 9 - nobjnm
+SAMPLE_F9_ntxtds,None,None,Feature 9 - ntxtds
+SAMPLE_F9_objl,17,17.0,Feature 9 - objl - VALUES DIFFER!
+SAMPLE_F9_objnam,Isthmus Cove North Entrance Lighted Buoy 1,Isthmus Cove North Entrance Lighted Buoy 1,Feature 9 - objnam
+SAMPLE_F9_perend,None,None,Feature 9 - perend
+SAMPLE_F9_persta,None,None,Feature 9 - persta
+SAMPLE_F9_picrep,None,None,Feature 9 - picrep
+SAMPLE_F9_prim,1,1.0,Feature 9 - prim - VALUES DIFFER!
+SAMPLE_F9_rcid,32,32.0,Feature 9 - rcid - VALUES DIFFER!
+SAMPLE_F9_recdat,None,None,Feature 9 - recdat
+SAMPLE_F9_recind,None,None,Feature 9 - recind
+SAMPLE_F9_rver,1,1.0,Feature 9 - rver - VALUES DIFFER!
+SAMPLE_F9_scamax,nan,None,Feature 9 - scamax - VALUES DIFFER!
+SAMPLE_F9_scamin,179999,179999,Feature 9 - scamin
+SAMPLE_F9_sordat,20100126,20100126,Feature 9 - sordat
+SAMPLE_F9_sorind,"US,US,reprt,11thCGD,LNM 04/10","US,US,reprt,11thCGD,LNM 04/10",Feature 9 - sorind
+SAMPLE_F9_txtdsc,None,None,Feature 9 - txtdsc
+SAMPLE_F9_veracc,nan,None,Feature 9 - veracc - VALUES DIFFER!
+SAMPLE_F9_verlen,nan,None,Feature 9 - verlen - VALUES DIFFER!
+SAMPLE_FEATURE_10_SEPARATOR,--- FEATURE 10 ---,--- FEATURE 10 ---,Feature 10 sample
+SAMPLE_F10_agen,550,550.0,Feature 10 - agen - VALUES DIFFER!
+SAMPLE_F10_boyshp,4,4,Feature 10 - boyshp
+SAMPLE_F10_catlam,2,2,Feature 10 - catlam
+SAMPLE_F10_conrad,nan,None,Feature 10 - conrad - VALUES DIFFER!
+SAMPLE_F10_datend,None,None,Feature 10 - datend
+SAMPLE_F10_datsta,None,None,Feature 10 - datsta
+SAMPLE_F10_dsid_dsnm,US4CA60M,US4CA60M,Feature 10 - dsid_dsnm
+SAMPLE_F10_dsid_edtn,37,37,Feature 10 - dsid_edtn
+SAMPLE_F10_dsid_updn,6,6,Feature 10 - dsid_updn
+SAMPLE_F10_fidn,5307729,5307729.0,Feature 10 - fidn - VALUES DIFFER!
+SAMPLE_F10_fids,3634,3634.0,Feature 10 - fids - VALUES DIFFER!
+SAMPLE_F10_grup,2,2.0,Feature 10 - grup - VALUES DIFFER!
+SAMPLE_F10_inform,None,None,Feature 10 - inform
+SAMPLE_F10_lnam,02260050FD510E32,02260050FD510E32,Feature 10 - lnam
+SAMPLE_F10_marsys,nan,None,Feature 10 - marsys - VALUES DIFFER!
+SAMPLE_F10_ninfom,None,None,Feature 10 - ninfom
+SAMPLE_F10_nobjnm,None,None,Feature 10 - nobjnm
+SAMPLE_F10_ntxtds,None,None,Feature 10 - ntxtds
+SAMPLE_F10_objl,17,17.0,Feature 10 - objl - VALUES DIFFER!
+SAMPLE_F10_objnam,Point Fermin Lighted Whistle Buoy 6PF,Point Fermin Lighted Whistle Buoy 6PF,Feature 10 - objnam
+SAMPLE_F10_perend,None,None,Feature 10 - perend
+SAMPLE_F10_persta,None,None,Feature 10 - persta
+SAMPLE_F10_picrep,None,None,Feature 10 - picrep
+SAMPLE_F10_prim,1,1.0,Feature 10 - prim - VALUES DIFFER!
+SAMPLE_F10_rcid,33,33.0,Feature 10 - rcid - VALUES DIFFER!
+SAMPLE_F10_recdat,None,None,Feature 10 - recdat
+SAMPLE_F10_recind,None,None,Feature 10 - recind
+SAMPLE_F10_rver,1,1.0,Feature 10 - rver - VALUES DIFFER!
+SAMPLE_F10_scamax,nan,None,Feature 10 - scamax - VALUES DIFFER!
+SAMPLE_F10_scamin,179999,179999,Feature 10 - scamin
+SAMPLE_F10_sordat,20041208,20041208,Feature 10 - sordat
+SAMPLE_F10_sorind,"US,US,reprt,11thCGD,ATONIS","US,US,reprt,11thCGD,ATONIS",Feature 10 - sorind
+SAMPLE_F10_txtdsc,None,None,Feature 10 - txtdsc
+SAMPLE_F10_veracc,nan,None,Feature 10 - veracc - VALUES DIFFER!
+SAMPLE_F10_verlen,nan,None,Feature 10 - verlen - VALUES DIFFER!

@@ -1,0 +1,15 @@
+NATIONAL GEOSPATIAL-INTELLIGENCE AGENCY
+US456612 - LAMOTREK ATOLL - FEDERATED STATES OF MICRONESIA
+
+INDEX:
+POSITIONS
+SUPPLEMENTAL INFORMATION
+
+NOTE:
+POSITIONS:
+This cell has been positioned on the WGS-84 Datum through the use of a Rectified Ortho-photo.
+
+SUPPLEMENTAL INFORMATION:
+Consult National Geospatial-Intelligence Agency Pub. 126 for important supplemental information.
+
+END OF FILE

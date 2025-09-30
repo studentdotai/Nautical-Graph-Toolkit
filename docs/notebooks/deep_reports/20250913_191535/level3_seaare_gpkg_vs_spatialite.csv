@@ -1,0 +1,64 @@
+attribute,gpkg,spatialite,notes
+METADATA_LAYER_NAME,seaare,seaare,Layer comparison between gpkg and spatialite
+METADATA_TOTAL_FEATURES,300,300,Total features in each format
+METADATA_GEOMETRY_FEATURES,300,300,Features with non-null geometry
+METADATA_TOTAL_COLUMNS,29,30,Total columns in each format
+SEPARATOR_COLUMN_PRESENCE,---,---,Column presence analysis follows
+COLUMN_agen,PRESENT,PRESENT,Column presence comparison
+COLUMN_catsea,PRESENT,PRESENT,Column presence comparison
+COLUMN_dsid_dsnm,PRESENT,PRESENT,Column presence comparison
+COLUMN_dsid_edtn,PRESENT,PRESENT,Column presence comparison
+COLUMN_dsid_updn,PRESENT,PRESENT,Column presence comparison
+COLUMN_ffpt_rind,PRESENT,PRESENT,Column presence comparison
+COLUMN_fidn,PRESENT,PRESENT,Column presence comparison
+COLUMN_fids,PRESENT,PRESENT,Column presence comparison
+COLUMN_geom,PRESENT,PRESENT,Column presence comparison
+COLUMN_grup,PRESENT,PRESENT,Column presence comparison
+COLUMN_inform,PRESENT,PRESENT,Column presence comparison
+COLUMN_lnam,PRESENT,PRESENT,Column presence comparison
+COLUMN_lnam_refs,PRESENT,PRESENT,Column presence comparison
+COLUMN_ninfom,PRESENT,PRESENT,Column presence comparison
+COLUMN_nobjnm,PRESENT,PRESENT,Column presence comparison
+COLUMN_ntxtds,PRESENT,PRESENT,Column presence comparison
+COLUMN_objl,PRESENT,PRESENT,Column presence comparison
+COLUMN_objnam,PRESENT,PRESENT,Column presence comparison
+COLUMN_ogc_fid,PRESENT,PRESENT,Column presence comparison
+COLUMN_prim,PRESENT,PRESENT,Column presence comparison
+COLUMN_rcid,PRESENT,PRESENT,Column presence comparison
+COLUMN_recdat,PRESENT,PRESENT,Column presence comparison
+COLUMN_recind,PRESENT,PRESENT,Column presence comparison
+COLUMN_rver,PRESENT,PRESENT,Column presence comparison
+COLUMN_scamax,PRESENT,PRESENT,Column presence comparison
+COLUMN_scamin,PRESENT,PRESENT,Column presence comparison
+COLUMN_sordat,PRESENT,PRESENT,Column presence comparison
+COLUMN_sorind,PRESENT,PRESENT,Column presence comparison
+COLUMN_txtdsc,PRESENT,PRESENT,Column presence comparison
+SEPARATOR_PROPERTY_COMPLETENESS,---,---,Property completeness analysis (non-empty / total)
+PROP_COMPLETENESS_agen,300/300 (100.0%),300/300 (100.0%),Values Match (100.0%)
+PROP_COMPLETENESS_catsea,130/300 (43.3%),130/300 (43.3%),Values Match (43.3%)
+PROP_COMPLETENESS_dsid_dsnm,300/300 (100.0%),300/300 (100.0%),Values Match (100.0%)
+PROP_COMPLETENESS_dsid_edtn,300/300 (100.0%),300/300 (100.0%),Values Match (100.0%)
+PROP_COMPLETENESS_dsid_updn,300/300 (100.0%),300/300 (100.0%),Values Match (100.0%)
+PROP_COMPLETENESS_ffpt_rind,0/300 (0.0%),0/300 (0.0%),Values Match (0.0%)
+PROP_COMPLETENESS_fidn,300/300 (100.0%),300/300 (100.0%),Values Match (100.0%)
+PROP_COMPLETENESS_fids,300/300 (100.0%),300/300 (100.0%),Values Match (100.0%)
+PROP_COMPLETENESS_grup,300/300 (100.0%),300/300 (100.0%),Values Match (100.0%)
+PROP_COMPLETENESS_inform,0/300 (0.0%),0/300 (0.0%),Values Match (0.0%)
+PROP_COMPLETENESS_lnam,300/300 (100.0%),300/300 (100.0%),Values Match (100.0%)
+PROP_COMPLETENESS_lnam_refs,0/300 (0.0%),0/300 (0.0%),Values Match (0.0%)
+PROP_COMPLETENESS_ninfom,0/300 (0.0%),0/300 (0.0%),Values Match (0.0%)
+PROP_COMPLETENESS_nobjnm,0/300 (0.0%),0/300 (0.0%),Values Match (0.0%)
+PROP_COMPLETENESS_ntxtds,0/300 (0.0%),0/300 (0.0%),Values Match (0.0%)
+PROP_COMPLETENESS_objl,300/300 (100.0%),300/300 (100.0%),Values Match (100.0%)
+PROP_COMPLETENESS_objnam,300/300 (100.0%),300/300 (100.0%),Values Match (100.0%)
+PROP_COMPLETENESS_ogc_fid,300/300 (100.0%),300/300 (100.0%),Values Match (100.0%)
+PROP_COMPLETENESS_prim,300/300 (100.0%),300/300 (100.0%),Values Match (100.0%)
+PROP_COMPLETENESS_rcid,300/300 (100.0%),300/300 (100.0%),Values Match (100.0%)
+PROP_COMPLETENESS_recdat,0/300 (0.0%),0/300 (0.0%),Values Match (0.0%)
+PROP_COMPLETENESS_recind,0/300 (0.0%),0/300 (0.0%),Values Match (0.0%)
+PROP_COMPLETENESS_rver,300/300 (100.0%),300/300 (100.0%),Values Match (100.0%)
+PROP_COMPLETENESS_scamax,0/300 (0.0%),0/300 (0.0%),Values Match (0.0%)
+PROP_COMPLETENESS_scamin,300/300 (100.0%),300/300 (100.0%),Values Match (100.0%)
+PROP_COMPLETENESS_sordat,300/300 (100.0%),300/300 (100.0%),Values Match (100.0%)
+PROP_COMPLETENESS_sorind,300/300 (100.0%),300/300 (100.0%),Values Match (100.0%)
+PROP_COMPLETENESS_txtdsc,0/300 (0.0%),0/300 (0.0%),Values Match (0.0%)

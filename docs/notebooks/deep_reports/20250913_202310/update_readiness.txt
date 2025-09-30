@@ -1,0 +1,48 @@
+================================================================================
+S57 UPDATE READINESS ANALYSIS
+================================================================================
+
+SUMMARY:
+  • Total ENCs analyzed: 6
+  • Newer versions available: 4
+  • Same versions: 0
+  • Older versions in update dir: 0
+
+DETAILED RESULTS:
+--------------------------------------------------------------------------------
+ENC: US1EEZ1M.000
+  Data Root: Edition 9, Update 0
+  Update Root: Edition 9, Update 0
+  Status: Same version (Edition 9, Update 0)
+  Recommendation: NO_UPDATE
+
+ENC: US1GC09M.000
+  Data Root: Edition 65, Update 5
+  Update Root: Edition 71, Update 1
+  Status: Newer edition available (65 → 71)
+  Recommendation: UPDATE
+
+ENC: US1PO02M.000
+  Data Root: Edition 21, Update 1
+  Update Root: Edition 21, Update 1
+  Status: Same version (Edition 21, Update 1)
+  Recommendation: NO_UPDATE
+
+ENC: US2WC12M.000
+  Data Root: Edition 27, Update 8
+  Update Root: Edition 27, Update 12
+  Status: Newer update available (Ed.27 Update 8 → 12)
+  Recommendation: UPDATE
+
+ENC: US3CA52M.000
+  Data Root: Edition 31, Update 0
+  Update Root: Edition 31, Update 7
+  Status: Newer update available (Ed.31 Update 0 → 7)
+  Recommendation: UPDATE
+
+ENC: US4CA60M.000
+  Data Root: Edition 37, Update 6
+  Update Root: Edition 38, Update 2
+  Status: Newer edition available (37 → 38)
+  Recommendation: UPDATE
+

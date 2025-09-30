@@ -1,0 +1,45 @@
+NATIONAL GEOSPATIAL-INTELLIGENCE AGENCY
+US4PJ3B0 - GUATEMALA - APPROACHES TO PUERTO BARRIOS SOUTH
+
+
+INDEX:
+GLOSSARY
+TIDES AND CURRENTS
+SURVEY DATA
+SOUNDING DATUM
+CAUTION - SUBMARINE PIPELINES and CABLES
+NOTE
+SUPPLEMENTAL INFORMATION
+
+
+GLOSSARY:
+Bahia, Ensenada...bay, cove
+Bajo...reef, shoal
+Cabo...cape
+Cayo(s)...island(s)
+Estero...stream, lagoon
+Laguneta...pond, lake
+Puerto...port
+Punta...point
+Quebrada...stream
+Rio...stream
+
+TIDES AND CURRENTS:
+Refer to Admiralty Total Tide for the latest information to compute tides and currents.
+
+SURVEY DATA:
+Survey data has been compiled using IHO S-4 rounding method 0-31 in meters and decimeters and thereafter to the nearest meter.
+
+SOUNDING DATUM:
+Approximately MLLW in Guatemala and Honduras waters and LAT in Belize waters.
+
+CAUTION - SUBMARINE PIPELINES and CABLES:
+Additional uncharted submarine pipelines and submarine cables may exist within the area of this cell. Not all submarine pipelines and submarine cables are required to be buried, and those that were originally buried may have become exposed. Mariners should use extreme caution when operating vessels in depths of water comparable to their draft in areas where pipelines and cables may exist, and when anchoring, dragging, or trawling.
+
+NOTE:
+Appropriate local authorities should be consulted for the latest information on depths and aids to navigation.
+
+SUPPLEMENTAL INFORMATION
+Consult National Geospatial-Intelligence Agency Pub. 147, Sailing Directions, for important supplemental information.
+
+END OF FILE

@@ -1,0 +1,142 @@
+NOAA ENC®
+
+NATIONAL OCEANIC AND ATMOSPHERIC ADMINISTRATION
+
+US4CT1AD - LONG ISLAND SOUND, HAMMONASSET RIVER TO CONNECTICUT RIVER
+
+
+INDEX:
+
+NOTE A
+AIDS TO NAVIGATION
+POLLUTION REPORTS
+CAUTION - USE OF RADIO SIGNALS (LIMITATIONS)
+SUPPLEMENTAL INFORMATION
+CAUTION - TEMPORARY CHANGES
+WARNING - PRUDENT MARINER
+ADDITIONAL INFORMATION
+AUTHORITIES
+ADMINISTRATION AREA
+CAUTION - QUALITY OF BATHYMETRIC DATA
+CAUTION - SMALL CRAFT WARNINGS
+CAUTION - SUBMARINE PIPELINES AND CABLES
+CAUTION - WARNINGS CONCERNING LARGE VESSELS
+FISHING AND HUNTING STRUCTURES
+MARINE WEATHER FORECASTS
+NOAA WEATHER RADIO BROADCASTS
+PUBLIC BOATING INSTRUCTION PROGRAMS
+RACING BUOYS
+RADAR REFLECTORS
+RULES OF THE ROAD (ABRIDGED)
+SMALL CRAFT WARNINGS
+WATER LEVELS, CURRENTS, AND TIDES
+COMMENTS REQUESTED
+
+
+NOTES:
+
+NOTE
+Navigation regulations are published in Chapter 2, U.S. Coast Pilot 2. Additions or revisions to Chapter 2 are published in the Notice to Mariners. Information concerning the regulations may be obtained at the Office of the Commander, 1st Coast Guard District in Boston, MA or at the Office of the District Engineer, Corps of Engineers in Concord, MA. Refer to charted regulation section numbers.
+
+
+AIDS TO NAVIGATION
+Consult U.S. Coast Guard Light List for supplemental information concerning aids to navigation.
+
+
+POLLUTION REPORTS
+Report all spills of oil and hazardous substances to the National Response Center via 1-800-424-8802 (toll free), or to the nearest U.S. Coast Guard facility if telephone communication is impossible (33 CFR 153).
+
+
+CAUTION - USE OF RADIO SIGNALS (LIMITATIONS)
+Limitations on the use of radio signals as aids to marine navigation can be found in the U.S. Coast Guard Light Lists and National Geospatial-Intelligence Agency Publication 117. Radio direction-finder bearings to commercial broadcasting stations are subject to error and should be used with caution.
+
+
+SUPPLEMENTAL INFORMATION
+Consult U.S. Coast Pilots 2 and 3 for important supplemental information.
+
+
+CAUTION - TEMPORARY CHANGES
+Temporary changes or defects in aids to navigation are not indicated. See Local Notice to Mariners. During some winter months or when endangered by ice, certain aids to navigation are replaced by other types or removed. For details see U.S. Coast Guard Light List.
+
+
+WARNING - PRUDENT MARINER
+The prudent mariner will not rely solely on any single aid to navigation, particularly on floating aids. See U.S. Coast Guard Light List and U.S. Coast Pilot for details.
+
+
+ADDITIONAL INFORMATION
+Additional information can be obtained at www.nauticalcharts.noaa.gov
+
+
+AUTHORITIES
+Hydrography and topography by the National Ocean Service, Coast Survey, with additional data from the Corps of Engineers, Geological Survey, U.S. Coast Guard, and National Geospatial-Intelligence Agency.
+
+
+ADMINISTRATION AREA
+The entire extent of this ENC cell falls within the limits of an Administration Area. This area covers land, internal waters, and territorial sea. The territorial sea is a maritime zone over which the United States exercises sovereignty extending to the airspace as well as to its bed and subsoil. For more information, please refer to the Coast Pilot.
+
+
+CAUTION - QUALITY OF BATHYMETRIC DATA
+The areas represented by the object M_QUAL (Quality of data) are approximate due to generalizing for clarity. Caution is advised, particularly for nearshore navigation or voyage planning. M_QUAL represents areas of uniform quality of bathymetric data. The CATZOC (Category of zone of confidence in data) attribute of M_QUAL provides an assessment of the overall zone of confidence.
+
+
+CAUTION - SMALL CRAFT WARNINGS
+Small craft warnings will be displayed from sunrise to sunset from Suffolk County Marine Police Patrol Boats underway in the coastal and navigable inland waters of Suffolk County, Long Island, New York: For boating season only.
+
+
+CAUTION - SUBMARINE PIPELINES AND CABLES
+Additional uncharted submarine pipelines and submarine cables may exist within the area of this chart. Not all submarine pipelines and submarine cables are required to be buried, and those that were originally buried may have become exposed. Mariners should use extreme caution when operating vessels in depths of water comparable to their draft in areas where pipelines and cables may exist, and when anchoring, dragging, or trawling. Covered wells may be marked by lighted or unlighted buoys.
+
+
+CAUTION - WARNINGS CONCERNING LARGE VESSELS
+The "Rules of the Road" state that recreational boats shall not impede the passage of a vessel that can navigate only within a narrow channel or fairway. Large vessels may appear to move slowly due to their large size but actually transit at speeds in excess of 12 knots, requiring a great distance in which to maneuver or stop. A large vessel's superstructure may block the wind with the result that sailboats and sailboards may unexpectedly find themselves unable to maneuver. Bow and stern waves can be hazardous to small vessels. Large vessels may not be able to see small craft close to their bows.
+
+
+FISHING AND HUNTING STRUCTURES
+Uncharted fish and wildlife harvesting devices and structures such as fish traps, pound nets, crab traps, and duck blinds, some submerged, may exist in the area of this chart, particularly in the near shore area. Mariners should proceed with caution.
+
+
+MARINE WEATHER FORECASTS
+NATIONAL WEATHER SERVICE	TELEPHONE NUMBER		HOURS AVAILABLE
+New York, NY			(631)924-0517			9:00 A.M. - 5:00 P.M. (Mon.-Fri.)
+								Recorded forecast only at other 									times
+Boston/Taunton, MA		(508) 828-2672			8:00 A.M. - 5:00 P.M. (Mon.-Fri.)
+				(508) 828-0634*			24 hours
+Portland (Gray), ME		(207) 688-3216			7:00 A.M. - 5:00 P.M.  (Mon.-Fri.)
+				(207) 688-3210*			24 hours daily
+*Recorded forecast only
+
+
+NOAA WEATHER RADIO BROADCASTS
+The NOAA Weather Radio stations listed below provide continuous weather broadcasts. The reception range is typically 20 to 40 nautical miles from the antenna site, but can be as much as 100 nautical miles for stations at high elevations.
+
+New London, CT    	KHB-47       	162.550 MHz
+Meriden, CT           	WXJ-42       	162.400 MHz
+Hartford, CT          	WXJ-41       	162.475 MHz
+Riverhead, NY     	WXM-80 		162.475 MHz
+
+
+RACING BUOYS
+Racing buoys within the limits of this chart are not shown hereon. Information may be obtained from the U.S. Coast Guard District Offices as racing and other private buoys are not all listed in the U.S. Coast Guard Light List.
+
+
+RADAR REFLECTORS
+Radar reflectors have been placed on many floating aids to navigation. Individual radar reflector identification on these aids has been omitted from this chart.
+
+
+RULES OF THE ROAD (ABRIDGED)
+Motorless craft have the right-of-way in almost all cases. Sailing vessels and motorboats less than 19.8 meters / 65 feet in length shall not hamper, in a narrow channel, the safe passage of a vessel which can navigate only inside that channel. A motorboat being overtaken has the right-of-way. Motorboats approaching head to head or nearly so should pass port to port. When Motorboats approach each other at right angles or obliquely, the boat on the right has the right-of-way in most cases. Motorboats must keep to the right in narrow channels, when safe and practicable. Mariners are urged to become familiar with the complete text of the Rules of the Road in U.S. Coast Guard publication "Amalgamated International & U.S. Inland Navigation Rules".
+
+
+SMALL CRAFT WARNINGS
+During the boating season small craft warnings will be displayed from sunrise to sunset on Suffolk County Marine Police Patrol Boats while underway in the coastal and navigable inland waters of Suffolk County, Long Island, New York.
+
+
+WATER LEVELS, CURRENTS, AND TIDES
+Real-time water levels, tide predictions, and tidal current predictions are available on the internet from NOAA's Center for Operational Oceanographic Products and Services (CO-OPS) at https://tidesandcurrents.noaa.gov/water_level_info.html and https://tidesandcurrents.noaa.gov/currents_info.html.
+
+
+COMMENTS REQUESTED
+NOAA encourages users to submit inquiries, discrepancies, or comments about this chart via NOAA's ASSIST tool at https://www.nauticalcharts.noaa.gov/customer-service/assist/.
+
+
+END OF FILE

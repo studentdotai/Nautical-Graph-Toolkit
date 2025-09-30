@@ -1,0 +1,26 @@
+Property Validation Analysis (with Database Verification)
+========================================================
+
+Baseline format: GPKG (195 properties)
+
+=== SPATIALITE vs GPKG ===
+Processing coverage: 100.0%
+Actual coverage: 100.0%
+Common properties: 195
+Properties missing from processing: 0
+Verified missing from DB: 0
+Processing artifacts (found in DB): 0
+Extra in spatialite: 1
+
+Extra properties in SPATIALITE:
+  - GEOMETRY
+
+=== POSTGIS vs GPKG ===
+Processing coverage: 100.0%
+Actual coverage: 100.0%
+Common properties: 195
+Properties missing from processing: 0
+Verified missing from DB: 0
+Processing artifacts (found in DB): 0
+Extra in postgis: 0
+

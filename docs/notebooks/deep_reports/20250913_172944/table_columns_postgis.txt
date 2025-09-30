@@ -1,0 +1,298 @@
+Detailed Table Column Analysis for POSTGIS
+==================================================
+
+Schema: s57_deeptest
+
+Table: dsid (37 columns)
+Columns: ['dsid_agen', 'dsid_comt', 'dsid_dsnm', 'dsid_edtn', 'dsid_expp', 'dsid_intu', 'dsid_isdt', 'dsid_pred', 'dsid_prof', 'dsid_prsp', 'dsid_psdn', 'dsid_sted', 'dsid_uadt', 'dsid_updn', 'dspm_comf', 'dspm_comt', 'dspm_coun', 'dspm_cscl', 'dspm_duni', 'dspm_hdat', 'dspm_huni', 'dspm_puni', 'dspm_sdat', 'dspm_somf', 'dspm_vdat', 'dssi_aall', 'dssi_dstr', 'dssi_nall', 'dssi_nocn', 'dssi_nocr', 'dssi_noed', 'dssi_nofa', 'dssi_nogr', 'dssi_noin', 'dssi_nolr', 'dssi_nomr', 'ogc_fid']
+
+Table: marcul (43 columns)
+Columns: ['agen', 'catmfa', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'expsou', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'perend', 'persta', 'prim', 'quasou', 'rcid', 'recdat', 'recind', 'restrn', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'souacc', 'status', 'txtdsc', 'valsou', 'veracc', 'verdat', 'verlen', 'watlev', 'wkb_geometry']
+
+Table: isolatednode (11 columns)
+Columns: ['dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ogc_fid', 'posacc', 'quapos', 'rcid', 'rcnm', 'ruin', 'rver', 'wkb_geometry']
+
+Table: morfac (47 columns)
+Columns: ['agen', 'boyshp', 'catmor', 'colour', 'colpat', 'condtn', 'conrad', 'convis', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'height', 'inform', 'lnam', 'lnam_refs', 'natcon', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'perend', 'persta', 'picrep', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'veracc', 'verdat', 'verlen', 'watlev', 'wkb_geometry']
+
+Table: connectednode (11 columns)
+Columns: ['dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ogc_fid', 'posacc', 'quapos', 'rcid', 'rcnm', 'ruin', 'rver', 'wkb_geometry']
+
+Table: edge (23 columns)
+Columns: ['dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'mask_0', 'mask_1', 'name_rcid_0', 'name_rcid_1', 'name_rcnm_0', 'name_rcnm_1', 'ogc_fid', 'ornt_0', 'ornt_1', 'posacc', 'quapos', 'rcid', 'rcnm', 'ruin', 'rver', 'topi_0', 'topi_1', 'usag_0', 'usag_1', 'wkb_geometry']
+
+Table: navlne (33 columns)
+Columns: ['agen', 'catnav', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'ntxtds', 'objl', 'ogc_fid', 'orient', 'perend', 'persta', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'wkb_geometry']
+
+Table: face (11 columns)
+Columns: ['dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ogc_fid', 'posacc', 'quapos', 'rcid', 'rcnm', 'ruin', 'rver', 'wkb_geometry']
+
+Table: ofsplf (44 columns)
+Columns: ['agen', 'catofp', 'colour', 'colpat', 'condtn', 'conrad', 'convis', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'height', 'inform', 'lnam', 'lnam_refs', 'natcon', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'picrep', 'prim', 'prodct', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'veracc', 'verdat', 'verlen', 'wkb_geometry']
+
+Table: admare (31 columns)
+Columns: ['agen', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'jrsdtn', 'lnam', 'lnam_refs', 'nation', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'picrep', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'txtdsc', 'wkb_geometry']
+
+Table: pilpnt (39 columns)
+Columns: ['agen', 'catple', 'colour', 'colpat', 'condtn', 'convis', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'height', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'txtdsc', 'veracc', 'verdat', 'verlen', 'wkb_geometry']
+
+Table: airare (33 columns)
+Columns: ['agen', 'catair', 'condtn', 'convis', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'picrep', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'wkb_geometry']
+
+Table: pilbop (37 columns)
+Columns: ['agen', 'catpil', 'comcha', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'npldst', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'perend', 'persta', 'pildst', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'wkb_geometry']
+
+Table: bcnlat (48 columns)
+Columns: ['agen', 'bcnshp', 'catlam', 'colour', 'colpat', 'condtn', 'conrad', 'convis', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'elevat', 'ffpt_rind', 'fidn', 'fids', 'grup', 'height', 'inform', 'lnam', 'lnam_refs', 'marsys', 'natcon', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'perend', 'persta', 'picrep', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'veracc', 'verdat', 'verlen', 'wkb_geometry']
+
+Table: pipare (35 columns)
+Columns: ['agen', 'catpip', 'condtn', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'prim', 'prodct', 'rcid', 'recdat', 'recind', 'restrn', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'wkb_geometry']
+
+Table: bcnspp (48 columns)
+Columns: ['agen', 'bcnshp', 'catspm', 'colour', 'colpat', 'condtn', 'conrad', 'convis', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'elevat', 'ffpt_rind', 'fidn', 'fids', 'grup', 'height', 'inform', 'lnam', 'lnam_refs', 'marsys', 'natcon', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'perend', 'persta', 'picrep', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'veracc', 'verdat', 'verlen', 'wkb_geometry']
+
+Table: bridge (45 columns)
+Columns: ['agen', 'catbrg', 'colour', 'colpat', 'condtn', 'conrad', 'convis', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'horacc', 'horclr', 'inform', 'lnam', 'lnam_refs', 'natcon', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'picrep', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'txtdsc', 'veracc', 'verccl', 'verclr', 'vercop', 'verdat', 'wkb_geometry']
+
+Table: ponton (39 columns)
+Columns: ['agen', 'condtn', 'conrad', 'convis', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'natcon', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'perend', 'persta', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'veracc', 'verlen', 'wkb_geometry']
+
+Table: buisgl (43 columns)
+Columns: ['agen', 'buishp', 'colour', 'colpat', 'condtn', 'conrad', 'convis', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'elevat', 'ffpt_rind', 'fidn', 'fids', 'functn', 'grup', 'height', 'inform', 'lnam', 'lnam_refs', 'natcon', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'picrep', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'veracc', 'verdat', 'verlen', 'wkb_geometry']
+
+Table: buaare (35 columns)
+Columns: ['agen', 'catbua', 'condtn', 'conrad', 'convis', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'height', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'txtdsc', 'veracc', 'verdat', 'wkb_geometry']
+
+Table: prcare (30 columns)
+Columns: ['agen', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'ntxtds', 'objl', 'ogc_fid', 'prim', 'rcid', 'recdat', 'recind', 'restrn', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'wkb_geometry']
+
+Table: boylat (43 columns)
+Columns: ['agen', 'boyshp', 'catlam', 'colour', 'colpat', 'conrad', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'marsys', 'natcon', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'perend', 'persta', 'picrep', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'veracc', 'verlen', 'wkb_geometry']
+
+Table: boysaw (42 columns)
+Columns: ['agen', 'boyshp', 'colour', 'colpat', 'conrad', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'marsys', 'natcon', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'perend', 'persta', 'picrep', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'veracc', 'verlen', 'wkb_geometry']
+
+Table: rtpbcn (40 columns)
+Columns: ['agen', 'catrtb', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'perend', 'persta', 'prim', 'radwal', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sectr1', 'sectr2', 'siggrp', 'sigseq', 'sordat', 'sorind', 'status', 'txtdsc', 'valmxr', 'wkb_geometry']
+
+Table: boyspp (43 columns)
+Columns: ['agen', 'boyshp', 'catspm', 'colour', 'colpat', 'conrad', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'marsys', 'natcon', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'perend', 'persta', 'picrep', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'veracc', 'verlen', 'wkb_geometry']
+
+Table: splare (32 columns)
+Columns: ['agen', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'perend', 'persta', 'prim', 'rcid', 'recdat', 'recind', 'restrn', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'wkb_geometry']
+
+Table: cblsub (37 columns)
+Columns: ['agen', 'burdep', 'catcbl', 'condtn', 'datend', 'datsta', 'drval1', 'drval2', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'verdat', 'wkb_geometry']
+
+Table: slotop (38 columns)
+Columns: ['agen', 'catslo', 'colour', 'conrad', 'convis', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'elevat', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'natcon', 'natqua', 'natsur', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'txtdsc', 'veracc', 'verdat', 'wkb_geometry']
+
+Table: ctnare (30 columns)
+Columns: ['agen', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'ntxtds', 'objl', 'ogc_fid', 'perend', 'persta', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'txtdsc', 'wkb_geometry']
+
+Table: unsare (26 columns)
+Columns: ['agen', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'ntxtds', 'objl', 'ogc_fid', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'txtdsc', 'wkb_geometry']
+
+Table: cgusta (33 columns)
+Columns: ['agen', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'perend', 'persta', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'wkb_geometry']
+
+Table: canals (36 columns)
+Columns: ['agen', 'catcan', 'condtn', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'horacc', 'horclr', 'horwid', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'wkb_geometry']
+
+Table: coalne (36 columns)
+Columns: ['agen', 'catcoa', 'colour', 'conrad', 'convis', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'elevat', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'picrep', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'txtdsc', 'veracc', 'verdat', 'wkb_geometry']
+
+Table: ctsare (33 columns)
+Columns: ['agen', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'perend', 'persta', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'wkb_geometry']
+
+Table: conzne (30 columns)
+Columns: ['agen', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'nation', 'ninfom', 'ntxtds', 'objl', 'ogc_fid', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'wkb_geometry']
+
+Table: curent (32 columns)
+Columns: ['agen', 'curvel', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'objl', 'objnam', 'ogc_fid', 'orient', 'perend', 'persta', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'wkb_geometry']
+
+Table: daymar (43 columns)
+Columns: ['agen', 'catspm', 'colour', 'colpat', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'elevat', 'ffpt_rind', 'fidn', 'fids', 'grup', 'height', 'inform', 'lnam', 'lnam_refs', 'natcon', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'perend', 'persta', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'topshp', 'txtdsc', 'veracc', 'verdat', 'verlen', 'wkb_geometry']
+
+Table: depare (31 columns)
+Columns: ['agen', 'drval1', 'drval2', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'ntxtds', 'objl', 'ogc_fid', 'prim', 'quasou', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'souacc', 'txtdsc', 'verdat', 'wkb_geometry']
+
+Table: depcnt (29 columns)
+Columns: ['agen', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'hypcat', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'ntxtds', 'objl', 'ogc_fid', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'txtdsc', 'valdco', 'verdat', 'wkb_geometry']
+
+Table: dmpgrd (31 columns)
+Columns: ['agen', 'catdpg', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'prim', 'rcid', 'recdat', 'recind', 'restrn', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'wkb_geometry']
+
+Table: exezne (27 columns)
+Columns: ['agen', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'nation', 'ninfom', 'ntxtds', 'objl', 'ogc_fid', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'txtdsc', 'wkb_geometry']
+
+Table: fogsig (40 columns)
+Columns: ['agen', 'catfog', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'perend', 'persta', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sigfrq', 'siggen', 'siggrp', 'sigper', 'sigseq', 'sordat', 'sorind', 'status', 'txtdsc', 'valmxr', 'wkb_geometry']
+
+Table: hrbfac (36 columns)
+Columns: ['agen', 'cathaf', 'condtn', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'natcon', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'perend', 'persta', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'wkb_geometry']
+
+Table: lakare (31 columns)
+Columns: ['agen', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'elevat', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'txtdsc', 'veracc', 'verdat', 'wkb_geometry']
+
+Table: lndare (30 columns)
+Columns: ['agen', 'condtn', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'wkb_geometry']
+
+Table: lndelv (32 columns)
+Columns: ['agen', 'convis', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'elevat', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'txtdsc', 'veracc', 'verdat', 'wkb_geometry']
+
+Table: lndrgn (32 columns)
+Columns: ['agen', 'catlnd', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'natqua', 'natsur', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'txtdsc', 'watlev', 'wkb_geometry']
+
+Table: lndmrk (43 columns)
+Columns: ['agen', 'catlmk', 'colour', 'colpat', 'condtn', 'conrad', 'convis', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'elevat', 'ffpt_rind', 'fidn', 'fids', 'functn', 'grup', 'height', 'inform', 'lnam', 'lnam_refs', 'natcon', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'picrep', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'veracc', 'verdat', 'verlen', 'wkb_geometry']
+
+Table: lights (50 columns)
+Columns: ['agen', 'catlit', 'colour', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'exclit', 'ffpt_rind', 'fidn', 'fids', 'grup', 'height', 'inform', 'litchr', 'litvis', 'lnam', 'lnam_refs', 'marsys', 'mltylt', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'orient', 'perend', 'persta', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sectr1', 'sectr2', 'siggrp', 'sigper', 'sigseq', 'sordat', 'sorind', 'status', 'txtdsc', 'valnmr', 'veracc', 'verdat', 'wkb_geometry']
+
+Table: magvar (29 columns)
+Columns: ['agen', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'objl', 'ogc_fid', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'ryrmgv', 'scamax', 'scamin', 'sordat', 'sorind', 'valacm', 'valmag', 'wkb_geometry']
+
+Table: mipare (35 columns)
+Columns: ['agen', 'catmpa', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'perend', 'persta', 'prim', 'rcid', 'recdat', 'recind', 'restrn', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'wkb_geometry']
+
+Table: obstrn (45 columns)
+Columns: ['agen', 'catobs', 'condtn', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'expsou', 'ffpt_rind', 'fidn', 'fids', 'grup', 'height', 'inform', 'lnam', 'lnam_refs', 'natcon', 'natqua', 'natsur', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'prim', 'prodct', 'quasou', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'souacc', 'status', 'tecsou', 'txtdsc', 'valsou', 'veracc', 'verdat', 'verlen', 'watlev', 'wkb_geometry']
+
+Table: pipsol (40 columns)
+Columns: ['agen', 'burdep', 'catpip', 'condtn', 'datend', 'datsta', 'drval1', 'drval2', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'prim', 'prodct', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'veracc', 'verdat', 'verlen', 'wkb_geometry']
+
+Table: rdocal (36 columns)
+Columns: ['agen', 'comcha', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'orient', 'perend', 'persta', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'trafic', 'txtdsc', 'wkb_geometry']
+
+Table: rdosta (39 columns)
+Columns: ['agen', 'calsgn', 'catros', 'comcha', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'estrng', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'orient', 'perend', 'persta', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sigfrq', 'sordat', 'sorind', 'status', 'txtdsc', 'wkb_geometry']
+
+Table: rectrc (42 columns)
+Columns: ['agen', 'cattrk', 'datend', 'datsta', 'drval1', 'drval2', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'orient', 'perend', 'persta', 'prim', 'quasou', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'souacc', 'status', 'tecsou', 'trafic', 'txtdsc', 'verdat', 'wkb_geometry']
+
+Table: resare (35 columns)
+Columns: ['agen', 'catrea', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'perend', 'persta', 'prim', 'rcid', 'recdat', 'recind', 'restrn', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'wkb_geometry']
+
+Table: rivers (29 columns)
+Columns: ['agen', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'wkb_geometry']
+
+Table: seaare (29 columns)
+Columns: ['agen', 'catsea', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'txtdsc', 'wkb_geometry']
+
+Table: sbdare (32 columns)
+Columns: ['agen', 'colour', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'natqua', 'natsur', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'txtdsc', 'watlev', 'wkb_geometry']
+
+Table: slcons (47 columns)
+Columns: ['agen', 'catslc', 'colour', 'colpat', 'condtn', 'conrad', 'convis', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'height', 'horacc', 'horclr', 'horlen', 'horwid', 'inform', 'lnam', 'lnam_refs', 'natcon', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'veracc', 'verdat', 'verlen', 'watlev', 'wkb_geometry']
+
+Table: siltnk (44 columns)
+Columns: ['agen', 'buishp', 'catsil', 'colour', 'colpat', 'condtn', 'conrad', 'convis', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'elevat', 'ffpt_rind', 'fidn', 'fids', 'grup', 'height', 'inform', 'lnam', 'lnam_refs', 'natcon', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'picrep', 'prim', 'prodct', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'veracc', 'verdat', 'verlen', 'wkb_geometry']
+
+Table: slogrd (35 columns)
+Columns: ['agen', 'catslo', 'colour', 'conrad', 'convis', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'natcon', 'natqua', 'natsur', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'txtdsc', 'wkb_geometry']
+
+Table: soundg (35 columns)
+Columns: ['agen', 'depth', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'expsou', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'prim', 'quasou', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'souacc', 'status', 'tecsou', 'txtdsc', 'verdat', 'wkb_geometry']
+
+Table: tesare (28 columns)
+Columns: ['agen', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'nation', 'ninfom', 'ntxtds', 'objl', 'ogc_fid', 'prim', 'rcid', 'recdat', 'recind', 'restrn', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'txtdsc', 'wkb_geometry']
+
+Table: topmar (40 columns)
+Columns: ['agen', 'colour', 'colpat', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'height', 'inform', 'lnam', 'lnam_refs', 'marsys', 'ninfom', 'ntxtds', 'objl', 'ogc_fid', 'perend', 'persta', 'picrep', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'topshp', 'txtdsc', 'veracc', 'verdat', 'verlen', 'wkb_geometry']
+
+Table: tssbnd (30 columns)
+Columns: ['agen', 'cattss', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'ntxtds', 'objl', 'ogc_fid', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'wkb_geometry']
+
+Table: tsslpt (32 columns)
+Columns: ['agen', 'cattss', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'ntxtds', 'objl', 'ogc_fid', 'orient', 'prim', 'rcid', 'recdat', 'recind', 'restrn', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'wkb_geometry']
+
+Table: tsezne (30 columns)
+Columns: ['agen', 'cattss', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'ntxtds', 'objl', 'ogc_fid', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'wkb_geometry']
+
+Table: uwtroc (38 columns)
+Columns: ['agen', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'expsou', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'natqua', 'natsur', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'prim', 'quasou', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'souacc', 'status', 'tecsou', 'txtdsc', 'valsou', 'verdat', 'watlev', 'wkb_geometry']
+
+Table: wattur (29 columns)
+Columns: ['agen', 'catwat', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'txtdsc', 'wkb_geometry']
+
+Table: wedklp (29 columns)
+Columns: ['agen', 'catwed', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'txtdsc', 'wkb_geometry']
+
+Table: wrecks (42 columns)
+Columns: ['agen', 'catwrk', 'conrad', 'convis', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'expsou', 'ffpt_rind', 'fidn', 'fids', 'grup', 'height', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'prim', 'quasou', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'souacc', 'status', 'tecsou', 'txtdsc', 'valsou', 'veracc', 'verdat', 'verlen', 'watlev', 'wkb_geometry']
+
+Table: m_covr (23 columns)
+Columns: ['agen', 'catcov', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'objl', 'ogc_fid', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'sordat', 'sorind', 'wkb_geometry']
+
+Table: m_npub (26 columns)
+Columns: ['agen', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'ntxtds', 'objl', 'ogc_fid', 'picrep', 'prim', 'pubref', 'rcid', 'recdat', 'recind', 'rver', 'sordat', 'sorind', 'txtdsc', 'wkb_geometry']
+
+Table: m_nsys (28 columns)
+Columns: ['agen', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'marsys', 'ninfom', 'ntxtds', 'objl', 'ogc_fid', 'orient', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'txtdsc', 'wkb_geometry']
+
+Table: m_qual (34 columns)
+Columns: ['agen', 'catqua', 'catzoc', 'drval1', 'drval2', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'ntxtds', 'objl', 'ogc_fid', 'posacc', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'sordat', 'sorind', 'souacc', 'surend', 'sursta', 'tecsou', 'txtdsc', 'verdat', 'wkb_geometry']
+
+Table: c_aggr (28 columns)
+Columns: ['agen', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'picrep', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'txtdsc']
+
+Table: c_asso (28 columns)
+Columns: ['agen', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'picrep', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'txtdsc']
+
+Table: fshzne (30 columns)
+Columns: ['agen', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'nation', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'wkb_geometry']
+
+Table: achare (35 columns)
+Columns: ['agen', 'catach', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'perend', 'persta', 'prim', 'rcid', 'recdat', 'recind', 'restrn', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'wkb_geometry']
+
+Table: cblare (33 columns)
+Columns: ['agen', 'catcbl', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'prim', 'rcid', 'recdat', 'recind', 'restrn', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'wkb_geometry']
+
+Table: cblohd (40 columns)
+Columns: ['agen', 'catcbl', 'condtn', 'conrad', 'convis', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'icefac', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'veracc', 'verclr', 'vercsa', 'verdat', 'wkb_geometry']
+
+Table: damcon (41 columns)
+Columns: ['agen', 'catdam', 'colour', 'colpat', 'condtn', 'conrad', 'convis', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'height', 'inform', 'lnam', 'lnam_refs', 'natcon', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'txtdsc', 'veracc', 'verdat', 'verlen', 'wkb_geometry']
+
+Table: fairwy (38 columns)
+Columns: ['agen', 'datend', 'datsta', 'drval1', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'orient', 'prim', 'quasou', 'rcid', 'recdat', 'recind', 'restrn', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'souacc', 'status', 'trafic', 'txtdsc', 'verdat', 'wkb_geometry']
+
+Table: feryrt (34 columns)
+Columns: ['agen', 'catfry', 'datend', 'datsta', 'dsid_dsnm', 'dsid_edtn', 'dsid_updn', 'ffpt_rind', 'fidn', 'fids', 'grup', 'inform', 'lnam', 'lnam_refs', 'ninfom', 'nobjnm', 'ntxtds', 'objl', 'objnam', 'ogc_fid', 'perend', 'persta', 'prim', 'rcid', 'recdat', 'recind', 'rver', 'scamax', 'scamin', 'sordat', 'sorind', 'status', 'txtdsc', 'wkb_geometry']
+
+
+Properties found in tables:
+  dsid_expp: ['dsid']
+  dsid_comt: ['dsid']
+  dssi_nall: ['dsid']
+  dspm_coun: ['dsid']
+  dsid_sted: ['dsid']
+  dsid_uadt: ['dsid']
+  dsid_prsp: ['dsid']
+  dssi_nomr: ['dsid']
+  dspm_puni: ['dsid']
+  dsid_prof: ['dsid']
+  dssi_dstr: ['dsid']
+  dspm_huni: ['dsid']
+  dssi_noin: ['dsid']
+  dssi_nofa: ['dsid']
+  dsid_intu: ['dsid']
+  dssi_aall: ['dsid']
+  dssi_nocn: ['dsid']
+  dspm_hdat: ['dsid']
+  dspm_duni: ['dsid']
+  dssi_nogr: ['dsid']
+  dspm_sdat: ['dsid']
+  dspm_vdat: ['dsid']
+  dsid_isdt: ['dsid']
+  dsid_agen: ['dsid']
+  dspm_comf: ['dsid']
+  dspm_cscl: ['dsid']
+  dssi_noed: ['dsid']
+  dspm_comt: ['dsid']
+  dsid_pred: ['dsid']
+  dsid_psdn: ['dsid']
+  dssi_nolr: ['dsid']
+  dspm_somf: ['dsid']
+  dssi_nocr: ['dsid']

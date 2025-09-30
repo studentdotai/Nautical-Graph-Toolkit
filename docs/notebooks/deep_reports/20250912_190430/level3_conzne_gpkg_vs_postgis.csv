@@ -1,0 +1,279 @@
+attribute,gpkg,postgis,notes
+METADATA_LAYER_NAME,conzne,conzne,Layer comparison between gpkg and postgis
+METADATA_TOTAL_FEATURES,6,6,Total features in each format
+METADATA_TOTAL_COLUMNS,34,35,Total columns in each format
+SEPARATOR_COLUMN_PRESENCE,--- COLUMN PRESENCE ---,--- COLUMN PRESENCE ---,Which columns exist in each format
+COLUMN_PRESENT_agen,YES,YES,Column agen presence
+COLUMN_PRESENT_datend,YES,YES,Column datend presence
+COLUMN_PRESENT_datsta,YES,YES,Column datsta presence
+COLUMN_PRESENT_dsid_dsnm,YES,YES,Column dsid_dsnm presence
+COLUMN_PRESENT_dsid_edtn,YES,YES,Column dsid_edtn presence
+COLUMN_PRESENT_dsid_updn,YES,YES,Column dsid_updn presence
+COLUMN_PRESENT_ffpt_rind,YES,YES,Column ffpt_rind presence
+COLUMN_PRESENT_fidn,YES,YES,Column fidn presence
+COLUMN_PRESENT_fids,YES,YES,Column fids presence
+COLUMN_PRESENT_grup,YES,YES,Column grup presence
+COLUMN_PRESENT_inform,YES,YES,Column inform presence
+COLUMN_PRESENT_lnam,YES,YES,Column lnam presence
+COLUMN_PRESENT_lnam_refs,YES,YES,Column lnam_refs presence
+COLUMN_PRESENT_mask,YES,YES,Column mask presence
+COLUMN_PRESENT_name_rcid,YES,YES,Column name_rcid presence
+COLUMN_PRESENT_name_rcnm,YES,YES,Column name_rcnm presence
+COLUMN_PRESENT_nation,YES,YES,Column nation presence
+COLUMN_PRESENT_ninfom,YES,YES,Column ninfom presence
+COLUMN_PRESENT_ntxtds,YES,YES,Column ntxtds presence
+COLUMN_PRESENT_objl,YES,YES,Column objl presence
+COLUMN_PRESENT_ogc_fid,NO,YES,Column ogc_fid presence
+COLUMN_PRESENT_ornt,YES,YES,Column ornt presence
+COLUMN_PRESENT_prim,YES,YES,Column prim presence
+COLUMN_PRESENT_rcid,YES,YES,Column rcid presence
+COLUMN_PRESENT_recdat,YES,YES,Column recdat presence
+COLUMN_PRESENT_recind,YES,YES,Column recind presence
+COLUMN_PRESENT_rver,YES,YES,Column rver presence
+COLUMN_PRESENT_scamax,YES,YES,Column scamax presence
+COLUMN_PRESENT_scamin,YES,YES,Column scamin presence
+COLUMN_PRESENT_sordat,YES,YES,Column sordat presence
+COLUMN_PRESENT_sorind,YES,YES,Column sorind presence
+COLUMN_PRESENT_status,YES,YES,Column status presence
+COLUMN_PRESENT_txtdsc,YES,YES,Column txtdsc presence
+COLUMN_PRESENT_usag,YES,YES,Column usag presence
+COLUMN_PRESENT_wkb_geometry,NO,YES,Column wkb_geometry presence
+SEPARATOR_DATA_TYPES,--- DATA TYPES ---,--- DATA TYPES ---,Data types for each column
+DATATYPE_agen,int32,float64,Data type for agen - MISMATCH!
+DATATYPE_datend,object,object,Data type for datend
+DATATYPE_datsta,object,object,Data type for datsta
+DATATYPE_dsid_dsnm,object,object,Data type for dsid_dsnm
+DATATYPE_dsid_edtn,int32,int64,Data type for dsid_edtn - MISMATCH!
+DATATYPE_dsid_updn,int32,int64,Data type for dsid_updn - MISMATCH!
+DATATYPE_ffpt_rind,object,object,Data type for ffpt_rind
+DATATYPE_fidn,int32,float64,Data type for fidn - MISMATCH!
+DATATYPE_fids,int32,float64,Data type for fids - MISMATCH!
+DATATYPE_grup,int32,float64,Data type for grup - MISMATCH!
+DATATYPE_inform,object,object,Data type for inform
+DATATYPE_lnam,object,object,Data type for lnam
+DATATYPE_lnam_refs,object,object,Data type for lnam_refs
+DATATYPE_mask,object,object,Data type for mask
+DATATYPE_name_rcid,object,object,Data type for name_rcid
+DATATYPE_name_rcnm,object,object,Data type for name_rcnm
+DATATYPE_nation,object,object,Data type for nation
+DATATYPE_ninfom,object,object,Data type for ninfom
+DATATYPE_ntxtds,object,object,Data type for ntxtds
+DATATYPE_objl,int32,float64,Data type for objl - MISMATCH!
+DATATYPE_ornt,object,object,Data type for ornt
+DATATYPE_prim,int32,float64,Data type for prim - MISMATCH!
+DATATYPE_rcid,int32,float64,Data type for rcid - MISMATCH!
+DATATYPE_recdat,object,object,Data type for recdat
+DATATYPE_recind,object,object,Data type for recind
+DATATYPE_rver,int32,float64,Data type for rver - MISMATCH!
+DATATYPE_scamax,float64,object,Data type for scamax - MISMATCH!
+DATATYPE_scamin,int32,int64,Data type for scamin - MISMATCH!
+DATATYPE_sordat,object,object,Data type for sordat
+DATATYPE_sorind,object,object,Data type for sorind
+DATATYPE_status,object,object,Data type for status
+DATATYPE_txtdsc,object,object,Data type for txtdsc
+DATATYPE_usag,object,object,Data type for usag
+SEPARATOR_FEATURE_SAMPLES,--- FEATURE SAMPLES (6) ---,--- FEATURE SAMPLES (6) ---,Sample of 6 features from each format
+SAMPLE_FEATURE_1_SEPARATOR,--- FEATURE 1 ---,--- FEATURE 1 ---,Feature 1 sample
+SAMPLE_F1_agen,550,550.0,Feature 1 - agen - VALUES DIFFER!
+SAMPLE_F1_datend,None,None,Feature 1 - datend
+SAMPLE_F1_datsta,None,None,Feature 1 - datsta
+SAMPLE_F1_dsid_dsnm,US3CA52M,US3CA52M,Feature 1 - dsid_dsnm
+SAMPLE_F1_dsid_edtn,31,31,Feature 1 - dsid_edtn
+SAMPLE_F1_dsid_updn,0,0,Feature 1 - dsid_updn
+SAMPLE_F1_ffpt_rind,None,None,Feature 1 - ffpt_rind
+SAMPLE_F1_fidn,261858221,261858221.0,Feature 1 - fidn - VALUES DIFFER!
+SAMPLE_F1_fids,8691,8691.0,Feature 1 - fids - VALUES DIFFER!
+SAMPLE_F1_grup,2,2.0,Feature 1 - grup - VALUES DIFFER!
+SAMPLE_F1_inform,"For more information about maritime zones, please refer to the Coast Pilot, Chapter 1.","For more information about maritime zones, please refer to the Coast Pilot, Chapter 1.",Feature 1 - inform
+SAMPLE_F1_lnam,02260F9BA3AD21F3,02260F9BA3AD21F3,Feature 1 - lnam
+SAMPLE_F1_lnam_refs,None,None,Feature 1 - lnam_refs
+SAMPLE_F1_mask,"[ 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 2, 2, 255, 255, 255, 255, 255, 255, 255,...","[255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 2, 2, 255, 255, 255, 255, 255, 255, 255, ...",Feature 1 - mask - VALUES DIFFER!
+SAMPLE_F1_name_rcid,"[ 43, 61, 62, 63, 617, 618, 65, 66, 73, 93, 98, 735, 736, 638, 639, 640, 641, 642, 643, 644, 91, ...","[43, 61, 62, 63, 617, 618, 65, 66, 73, 93, 98, 735, 736, 638, 639, 640, 641, 642, 643, 644, 91, 1...",Feature 1 - name_rcid - VALUES DIFFER!
+SAMPLE_F1_name_rcnm,"[ 130, 130, 130, 130, 130, 130, 130, 130, 130, 130, 130, 130, 130, 130, 130, 130, 130, 130, 130, ...","[130, 130, 130, 130, 130, 130, 130, 130, 130, 130, 130, 130, 130, 130, 130, 130, 130, 130, 130, 1...",Feature 1 - name_rcnm - VALUES DIFFER!
+SAMPLE_F1_nation,US,US,Feature 1 - nation
+SAMPLE_F1_ninfom,None,None,Feature 1 - ninfom
+SAMPLE_F1_ntxtds,None,None,Feature 1 - ntxtds
+SAMPLE_F1_objl,31,31.0,Feature 1 - objl - VALUES DIFFER!
+SAMPLE_F1_ornt,"[ 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 ]","[2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]",Feature 1 - ornt - VALUES DIFFER!
+SAMPLE_F1_prim,3,3.0,Feature 1 - prim - VALUES DIFFER!
+SAMPLE_F1_rcid,1700,1700.0,Feature 1 - rcid - VALUES DIFFER!
+SAMPLE_F1_recdat,None,None,Feature 1 - recdat
+SAMPLE_F1_recind,None,None,Feature 1 - recind
+SAMPLE_F1_rver,1,1.0,Feature 1 - rver - VALUES DIFFER!
+SAMPLE_F1_scamax,nan,None,Feature 1 - scamax - VALUES DIFFER!
+SAMPLE_F1_scamin,499999,499999,Feature 1 - scamin
+SAMPLE_F1_sordat,20240119,20240119,Feature 1 - sordat
+SAMPLE_F1_sorind,"US,US,reprt,L-30-2024","US,US,reprt,L-30-2024",Feature 1 - sorind
+SAMPLE_F1_status,None,None,Feature 1 - status
+SAMPLE_F1_txtdsc,None,None,Feature 1 - txtdsc
+SAMPLE_F1_usag,"[ 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 1, 1, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 1, 3, 3, 1 ]","[3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 1, 1, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 1, 3, 3, 1]",Feature 1 - usag - VALUES DIFFER!
+SAMPLE_FEATURE_2_SEPARATOR,--- FEATURE 2 ---,--- FEATURE 2 ---,Feature 2 sample
+SAMPLE_F2_agen,550,550.0,Feature 2 - agen - VALUES DIFFER!
+SAMPLE_F2_datend,None,None,Feature 2 - datend
+SAMPLE_F2_datsta,None,None,Feature 2 - datsta
+SAMPLE_F2_dsid_dsnm,US1EEZ1M,US1EEZ1M,Feature 2 - dsid_dsnm
+SAMPLE_F2_dsid_edtn,9,9,Feature 2 - dsid_edtn
+SAMPLE_F2_dsid_updn,0,0,Feature 2 - dsid_updn
+SAMPLE_F2_ffpt_rind,None,None,Feature 2 - ffpt_rind
+SAMPLE_F2_fidn,134380034,134380034.0,Feature 2 - fidn - VALUES DIFFER!
+SAMPLE_F2_fids,1,1.0,Feature 2 - fids - VALUES DIFFER!
+SAMPLE_F2_grup,2,2.0,Feature 2 - grup - VALUES DIFFER!
+SAMPLE_F2_inform,None,None,Feature 2 - inform
+SAMPLE_F2_lnam,022608027A020001,022608027A020001,Feature 2 - lnam
+SAMPLE_F2_lnam_refs,None,None,Feature 2 - lnam_refs
+SAMPLE_F2_mask,"[ 2, 2, 2, 2, 2, 2, 2 ]","[2, 2, 2, 2, 2, 2, 2]",Feature 2 - mask - VALUES DIFFER!
+SAMPLE_F2_name_rcid,"[ 21, 22, 23, 30, 29, 81, 80 ]","[21, 22, 23, 30, 29, 81, 80]",Feature 2 - name_rcid - VALUES DIFFER!
+SAMPLE_F2_name_rcnm,"[ 130, 130, 130, 130, 130, 130, 130 ]","[130, 130, 130, 130, 130, 130, 130]",Feature 2 - name_rcnm - VALUES DIFFER!
+SAMPLE_F2_nation,US,US,Feature 2 - nation
+SAMPLE_F2_ninfom,None,None,Feature 2 - ninfom
+SAMPLE_F2_ntxtds,None,None,Feature 2 - ntxtds
+SAMPLE_F2_objl,31,31.0,Feature 2 - objl - VALUES DIFFER!
+SAMPLE_F2_ornt,"[ 1, 2, 2, 1, 2, 1, 2 ]","[1, 2, 2, 1, 2, 1, 2]",Feature 2 - ornt - VALUES DIFFER!
+SAMPLE_F2_prim,3,3.0,Feature 2 - prim - VALUES DIFFER!
+SAMPLE_F2_rcid,152,152.0,Feature 2 - rcid - VALUES DIFFER!
+SAMPLE_F2_recdat,None,None,Feature 2 - recdat
+SAMPLE_F2_recind,None,None,Feature 2 - recind
+SAMPLE_F2_rver,1,1.0,Feature 2 - rver - VALUES DIFFER!
+SAMPLE_F2_scamax,nan,None,Feature 2 - scamax - VALUES DIFFER!
+SAMPLE_F2_scamin,19999999,19999999,Feature 2 - scamin
+SAMPLE_F2_sordat,20111116,20111116,Feature 2 - sordat
+SAMPLE_F2_sorind,"US,US,reprt,L-1430/11","US,US,reprt,L-1430/11",Feature 2 - sorind
+SAMPLE_F2_status,None,None,Feature 2 - status
+SAMPLE_F2_txtdsc,USMTZONE.TXT,USMTZONE.TXT,Feature 2 - txtdsc
+SAMPLE_F2_usag,"[ 1, 1, 1, 2, 2, 2, 2 ]","[1, 1, 1, 2, 2, 2, 2]",Feature 2 - usag - VALUES DIFFER!
+SAMPLE_FEATURE_3_SEPARATOR,--- FEATURE 3 ---,--- FEATURE 3 ---,Feature 3 sample
+SAMPLE_F3_agen,550,550.0,Feature 3 - agen - VALUES DIFFER!
+SAMPLE_F3_datend,None,None,Feature 3 - datend
+SAMPLE_F3_datsta,None,None,Feature 3 - datsta
+SAMPLE_F3_dsid_dsnm,US1EEZ1M,US1EEZ1M,Feature 3 - dsid_dsnm
+SAMPLE_F3_dsid_edtn,9,9,Feature 3 - dsid_edtn
+SAMPLE_F3_dsid_updn,0,0,Feature 3 - dsid_updn
+SAMPLE_F3_ffpt_rind,None,None,Feature 3 - ffpt_rind
+SAMPLE_F3_fidn,280301747,280301747.0,Feature 3 - fidn - VALUES DIFFER!
+SAMPLE_F3_fids,1,1.0,Feature 3 - fids - VALUES DIFFER!
+SAMPLE_F3_grup,2,2.0,Feature 3 - grup - VALUES DIFFER!
+SAMPLE_F3_inform,None,None,Feature 3 - inform
+SAMPLE_F3_lnam,022610B510B30001,022610B510B30001,Feature 3 - lnam
+SAMPLE_F3_lnam_refs,None,None,Feature 3 - lnam_refs
+SAMPLE_F3_mask,"[ 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2 ]","[2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2]",Feature 3 - mask - VALUES DIFFER!
+SAMPLE_F3_name_rcid,"[ 2, 3, 4, 5, 6, 7, 15, 16, 18, 19, 25, 26, 27, 31, 32, 42, 48, 67, 74, 75 ]","[2, 3, 4, 5, 6, 7, 15, 16, 18, 19, 25, 26, 27, 31, 32, 42, 48, 67, 74, 75]",Feature 3 - name_rcid - VALUES DIFFER!
+SAMPLE_F3_name_rcnm,"[ 130, 130, 130, 130, 130, 130, 130, 130, 130, 130, 130, 130, 130, 130, 130, 130, 130, 130, 130, ...","[130, 130, 130, 130, 130, 130, 130, 130, 130, 130, 130, 130, 130, 130, 130, 130, 130, 130, 130, 130]",Feature 3 - name_rcnm - VALUES DIFFER!
+SAMPLE_F3_nation,US,US,Feature 3 - nation
+SAMPLE_F3_ninfom,None,None,Feature 3 - ninfom
+SAMPLE_F3_ntxtds,None,None,Feature 3 - ntxtds
+SAMPLE_F3_objl,31,31.0,Feature 3 - objl - VALUES DIFFER!
+SAMPLE_F3_ornt,"[ 2, 2, 1, 1, 1, 1, 2, 1, 1, 1, 2, 2, 1, 2, 1, 2, 2, 2, 2, 2 ]","[2, 2, 1, 1, 1, 1, 2, 1, 1, 1, 2, 2, 1, 2, 1, 2, 2, 2, 2, 2]",Feature 3 - ornt - VALUES DIFFER!
+SAMPLE_F3_prim,3,3.0,Feature 3 - prim - VALUES DIFFER!
+SAMPLE_F3_rcid,153,153.0,Feature 3 - rcid - VALUES DIFFER!
+SAMPLE_F3_recdat,None,None,Feature 3 - recdat
+SAMPLE_F3_recind,None,None,Feature 3 - recind
+SAMPLE_F3_rver,1,1.0,Feature 3 - rver - VALUES DIFFER!
+SAMPLE_F3_scamax,nan,None,Feature 3 - scamax - VALUES DIFFER!
+SAMPLE_F3_scamin,19999999,19999999,Feature 3 - scamin
+SAMPLE_F3_sordat,20121218,20121218,Feature 3 - sordat
+SAMPLE_F3_sorind,"US,US,reprt,L-2369/12","US,US,reprt,L-2369/12",Feature 3 - sorind
+SAMPLE_F3_status,None,None,Feature 3 - status
+SAMPLE_F3_txtdsc,USMTZONE.TXT,USMTZONE.TXT,Feature 3 - txtdsc
+SAMPLE_F3_usag,"[ 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2 ]","[1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2]",Feature 3 - usag - VALUES DIFFER!
+SAMPLE_FEATURE_4_SEPARATOR,--- FEATURE 4 ---,--- FEATURE 4 ---,Feature 4 sample
+SAMPLE_F4_agen,550,550.0,Feature 4 - agen - VALUES DIFFER!
+SAMPLE_F4_datend,None,None,Feature 4 - datend
+SAMPLE_F4_datsta,None,None,Feature 4 - datsta
+SAMPLE_F4_dsid_dsnm,US1EEZ1M,US1EEZ1M,Feature 4 - dsid_dsnm
+SAMPLE_F4_dsid_edtn,9,9,Feature 4 - dsid_edtn
+SAMPLE_F4_dsid_updn,0,0,Feature 4 - dsid_updn
+SAMPLE_F4_ffpt_rind,None,None,Feature 4 - ffpt_rind
+SAMPLE_F4_fidn,74746115,74746115.0,Feature 4 - fidn - VALUES DIFFER!
+SAMPLE_F4_fids,1,1.0,Feature 4 - fids - VALUES DIFFER!
+SAMPLE_F4_grup,2,2.0,Feature 4 - grup - VALUES DIFFER!
+SAMPLE_F4_inform,None,None,Feature 4 - inform
+SAMPLE_F4_lnam,0226047489030001,0226047489030001,Feature 4 - lnam
+SAMPLE_F4_lnam_refs,None,None,Feature 4 - lnam_refs
+SAMPLE_F4_mask,"[ 2, 2 ]","[2, 2]",Feature 4 - mask - VALUES DIFFER!
+SAMPLE_F4_name_rcid,"[ 68, 59 ]","[68, 59]",Feature 4 - name_rcid - VALUES DIFFER!
+SAMPLE_F4_name_rcnm,"[ 130, 130 ]","[130, 130]",Feature 4 - name_rcnm - VALUES DIFFER!
+SAMPLE_F4_nation,US,US,Feature 4 - nation
+SAMPLE_F4_ninfom,None,None,Feature 4 - ninfom
+SAMPLE_F4_ntxtds,None,None,Feature 4 - ntxtds
+SAMPLE_F4_objl,31,31.0,Feature 4 - objl - VALUES DIFFER!
+SAMPLE_F4_ornt,"[ 1, 2 ]","[1, 2]",Feature 4 - ornt - VALUES DIFFER!
+SAMPLE_F4_prim,3,3.0,Feature 4 - prim - VALUES DIFFER!
+SAMPLE_F4_rcid,154,154.0,Feature 4 - rcid - VALUES DIFFER!
+SAMPLE_F4_recdat,None,None,Feature 4 - recdat
+SAMPLE_F4_recind,None,None,Feature 4 - recind
+SAMPLE_F4_rver,1,1.0,Feature 4 - rver - VALUES DIFFER!
+SAMPLE_F4_scamax,nan,None,Feature 4 - scamax - VALUES DIFFER!
+SAMPLE_F4_scamin,19999999,19999999,Feature 4 - scamin
+SAMPLE_F4_sordat,20111116,20111116,Feature 4 - sordat
+SAMPLE_F4_sorind,"US,US,reprt,L-1430/11","US,US,reprt,L-1430/11",Feature 4 - sorind
+SAMPLE_F4_status,None,None,Feature 4 - status
+SAMPLE_F4_txtdsc,USMTZONE.TXT,USMTZONE.TXT,Feature 4 - txtdsc
+SAMPLE_F4_usag,"[ 1, 2 ]","[1, 2]",Feature 4 - usag - VALUES DIFFER!
+SAMPLE_FEATURE_5_SEPARATOR,--- FEATURE 5 ---,--- FEATURE 5 ---,Feature 5 sample
+SAMPLE_F5_agen,550,550.0,Feature 5 - agen - VALUES DIFFER!
+SAMPLE_F5_datend,None,None,Feature 5 - datend
+SAMPLE_F5_datsta,None,None,Feature 5 - datsta
+SAMPLE_F5_dsid_dsnm,US4CA60M,US4CA60M,Feature 5 - dsid_dsnm
+SAMPLE_F5_dsid_edtn,37,37,Feature 5 - dsid_edtn
+SAMPLE_F5_dsid_updn,6,6,Feature 5 - dsid_updn
+SAMPLE_F5_ffpt_rind,None,None,Feature 5 - ffpt_rind
+SAMPLE_F5_fidn,364717923,364717923.0,Feature 5 - fidn - VALUES DIFFER!
+SAMPLE_F5_fids,1,1.0,Feature 5 - fids - VALUES DIFFER!
+SAMPLE_F5_grup,2,2.0,Feature 5 - grup - VALUES DIFFER!
+SAMPLE_F5_inform,None,None,Feature 5 - inform
+SAMPLE_F5_lnam,022615BD27630001,022615BD27630001,Feature 5 - lnam
+SAMPLE_F5_lnam_refs,None,None,Feature 5 - lnam_refs
+SAMPLE_F5_mask,"[ 255, 255, 2, 2, 2, 2, 255 ]","[255, 255, 2, 2, 2, 2, 255]",Feature 5 - mask - VALUES DIFFER!
+SAMPLE_F5_name_rcid,"[ 405, 406, 1645, 1644, 1643, 1642, 404 ]","[405, 406, 1645, 1644, 1643, 1642, 404]",Feature 5 - name_rcid - VALUES DIFFER!
+SAMPLE_F5_name_rcnm,"[ 130, 130, 130, 130, 130, 130, 130 ]","[130, 130, 130, 130, 130, 130, 130]",Feature 5 - name_rcnm - VALUES DIFFER!
+SAMPLE_F5_nation,US,US,Feature 5 - nation
+SAMPLE_F5_ninfom,None,None,Feature 5 - ninfom
+SAMPLE_F5_ntxtds,None,None,Feature 5 - ntxtds
+SAMPLE_F5_objl,31,31.0,Feature 5 - objl - VALUES DIFFER!
+SAMPLE_F5_ornt,"[ 2, 2, 1, 1, 1, 1, 2 ]","[2, 2, 1, 1, 1, 1, 2]",Feature 5 - ornt - VALUES DIFFER!
+SAMPLE_F5_prim,3,3.0,Feature 5 - prim - VALUES DIFFER!
+SAMPLE_F5_rcid,3253,3253.0,Feature 5 - rcid - VALUES DIFFER!
+SAMPLE_F5_recdat,None,None,Feature 5 - recdat
+SAMPLE_F5_recind,None,None,Feature 5 - recind
+SAMPLE_F5_rver,1,1.0,Feature 5 - rver - VALUES DIFFER!
+SAMPLE_F5_scamax,nan,None,Feature 5 - scamax - VALUES DIFFER!
+SAMPLE_F5_scamin,179999,179999,Feature 5 - scamin
+SAMPLE_F5_sordat,20111114,20111114,Feature 5 - sordat
+SAMPLE_F5_sorind,"US,US,reprt,L-1428/11","US,US,reprt,L-1428/11",Feature 5 - sorind
+SAMPLE_F5_status,None,None,Feature 5 - status
+SAMPLE_F5_txtdsc,US4CA60H.TXT,US4CA60H.TXT,Feature 5 - txtdsc
+SAMPLE_F5_usag,"[ 3, 3, 1, 1, 1, 1, 3 ]","[3, 3, 1, 1, 1, 1, 3]",Feature 5 - usag - VALUES DIFFER!
+SAMPLE_FEATURE_6_SEPARATOR,--- FEATURE 6 ---,--- FEATURE 6 ---,Feature 6 sample
+SAMPLE_F6_agen,550,550.0,Feature 6 - agen - VALUES DIFFER!
+SAMPLE_F6_datend,None,None,Feature 6 - datend
+SAMPLE_F6_datsta,None,None,Feature 6 - datsta
+SAMPLE_F6_dsid_dsnm,US1GC09M,US1GC09M,Feature 6 - dsid_dsnm
+SAMPLE_F6_dsid_edtn,65,65,Feature 6 - dsid_edtn
+SAMPLE_F6_dsid_updn,5,5,Feature 6 - dsid_updn
+SAMPLE_F6_ffpt_rind,None,None,Feature 6 - ffpt_rind
+SAMPLE_F6_fidn,457884567,457884567.0,Feature 6 - fidn - VALUES DIFFER!
+SAMPLE_F6_fids,8691,8691.0,Feature 6 - fids - VALUES DIFFER!
+SAMPLE_F6_grup,2,2.0,Feature 6 - grup - VALUES DIFFER!
+SAMPLE_F6_inform,"For more information about maritime zones, please refer to the Coast Pilot, Chapter 1.","For more information about maritime zones, please refer to the Coast Pilot, Chapter 1.",Feature 6 - inform
+SAMPLE_F6_lnam,02261B4AC39721F3,02261B4AC39721F3,Feature 6 - lnam
+SAMPLE_F6_lnam_refs,None,None,Feature 6 - lnam_refs
+SAMPLE_F6_mask,"[ 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 255, 255, 255, 255, 255, 255, 255, 2 ]","[2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 255, 255, 255, 255, 255, 255, 255, 2]",Feature 6 - mask - VALUES DIFFER!
+SAMPLE_F6_name_rcid,"[ 841, 842, 843, 844, 4907, 845, 1598, 850, 849, 836, 618, 619, 620, 811, 812, 813, 622, 1529 ]","[841, 842, 843, 844, 4907, 845, 1598, 850, 849, 836, 618, 619, 620, 811, 812, 813, 622, 1529]",Feature 6 - name_rcid - VALUES DIFFER!
+SAMPLE_F6_name_rcnm,"[ 130, 130, 130, 130, 130, 130, 130, 130, 130, 130, 130, 130, 130, 130, 130, 130, 130, 130 ]","[130, 130, 130, 130, 130, 130, 130, 130, 130, 130, 130, 130, 130, 130, 130, 130, 130, 130]",Feature 6 - name_rcnm - VALUES DIFFER!
+SAMPLE_F6_nation,US,US,Feature 6 - nation
+SAMPLE_F6_ninfom,None,None,Feature 6 - ninfom
+SAMPLE_F6_ntxtds,None,None,Feature 6 - ntxtds
+SAMPLE_F6_objl,31,31.0,Feature 6 - objl - VALUES DIFFER!
+SAMPLE_F6_ornt,"[ 2, 2, 2, 2, 1, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1 ]","[2, 2, 2, 2, 1, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1]",Feature 6 - ornt - VALUES DIFFER!
+SAMPLE_F6_prim,3,3.0,Feature 6 - prim - VALUES DIFFER!
+SAMPLE_F6_rcid,5335,5335.0,Feature 6 - rcid - VALUES DIFFER!
+SAMPLE_F6_recdat,None,None,Feature 6 - recdat
+SAMPLE_F6_recind,None,None,Feature 6 - recind
+SAMPLE_F6_rver,1,1.0,Feature 6 - rver - VALUES DIFFER!
+SAMPLE_F6_scamax,nan,None,Feature 6 - scamax - VALUES DIFFER!
+SAMPLE_F6_scamin,9999999,9999999,Feature 6 - scamin
+SAMPLE_F6_sordat,20240119,20240119,Feature 6 - sordat
+SAMPLE_F6_sorind,"US,US,reprt,L-30-2024","US,US,reprt,L-30-2024",Feature 6 - sorind
+SAMPLE_F6_status,None,None,Feature 6 - status
+SAMPLE_F6_txtdsc,None,None,Feature 6 - txtdsc
+SAMPLE_F6_usag,"[ 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 3, 3, 3, 3, 3, 3, 2 ]","[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 3, 3, 3, 3, 3, 3, 2]",Feature 6 - usag - VALUES DIFFER!

@@ -1,0 +1,37 @@
+NATIONAL GEOSPATIAL-INTELLIGENCE AGENCY
+US4TB3J0 - PALAU - NGEAUR
+ 
+INDEX:
+GLOSSARY
+POSITIONS
+SOUNDING DATUM
+CAUTION 1
+CAUTION 2
+TIDAL INFORMATION
+SUPPLEMENTAL INFORMATION
+
+NOTES: 
+GLOSSARY:
+Bkul ... cape
+Euchel ... channel, passage
+Toachel ... channel, passage
+
+POSITIONS:
+This cell has been positioned on the WGS-84 Datum through the use of commercial satellite imagery.
+
+SOUNDING DATUM:
+0.3 meters below Mean Low Water Springs.
+
+CAUTION 1:
+Fish Aggregating Devices (FADs), anchored or drifting, are commonly deployed within the waters of many Pacific Islands and may not be charted. Even though many of the installations are temporary in nature, FADs pose significant risk to navigation safety. Prudent mariners should exercise caution in navigating these waters.
+
+CAUTION 2:
+QUALITY OF BATHYMETRIC DATA - The areas represented by the object M_QUAL (Quality of Data) are approximate due to generalizing for clarity. Caution is advised, particularly for nearshore navigation or voyage planning. M_QUAL represents areas of uniform quality of bathymetric data. The CATZOC (Category of Zone of Confidence in Data) attribute of M_QUAL provides an assessment of the overall zone of confidence.
+
+TIDAL INFORMATION:
+Refer to Admiralty Total Tides Program for the latest information.
+
+SUPPLEMENTAL INFORMATION:
+Consult National Geospatial-Intelligence Agency Pub. 126, Sailing Directions, for important supplemental information. 
+
+END OF FILE

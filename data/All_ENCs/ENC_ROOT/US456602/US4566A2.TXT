@@ -1,0 +1,15 @@
+NATIONAL GEOSPATIAL-INTELLIGENCE AGENCY
+US456602 - PULUSUK - FEDERATED STATES OF MICRONESIA
+ 
+INDEX:
+NOTE 1
+NOTE 2 
+
+NOTES:
+NOTE 1:
+The original soundings were in fathoms.
+
+NOTE 2:
+All information positioned using orthorectified imagery dated November 2018.
+
+END OF FILE

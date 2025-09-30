@@ -1,0 +1,146 @@
+attribute,gpkg,spatialite,notes
+METADATA_LAYER_NAME,tsezne,tsezne,Layer comparison between gpkg and spatialite
+METADATA_TOTAL_FEATURES,3,3,Total features in each format
+METADATA_TOTAL_COLUMNS,34,26,Total columns in each format
+SEPARATOR_COLUMN_PRESENCE,--- COLUMN PRESENCE ---,--- COLUMN PRESENCE ---,Which columns exist in each format
+COLUMN_PRESENT_agen,YES,YES,Column agen presence
+COLUMN_PRESENT_cattss,YES,YES,Column cattss presence
+COLUMN_PRESENT_datend,YES,YES,Column datend presence
+COLUMN_PRESENT_datsta,YES,YES,Column datsta presence
+COLUMN_PRESENT_dsid_dsnm,YES,YES,Column dsid_dsnm presence
+COLUMN_PRESENT_dsid_edtn,YES,YES,Column dsid_edtn presence
+COLUMN_PRESENT_dsid_updn,YES,YES,Column dsid_updn presence
+COLUMN_PRESENT_ffpt_rind,YES,NO,Column ffpt_rind presence
+COLUMN_PRESENT_fidn,YES,YES,Column fidn presence
+COLUMN_PRESENT_fids,YES,YES,Column fids presence
+COLUMN_PRESENT_grup,YES,YES,Column grup presence
+COLUMN_PRESENT_inform,YES,YES,Column inform presence
+COLUMN_PRESENT_lnam,YES,YES,Column lnam presence
+COLUMN_PRESENT_lnam_refs,YES,NO,Column lnam_refs presence
+COLUMN_PRESENT_mask,YES,NO,Column mask presence
+COLUMN_PRESENT_name_rcid,YES,NO,Column name_rcid presence
+COLUMN_PRESENT_name_rcnm,YES,NO,Column name_rcnm presence
+COLUMN_PRESENT_ninfom,YES,YES,Column ninfom presence
+COLUMN_PRESENT_ntxtds,YES,YES,Column ntxtds presence
+COLUMN_PRESENT_objl,YES,YES,Column objl presence
+COLUMN_PRESENT_ornt,YES,NO,Column ornt presence
+COLUMN_PRESENT_prim,YES,YES,Column prim presence
+COLUMN_PRESENT_rcid,YES,YES,Column rcid presence
+COLUMN_PRESENT_recdat,YES,YES,Column recdat presence
+COLUMN_PRESENT_recind,YES,YES,Column recind presence
+COLUMN_PRESENT_rver,YES,YES,Column rver presence
+COLUMN_PRESENT_scamax,YES,YES,Column scamax presence
+COLUMN_PRESENT_scamin,YES,YES,Column scamin presence
+COLUMN_PRESENT_sordat,YES,YES,Column sordat presence
+COLUMN_PRESENT_sorind,YES,YES,Column sorind presence
+COLUMN_PRESENT_status,YES,NO,Column status presence
+COLUMN_PRESENT_txtdsc,YES,YES,Column txtdsc presence
+COLUMN_PRESENT_usag,YES,NO,Column usag presence
+SEPARATOR_DATA_TYPES,--- DATA TYPES ---,--- DATA TYPES ---,Data types for each column
+DATATYPE_agen,int32,int32,Data type for agen
+DATATYPE_cattss,int32,int32,Data type for cattss
+DATATYPE_datend,object,object,Data type for datend
+DATATYPE_datsta,object,object,Data type for datsta
+DATATYPE_dsid_dsnm,object,object,Data type for dsid_dsnm
+DATATYPE_dsid_edtn,int32,int32,Data type for dsid_edtn
+DATATYPE_dsid_updn,int32,int32,Data type for dsid_updn
+DATATYPE_fidn,int32,int32,Data type for fidn
+DATATYPE_fids,int32,int32,Data type for fids
+DATATYPE_grup,int32,int32,Data type for grup
+DATATYPE_inform,object,object,Data type for inform
+DATATYPE_lnam,object,object,Data type for lnam
+DATATYPE_ninfom,object,object,Data type for ninfom
+DATATYPE_ntxtds,object,object,Data type for ntxtds
+DATATYPE_objl,int32,int32,Data type for objl
+DATATYPE_prim,int32,int32,Data type for prim
+DATATYPE_rcid,int32,int32,Data type for rcid
+DATATYPE_recdat,object,object,Data type for recdat
+DATATYPE_recind,object,object,Data type for recind
+DATATYPE_rver,int32,int32,Data type for rver
+DATATYPE_scamax,float64,float64,Data type for scamax
+DATATYPE_scamin,float64,float64,Data type for scamin
+DATATYPE_sordat,object,object,Data type for sordat
+DATATYPE_sorind,object,object,Data type for sorind
+DATATYPE_txtdsc,object,object,Data type for txtdsc
+SEPARATOR_FEATURE_SAMPLES,--- FEATURE SAMPLES (3) ---,--- FEATURE SAMPLES (3) ---,Sample of 3 features from each format
+SAMPLE_FEATURE_1_SEPARATOR,--- FEATURE 1 ---,--- FEATURE 1 ---,Feature 1 sample
+SAMPLE_F1_agen,550,550,Feature 1 - agen
+SAMPLE_F1_cattss,1,1,Feature 1 - cattss
+SAMPLE_F1_datend,None,None,Feature 1 - datend
+SAMPLE_F1_datsta,None,None,Feature 1 - datsta
+SAMPLE_F1_dsid_dsnm,US3CA52M,US3CA52M,Feature 1 - dsid_dsnm
+SAMPLE_F1_dsid_edtn,31,31,Feature 1 - dsid_edtn
+SAMPLE_F1_dsid_updn,0,0,Feature 1 - dsid_updn
+SAMPLE_F1_fidn,768412241,768412241,Feature 1 - fidn
+SAMPLE_F1_fids,1,1,Feature 1 - fids
+SAMPLE_F1_geometry,"POLYGON ((-122.716667 37.311786, -122.673333 37.30...","POLYGON ((-122.716667 37.311786, -122.673333 37.30...",Feature 1 - geometry
+SAMPLE_F1_grup,2,2,Feature 1 - grup
+SAMPLE_F1_inform,Southern approach - separation zone,Southern approach - separation zone,Feature 1 - inform
+SAMPLE_F1_lnam,02262DCD0A510001,02262DCD0A510001,Feature 1 - lnam
+SAMPLE_F1_ninfom,None,None,Feature 1 - ninfom
+SAMPLE_F1_ntxtds,None,None,Feature 1 - ntxtds
+SAMPLE_F1_objl,150,150,Feature 1 - objl
+SAMPLE_F1_prim,3,3,Feature 1 - prim
+SAMPLE_F1_rcid,2131,2131,Feature 1 - rcid
+SAMPLE_F1_recdat,None,None,Feature 1 - recdat
+SAMPLE_F1_recind,None,None,Feature 1 - recind
+SAMPLE_F1_rver,1,1,Feature 1 - rver
+SAMPLE_F1_scamax,nan,nan,Feature 1 - scamax
+SAMPLE_F1_scamin,nan,nan,Feature 1 - scamin
+SAMPLE_F1_sordat,20130328,20130328,Feature 1 - sordat
+SAMPLE_F1_sorind,"US,US,reprt,L-25/13","US,US,reprt,L-25/13",Feature 1 - sorind
+SAMPLE_F1_txtdsc,None,None,Feature 1 - txtdsc
+SAMPLE_FEATURE_2_SEPARATOR,--- FEATURE 2 ---,--- FEATURE 2 ---,Feature 2 sample
+SAMPLE_F2_agen,550,550,Feature 2 - agen
+SAMPLE_F2_cattss,1,1,Feature 2 - cattss
+SAMPLE_F2_datend,None,None,Feature 2 - datend
+SAMPLE_F2_datsta,None,None,Feature 2 - datsta
+SAMPLE_F2_dsid_dsnm,US4CA60M,US4CA60M,Feature 2 - dsid_dsnm
+SAMPLE_F2_dsid_edtn,37,37,Feature 2 - dsid_edtn
+SAMPLE_F2_dsid_updn,6,6,Feature 2 - dsid_updn
+SAMPLE_F2_fidn,816420470,816420470,Feature 2 - fidn
+SAMPLE_F2_fids,1,1,Feature 2 - fids
+SAMPLE_F2_geometry,"POLYGON ((-118.625892 33.7438433, -118.625892 33.7...","POLYGON ((-118.625892 33.7438433, -118.625892 33.7...",Feature 2 - geometry
+SAMPLE_F2_grup,2,2,Feature 2 - grup
+SAMPLE_F2_inform,None,None,Feature 2 - inform
+SAMPLE_F2_lnam,022630A996760001,022630A996760001,Feature 2 - lnam
+SAMPLE_F2_ninfom,None,None,Feature 2 - ninfom
+SAMPLE_F2_ntxtds,None,None,Feature 2 - ntxtds
+SAMPLE_F2_objl,150,150,Feature 2 - objl
+SAMPLE_F2_prim,3,3,Feature 2 - prim
+SAMPLE_F2_rcid,3683,3683,Feature 2 - rcid
+SAMPLE_F2_recdat,None,None,Feature 2 - recdat
+SAMPLE_F2_recind,None,None,Feature 2 - recind
+SAMPLE_F2_rver,1,1,Feature 2 - rver
+SAMPLE_F2_scamax,nan,nan,Feature 2 - scamax
+SAMPLE_F2_scamin,nan,nan,Feature 2 - scamin
+SAMPLE_F2_sordat,20130328,20130328,Feature 2 - sordat
+SAMPLE_F2_sorind,"US,US,reprt,L-25/13","US,US,reprt,L-25/13",Feature 2 - sorind
+SAMPLE_F2_txtdsc,None,None,Feature 2 - txtdsc
+SAMPLE_FEATURE_3_SEPARATOR,--- FEATURE 3 ---,--- FEATURE 3 ---,Feature 3 sample
+SAMPLE_F3_agen,550,550,Feature 3 - agen
+SAMPLE_F3_cattss,1,1,Feature 3 - cattss
+SAMPLE_F3_datend,None,None,Feature 3 - datend
+SAMPLE_F3_datsta,None,None,Feature 3 - datsta
+SAMPLE_F3_dsid_dsnm,US4CA60M,US4CA60M,Feature 3 - dsid_dsnm
+SAMPLE_F3_dsid_edtn,37,37,Feature 3 - dsid_edtn
+SAMPLE_F3_dsid_updn,6,6,Feature 3 - dsid_updn
+SAMPLE_F3_fidn,18999545,18999545,Feature 3 - fidn
+SAMPLE_F3_fids,50,50,Feature 3 - fids
+SAMPLE_F3_geometry,"POLYGON ((-118.0932245 33.3166492, -118.0928402 33...","POLYGON ((-118.0932245 33.3166492, -118.0928402 33...",Feature 3 - geometry
+SAMPLE_F3_grup,2,2,Feature 3 - grup
+SAMPLE_F3_inform,None,None,Feature 3 - inform
+SAMPLE_F3_lnam,02260121E8F90032,02260121E8F90032,Feature 3 - lnam
+SAMPLE_F3_ninfom,None,None,Feature 3 - ninfom
+SAMPLE_F3_ntxtds,None,None,Feature 3 - ntxtds
+SAMPLE_F3_objl,150,150,Feature 3 - objl
+SAMPLE_F3_prim,3,3,Feature 3 - prim
+SAMPLE_F3_rcid,3684,3684,Feature 3 - rcid
+SAMPLE_F3_recdat,None,None,Feature 3 - recdat
+SAMPLE_F3_recind,None,None,Feature 3 - recind
+SAMPLE_F3_rver,1,1,Feature 3 - rver
+SAMPLE_F3_scamax,nan,nan,Feature 3 - scamax
+SAMPLE_F3_scamin,nan,nan,Feature 3 - scamin
+SAMPLE_F3_sordat,200311,200311,Feature 3 - sordat
+SAMPLE_F3_sorind,"US,US,graph,Chart 18746","US,US,graph,Chart 18746",Feature 3 - sorind
+SAMPLE_F3_txtdsc,None,None,Feature 3 - txtdsc

@@ -1,0 +1,86 @@
+ # ===============================================
+  # Maritime Graph Generation Configuration
+  # ===============================================
+
+  # --- General Settings ---
+  graph_type: "h3"  # "h3" or "fine"
+  output_gpkg: "graphs/h3_graph.gpkg"
+  keep_largest_component: true
+
+  # --- Unified Layer Configuration ---
+  # All layers use the same format: { layer: "name", bands: [1,2,3] or "all", resolution: N }
+  # - "resolution" is ONLY used by H3Graph
+  # - FineGraph uses seaare bands [1-6] for progressive refinement (hardcoded)
+  # - Both graphs use the same format for extra layers and subtract layers
+
+  layers:
+    # Base navigable layers (additive - form the graph)
+    navigable:
+      # seaare is processed specially by both graphs
+      # FineGraph: progressive refinement by bands 1-6
+      # H3Graph: resolution mapping by bands
+      - { layer: "seaare", bands: [1, 2], resolution: 6 }
+      - { layer: "seaare", bands: [3],    resolution: 9 }
+      - { layer: "seaare", bands: [4],    resolution: 10 }
+      - { layer: "seaare", bands: [5],    resolution: 11 }
+      - { layer: "seaare", bands: [6],    resolution: 12 }
+
+      # Additional navigable layers (both graphs use same logic)
+      - { layer: "drgare", bands: [3, 4, 5, 6], resolution: 11 }
+      - { layer: "fairwy", bands: "all", resolution: 11 }
+      - { layer: "tsslpt", bands: "all", resolution: 11 }
+      - { layer: "prcare", bands: "all", resolution: 10 }
+
+    # Obstacle/restriction layers (subtractive)
+    obstacles:
+      # lndare is processed specially by FineGraph (per-band subtraction)
+      # H3Graph processes it like other subtract layers
+      - { layer: "lndare", bands: [1, 2, 3, 4, 5, 6], resolution: null }
+      - { layer: "slcons", bands: [1, 2, 3, 4, 5, 6], resolution: null }
+      # Commented examples:
+      # - { layer: "obstrn", bands: [3, 4, 5, 6], resolution: null }
+      # - { layer: "wrecks", bands: "all", resolution: null }
+
+  # --- Fine Graph Specific Settings ---
+  fine_settings:
+    spacing_nm: 0.1
+    max_edge_factor: 2.0
+    max_points_per_subdivision: 1000000
+    # usage_bands: [1,2,3,4,5,6]  # Can override default seaare bands if needed
+
+  # --- H3 Graph Specific Settings ---
+  h3_settings:
+    connectivity:
+      enable_hierarchical: true
+      enable_spatial_proximity: true
+      max_spatial_distance_nm: 2.7
+      spatial_search_radius: 2
+      enable_bridge_enhancement: true
+      min_same_resolution_connections: 4
+      target_total_connections: 6
+      max_bridge_distance_nm: 4.3
+      bridge_search_radius: 3
+
+  # --- Weighting Configuration ---
+  weight_settings:
+    land_crossing_protection:
+      enabled: true
+      penalties:
+        minor_crossing: 10
+        moderate_crossing: 100
+        major_crossing: 1000
+        blocked: 9999
+    static_layers:
+      lndare: { factor: 999.0 }
+      obstrn: { factor: 5.0 }
+      fairwy: { factor: 0.8 }
+      tsslpt: { factor: 0.7 }
+    dynamic_properties:
+      depth_min:
+        layer: 'depare'
+        attribute: 'drval1'
+        query_type: 'min'
+      wreck_sounding:
+        layer: 'wrecks'
+        attribute: 'valsou'
+        query_type: 'min'

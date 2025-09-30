@@ -1,0 +1,94 @@
+attribute,gpkg,spatialite,notes
+METADATA_LAYER_NAME,lndmrk,lndmrk,Layer comparison between gpkg and spatialite
+METADATA_TOTAL_FEATURES,251,251,Total features in each format
+METADATA_GEOMETRY_FEATURES,251,251,Features with non-null geometry
+METADATA_TOTAL_COLUMNS,43,44,Total columns in each format
+SEPARATOR_COLUMN_PRESENCE,---,---,Column presence analysis follows
+COLUMN_agen,PRESENT,PRESENT,Column presence comparison
+COLUMN_catlmk,PRESENT,PRESENT,Column presence comparison
+COLUMN_colour,PRESENT,PRESENT,Column presence comparison
+COLUMN_colpat,PRESENT,PRESENT,Column presence comparison
+COLUMN_condtn,PRESENT,PRESENT,Column presence comparison
+COLUMN_conrad,PRESENT,PRESENT,Column presence comparison
+COLUMN_convis,PRESENT,PRESENT,Column presence comparison
+COLUMN_dsid_dsnm,PRESENT,PRESENT,Column presence comparison
+COLUMN_dsid_edtn,PRESENT,PRESENT,Column presence comparison
+COLUMN_dsid_updn,PRESENT,PRESENT,Column presence comparison
+COLUMN_elevat,PRESENT,PRESENT,Column presence comparison
+COLUMN_ffpt_rind,PRESENT,PRESENT,Column presence comparison
+COLUMN_fidn,PRESENT,PRESENT,Column presence comparison
+COLUMN_fids,PRESENT,PRESENT,Column presence comparison
+COLUMN_functn,PRESENT,PRESENT,Column presence comparison
+COLUMN_geom,PRESENT,PRESENT,Column presence comparison
+COLUMN_geometry,MISSING,PRESENT,Column presence comparison
+COLUMN_grup,PRESENT,PRESENT,Column presence comparison
+COLUMN_height,PRESENT,PRESENT,Column presence comparison
+COLUMN_inform,PRESENT,PRESENT,Column presence comparison
+COLUMN_lnam,PRESENT,PRESENT,Column presence comparison
+COLUMN_lnam_refs,PRESENT,PRESENT,Column presence comparison
+COLUMN_natcon,PRESENT,PRESENT,Column presence comparison
+COLUMN_ninfom,PRESENT,PRESENT,Column presence comparison
+COLUMN_nobjnm,PRESENT,PRESENT,Column presence comparison
+COLUMN_ntxtds,PRESENT,PRESENT,Column presence comparison
+COLUMN_objl,PRESENT,PRESENT,Column presence comparison
+COLUMN_objnam,PRESENT,PRESENT,Column presence comparison
+COLUMN_ogc_fid,PRESENT,PRESENT,Column presence comparison
+COLUMN_picrep,PRESENT,PRESENT,Column presence comparison
+COLUMN_prim,PRESENT,PRESENT,Column presence comparison
+COLUMN_rcid,PRESENT,PRESENT,Column presence comparison
+COLUMN_recdat,PRESENT,PRESENT,Column presence comparison
+COLUMN_recind,PRESENT,PRESENT,Column presence comparison
+COLUMN_rver,PRESENT,PRESENT,Column presence comparison
+COLUMN_scamax,PRESENT,PRESENT,Column presence comparison
+COLUMN_scamin,PRESENT,PRESENT,Column presence comparison
+COLUMN_sordat,PRESENT,PRESENT,Column presence comparison
+COLUMN_sorind,PRESENT,PRESENT,Column presence comparison
+COLUMN_status,PRESENT,PRESENT,Column presence comparison
+COLUMN_txtdsc,PRESENT,PRESENT,Column presence comparison
+COLUMN_veracc,PRESENT,PRESENT,Column presence comparison
+COLUMN_verdat,PRESENT,PRESENT,Column presence comparison
+COLUMN_verlen,PRESENT,PRESENT,Column presence comparison
+SEPARATOR_PROPERTY_COMPLETENESS,---,---,Property completeness analysis (non-empty / total)
+PROP_COMPLETENESS_agen,251/251 (100.0%),251/251 (100.0%),Values Match (100.0%)
+PROP_COMPLETENESS_catlmk,251/251 (100.0%),251/251 (100.0%),Values Match (100.0%)
+PROP_COMPLETENESS_colour,74/251 (29.5%),74/251 (29.5%),Values Match (29.5%)
+PROP_COMPLETENESS_colpat,18/251 (7.2%),18/251 (7.2%),Values Match (7.2%)
+PROP_COMPLETENESS_condtn,1/251 (0.4%),1/251 (0.4%),Values Match (0.4%)
+PROP_COMPLETENESS_conrad,2/251 (0.8%),2/251 (0.8%),Values Match (0.8%)
+PROP_COMPLETENESS_convis,251/251 (100.0%),251/251 (100.0%),Values Match (100.0%)
+PROP_COMPLETENESS_dsid_dsnm,251/251 (100.0%),251/251 (100.0%),Values Match (100.0%)
+PROP_COMPLETENESS_dsid_edtn,251/251 (100.0%),251/251 (100.0%),Values Match (100.0%)
+PROP_COMPLETENESS_dsid_updn,251/251 (100.0%),251/251 (100.0%),Values Match (100.0%)
+PROP_COMPLETENESS_elevat,0/251 (0.0%),0/251 (0.0%),Values Match (0.0%)
+PROP_COMPLETENESS_ffpt_rind,178/251 (70.9%),178/251 (70.9%),Values Match (70.9%)
+PROP_COMPLETENESS_fidn,251/251 (100.0%),251/251 (100.0%),Values Match (100.0%)
+PROP_COMPLETENESS_fids,251/251 (100.0%),251/251 (100.0%),Values Match (100.0%)
+PROP_COMPLETENESS_functn,174/251 (69.3%),174/251 (69.3%),Values Match (69.3%)
+PROP_COMPLETENESS_geometry,N/A,251/251 (100.0%),Property completeness comparison
+PROP_COMPLETENESS_grup,251/251 (100.0%),251/251 (100.0%),Values Match (100.0%)
+PROP_COMPLETENESS_height,67/251 (26.7%),67/251 (26.7%),Values Match (26.7%)
+PROP_COMPLETENESS_inform,88/251 (35.1%),88/251 (35.1%),Values Match (35.1%)
+PROP_COMPLETENESS_lnam,251/251 (100.0%),251/251 (100.0%),Values Match (100.0%)
+PROP_COMPLETENESS_lnam_refs,178/251 (70.9%),178/251 (70.9%),Values Match (70.9%)
+PROP_COMPLETENESS_natcon,52/251 (20.7%),52/251 (20.7%),Values Match (20.7%)
+PROP_COMPLETENESS_ninfom,0/251 (0.0%),0/251 (0.0%),Values Match (0.0%)
+PROP_COMPLETENESS_nobjnm,0/251 (0.0%),0/251 (0.0%),Values Match (0.0%)
+PROP_COMPLETENESS_ntxtds,0/251 (0.0%),0/251 (0.0%),Values Match (0.0%)
+PROP_COMPLETENESS_objl,251/251 (100.0%),251/251 (100.0%),Values Match (100.0%)
+PROP_COMPLETENESS_objnam,112/251 (44.6%),112/251 (44.6%),Values Match (44.6%)
+PROP_COMPLETENESS_ogc_fid,251/251 (100.0%),251/251 (100.0%),Values Match (100.0%)
+PROP_COMPLETENESS_picrep,0/251 (0.0%),0/251 (0.0%),Values Match (0.0%)
+PROP_COMPLETENESS_prim,251/251 (100.0%),251/251 (100.0%),Values Match (100.0%)
+PROP_COMPLETENESS_rcid,251/251 (100.0%),251/251 (100.0%),Values Match (100.0%)
+PROP_COMPLETENESS_recdat,0/251 (0.0%),0/251 (0.0%),Values Match (0.0%)
+PROP_COMPLETENESS_recind,0/251 (0.0%),0/251 (0.0%),Values Match (0.0%)
+PROP_COMPLETENESS_rver,251/251 (100.0%),251/251 (100.0%),Values Match (100.0%)
+PROP_COMPLETENESS_scamax,0/251 (0.0%),0/251 (0.0%),Values Match (0.0%)
+PROP_COMPLETENESS_scamin,251/251 (100.0%),251/251 (100.0%),Values Match (100.0%)
+PROP_COMPLETENESS_sordat,251/251 (100.0%),251/251 (100.0%),Values Match (100.0%)
+PROP_COMPLETENESS_sorind,251/251 (100.0%),251/251 (100.0%),Values Match (100.0%)
+PROP_COMPLETENESS_status,167/251 (66.5%),167/251 (66.5%),Values Match (66.5%)
+PROP_COMPLETENESS_txtdsc,0/251 (0.0%),0/251 (0.0%),Values Match (0.0%)
+PROP_COMPLETENESS_veracc,0/251 (0.0%),0/251 (0.0%),Values Match (0.0%)
+PROP_COMPLETENESS_verdat,0/251 (0.0%),0/251 (0.0%),Values Match (0.0%)
+PROP_COMPLETENESS_verlen,7/251 (2.8%),7/251 (2.8%),Values Match (2.8%)

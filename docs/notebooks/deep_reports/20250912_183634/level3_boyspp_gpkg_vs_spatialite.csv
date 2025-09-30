@@ -1,0 +1,447 @@
+attribute,gpkg,spatialite,notes
+METADATA_LAYER_NAME,boyspp,boyspp,Layer comparison between gpkg and spatialite
+METADATA_TOTAL_FEATURES,78,78,Total features in each format
+METADATA_TOTAL_COLUMNS,47,35,Total columns in each format
+SEPARATOR_COLUMN_PRESENCE,--- COLUMN PRESENCE ---,--- COLUMN PRESENCE ---,Which columns exist in each format
+COLUMN_PRESENT_agen,YES,YES,Column agen presence
+COLUMN_PRESENT_boyshp,YES,YES,Column boyshp presence
+COLUMN_PRESENT_catspm,YES,NO,Column catspm presence
+COLUMN_PRESENT_colour,YES,NO,Column colour presence
+COLUMN_PRESENT_colpat,YES,NO,Column colpat presence
+COLUMN_PRESENT_conrad,YES,YES,Column conrad presence
+COLUMN_PRESENT_datend,YES,YES,Column datend presence
+COLUMN_PRESENT_datsta,YES,YES,Column datsta presence
+COLUMN_PRESENT_dsid_dsnm,YES,YES,Column dsid_dsnm presence
+COLUMN_PRESENT_dsid_edtn,YES,YES,Column dsid_edtn presence
+COLUMN_PRESENT_dsid_updn,YES,YES,Column dsid_updn presence
+COLUMN_PRESENT_ffpt_rind,YES,NO,Column ffpt_rind presence
+COLUMN_PRESENT_fidn,YES,YES,Column fidn presence
+COLUMN_PRESENT_fids,YES,YES,Column fids presence
+COLUMN_PRESENT_grup,YES,YES,Column grup presence
+COLUMN_PRESENT_inform,YES,YES,Column inform presence
+COLUMN_PRESENT_lnam,YES,YES,Column lnam presence
+COLUMN_PRESENT_lnam_refs,YES,NO,Column lnam_refs presence
+COLUMN_PRESENT_marsys,YES,YES,Column marsys presence
+COLUMN_PRESENT_mask,YES,NO,Column mask presence
+COLUMN_PRESENT_name_rcid,YES,NO,Column name_rcid presence
+COLUMN_PRESENT_name_rcnm,YES,NO,Column name_rcnm presence
+COLUMN_PRESENT_natcon,YES,NO,Column natcon presence
+COLUMN_PRESENT_ninfom,YES,YES,Column ninfom presence
+COLUMN_PRESENT_nobjnm,YES,YES,Column nobjnm presence
+COLUMN_PRESENT_ntxtds,YES,YES,Column ntxtds presence
+COLUMN_PRESENT_objl,YES,YES,Column objl presence
+COLUMN_PRESENT_objnam,YES,YES,Column objnam presence
+COLUMN_PRESENT_ornt,YES,NO,Column ornt presence
+COLUMN_PRESENT_perend,YES,YES,Column perend presence
+COLUMN_PRESENT_persta,YES,YES,Column persta presence
+COLUMN_PRESENT_picrep,YES,YES,Column picrep presence
+COLUMN_PRESENT_prim,YES,YES,Column prim presence
+COLUMN_PRESENT_rcid,YES,YES,Column rcid presence
+COLUMN_PRESENT_recdat,YES,YES,Column recdat presence
+COLUMN_PRESENT_recind,YES,YES,Column recind presence
+COLUMN_PRESENT_rver,YES,YES,Column rver presence
+COLUMN_PRESENT_scamax,YES,YES,Column scamax presence
+COLUMN_PRESENT_scamin,YES,YES,Column scamin presence
+COLUMN_PRESENT_sordat,YES,YES,Column sordat presence
+COLUMN_PRESENT_sorind,YES,YES,Column sorind presence
+COLUMN_PRESENT_status,YES,NO,Column status presence
+COLUMN_PRESENT_txtdsc,YES,YES,Column txtdsc presence
+COLUMN_PRESENT_usag,YES,NO,Column usag presence
+COLUMN_PRESENT_veracc,YES,YES,Column veracc presence
+COLUMN_PRESENT_verlen,YES,YES,Column verlen presence
+SEPARATOR_DATA_TYPES,--- DATA TYPES ---,--- DATA TYPES ---,Data types for each column
+DATATYPE_agen,int32,int32,Data type for agen
+DATATYPE_boyshp,float64,float64,Data type for boyshp
+DATATYPE_conrad,float64,float64,Data type for conrad
+DATATYPE_datend,object,object,Data type for datend
+DATATYPE_datsta,object,object,Data type for datsta
+DATATYPE_dsid_dsnm,object,object,Data type for dsid_dsnm
+DATATYPE_dsid_edtn,int32,int32,Data type for dsid_edtn
+DATATYPE_dsid_updn,int32,int32,Data type for dsid_updn
+DATATYPE_fidn,int32,int32,Data type for fidn
+DATATYPE_fids,int32,int32,Data type for fids
+DATATYPE_grup,int32,int32,Data type for grup
+DATATYPE_inform,object,object,Data type for inform
+DATATYPE_lnam,object,object,Data type for lnam
+DATATYPE_marsys,float64,float64,Data type for marsys
+DATATYPE_ninfom,object,object,Data type for ninfom
+DATATYPE_nobjnm,object,object,Data type for nobjnm
+DATATYPE_ntxtds,object,object,Data type for ntxtds
+DATATYPE_objl,int32,int32,Data type for objl
+DATATYPE_objnam,object,object,Data type for objnam
+DATATYPE_perend,object,object,Data type for perend
+DATATYPE_persta,object,object,Data type for persta
+DATATYPE_picrep,object,object,Data type for picrep
+DATATYPE_prim,int32,int32,Data type for prim
+DATATYPE_rcid,int32,int32,Data type for rcid
+DATATYPE_recdat,object,object,Data type for recdat
+DATATYPE_recind,object,object,Data type for recind
+DATATYPE_rver,int32,int32,Data type for rver
+DATATYPE_scamax,float64,float64,Data type for scamax
+DATATYPE_scamin,int32,int32,Data type for scamin
+DATATYPE_sordat,object,object,Data type for sordat
+DATATYPE_sorind,object,object,Data type for sorind
+DATATYPE_txtdsc,object,object,Data type for txtdsc
+DATATYPE_veracc,float64,float64,Data type for veracc
+DATATYPE_verlen,float64,float64,Data type for verlen
+SEPARATOR_FEATURE_SAMPLES,--- FEATURE SAMPLES (10) ---,--- FEATURE SAMPLES (10) ---,Sample of 10 features from each format
+SAMPLE_FEATURE_1_SEPARATOR,--- FEATURE 1 ---,--- FEATURE 1 ---,Feature 1 sample
+SAMPLE_F1_agen,550,550,Feature 1 - agen
+SAMPLE_F1_boyshp,4.0,4.0,Feature 1 - boyshp
+SAMPLE_F1_conrad,nan,nan,Feature 1 - conrad
+SAMPLE_F1_datend,None,None,Feature 1 - datend
+SAMPLE_F1_datsta,None,None,Feature 1 - datsta
+SAMPLE_F1_dsid_dsnm,US3CA52M,US3CA52M,Feature 1 - dsid_dsnm
+SAMPLE_F1_dsid_edtn,31,31,Feature 1 - dsid_edtn
+SAMPLE_F1_dsid_updn,0,0,Feature 1 - dsid_updn
+SAMPLE_F1_fidn,18685605,18685605,Feature 1 - fidn
+SAMPLE_F1_fids,50,50,Feature 1 - fids
+SAMPLE_F1_geometry,Point(1),Point(1),Feature 1 - geometry
+SAMPLE_F1_grup,2,2,Feature 1 - grup
+SAMPLE_F1_inform,Disc-shaped,Disc-shaped,Feature 1 - inform
+SAMPLE_F1_lnam,0226011D1EA50032,0226011D1EA50032,Feature 1 - lnam
+SAMPLE_F1_marsys,nan,nan,Feature 1 - marsys
+SAMPLE_F1_ninfom,None,None,Feature 1 - ninfom
+SAMPLE_F1_nobjnm,None,None,Feature 1 - nobjnm
+SAMPLE_F1_ntxtds,None,None,Feature 1 - ntxtds
+SAMPLE_F1_objl,19,19,Feature 1 - objl
+SAMPLE_F1_objnam,NOAA Environmental Lighted Buoy 46012,NOAA Environmental Lighted Buoy 46012,Feature 1 - objnam
+SAMPLE_F1_perend,None,None,Feature 1 - perend
+SAMPLE_F1_persta,None,None,Feature 1 - persta
+SAMPLE_F1_picrep,None,None,Feature 1 - picrep
+SAMPLE_F1_prim,1,1,Feature 1 - prim
+SAMPLE_F1_rcid,18,18,Feature 1 - rcid
+SAMPLE_F1_recdat,None,None,Feature 1 - recdat
+SAMPLE_F1_recind,None,None,Feature 1 - recind
+SAMPLE_F1_rver,1,1,Feature 1 - rver
+SAMPLE_F1_scamax,nan,nan,Feature 1 - scamax
+SAMPLE_F1_scamin,499999,499999,Feature 1 - scamin
+SAMPLE_F1_sordat,20180626,20180626,Feature 1 - sordat
+SAMPLE_F1_sorind,"US,US,reprt,11thCGD,LNM 26/18","US,US,reprt,11thCGD,LNM 26/18",Feature 1 - sorind
+SAMPLE_F1_txtdsc,None,None,Feature 1 - txtdsc
+SAMPLE_F1_veracc,nan,nan,Feature 1 - veracc
+SAMPLE_F1_verlen,nan,nan,Feature 1 - verlen
+SAMPLE_FEATURE_2_SEPARATOR,--- FEATURE 2 ---,--- FEATURE 2 ---,Feature 2 sample
+SAMPLE_F2_agen,550,550,Feature 2 - agen
+SAMPLE_F2_boyshp,2.0,2.0,Feature 2 - boyshp
+SAMPLE_F2_conrad,nan,nan,Feature 2 - conrad
+SAMPLE_F2_datend,None,None,Feature 2 - datend
+SAMPLE_F2_datsta,None,None,Feature 2 - datsta
+SAMPLE_F2_dsid_dsnm,US3CA52M,US3CA52M,Feature 2 - dsid_dsnm
+SAMPLE_F2_dsid_edtn,31,31,Feature 2 - dsid_edtn
+SAMPLE_F2_dsid_updn,0,0,Feature 2 - dsid_updn
+SAMPLE_F2_fidn,565186119,565186119,Feature 2 - fidn
+SAMPLE_F2_fids,7312,7312,Feature 2 - fids
+SAMPLE_F2_geometry,Point(1),Point(1),Feature 2 - geometry
+SAMPLE_F2_grup,2,2,Feature 2 - grup
+SAMPLE_F2_inform,None,None,Feature 2 - inform
+SAMPLE_F2_lnam,022621B00E471C90,022621B00E471C90,Feature 2 - lnam
+SAMPLE_F2_marsys,nan,nan,Feature 2 - marsys
+SAMPLE_F2_ninfom,None,None,Feature 2 - ninfom
+SAMPLE_F2_nobjnm,None,None,Feature 2 - nobjnm
+SAMPLE_F2_ntxtds,None,None,Feature 2 - ntxtds
+SAMPLE_F2_objl,19,19,Feature 2 - objl
+SAMPLE_F2_objnam,Kinnetic Environmental CCLEAN Buoy,Kinnetic Environmental CCLEAN Buoy,Feature 2 - objnam
+SAMPLE_F2_perend,None,None,Feature 2 - perend
+SAMPLE_F2_persta,None,None,Feature 2 - persta
+SAMPLE_F2_picrep,None,None,Feature 2 - picrep
+SAMPLE_F2_prim,1,1,Feature 2 - prim
+SAMPLE_F2_rcid,19,19,Feature 2 - rcid
+SAMPLE_F2_recdat,None,None,Feature 2 - recdat
+SAMPLE_F2_recind,None,None,Feature 2 - recind
+SAMPLE_F2_rver,1,1,Feature 2 - rver
+SAMPLE_F2_scamax,nan,nan,Feature 2 - scamax
+SAMPLE_F2_scamin,499999,499999,Feature 2 - scamin
+SAMPLE_F2_sordat,20231018,20231018,Feature 2 - sordat
+SAMPLE_F2_sorind,"US,US,reprt,11thCGD,LNM 42/23","US,US,reprt,11thCGD,LNM 42/23",Feature 2 - sorind
+SAMPLE_F2_txtdsc,None,None,Feature 2 - txtdsc
+SAMPLE_F2_veracc,nan,nan,Feature 2 - veracc
+SAMPLE_F2_verlen,nan,nan,Feature 2 - verlen
+SAMPLE_FEATURE_3_SEPARATOR,--- FEATURE 3 ---,--- FEATURE 3 ---,Feature 3 sample
+SAMPLE_F3_agen,550,550,Feature 3 - agen
+SAMPLE_F3_boyshp,nan,nan,Feature 3 - boyshp
+SAMPLE_F3_conrad,nan,nan,Feature 3 - conrad
+SAMPLE_F3_datend,None,None,Feature 3 - datend
+SAMPLE_F3_datsta,None,None,Feature 3 - datsta
+SAMPLE_F3_dsid_dsnm,US3CA52M,US3CA52M,Feature 3 - dsid_dsnm
+SAMPLE_F3_dsid_edtn,31,31,Feature 3 - dsid_edtn
+SAMPLE_F3_dsid_updn,0,0,Feature 3 - dsid_updn
+SAMPLE_F3_fidn,96853884,96853884,Feature 3 - fidn
+SAMPLE_F3_fids,7312,7312,Feature 3 - fids
+SAMPLE_F3_geometry,Point(1),Point(1),Feature 3 - geometry
+SAMPLE_F3_grup,2,2,Feature 3 - grup
+SAMPLE_F3_inform,None,None,Feature 3 - inform
+SAMPLE_F3_lnam,022605C5DF7C1C90,022605C5DF7C1C90,Feature 3 - lnam
+SAMPLE_F3_marsys,nan,nan,Feature 3 - marsys
+SAMPLE_F3_ninfom,None,None,Feature 3 - ninfom
+SAMPLE_F3_nobjnm,None,None,Feature 3 - nobjnm
+SAMPLE_F3_ntxtds,None,None,Feature 3 - ntxtds
+SAMPLE_F3_objl,19,19,Feature 3 - objl
+SAMPLE_F3_objnam,SOFAR Half Moon Bay (NMS) Lighted Research Buoy 1,SOFAR Half Moon Bay (NMS) Lighted Research Buoy 1,Feature 3 - objnam
+SAMPLE_F3_perend,None,None,Feature 3 - perend
+SAMPLE_F3_persta,None,None,Feature 3 - persta
+SAMPLE_F3_picrep,None,None,Feature 3 - picrep
+SAMPLE_F3_prim,1,1,Feature 3 - prim
+SAMPLE_F3_rcid,20,20,Feature 3 - rcid
+SAMPLE_F3_recdat,None,None,Feature 3 - recdat
+SAMPLE_F3_recind,None,None,Feature 3 - recind
+SAMPLE_F3_rver,1,1,Feature 3 - rver
+SAMPLE_F3_scamax,nan,nan,Feature 3 - scamax
+SAMPLE_F3_scamin,499999,499999,Feature 3 - scamin
+SAMPLE_F3_sordat,20240423,20240423,Feature 3 - sordat
+SAMPLE_F3_sorind,"US,US,reprt,11thCGD,LNM 17/24","US,US,reprt,11thCGD,LNM 17/24",Feature 3 - sorind
+SAMPLE_F3_txtdsc,None,None,Feature 3 - txtdsc
+SAMPLE_F3_veracc,nan,nan,Feature 3 - veracc
+SAMPLE_F3_verlen,nan,nan,Feature 3 - verlen
+SAMPLE_FEATURE_4_SEPARATOR,--- FEATURE 4 ---,--- FEATURE 4 ---,Feature 4 sample
+SAMPLE_F4_agen,550,550,Feature 4 - agen
+SAMPLE_F4_boyshp,3.0,3.0,Feature 4 - boyshp
+SAMPLE_F4_conrad,nan,nan,Feature 4 - conrad
+SAMPLE_F4_datend,None,None,Feature 4 - datend
+SAMPLE_F4_datsta,None,None,Feature 4 - datsta
+SAMPLE_F4_dsid_dsnm,US3CA52M,US3CA52M,Feature 4 - dsid_dsnm
+SAMPLE_F4_dsid_edtn,31,31,Feature 4 - dsid_edtn
+SAMPLE_F4_dsid_updn,0,0,Feature 4 - dsid_updn
+SAMPLE_F4_fidn,846474427,846474427,Feature 4 - fidn
+SAMPLE_F4_fids,7312,7312,Feature 4 - fids
+SAMPLE_F4_geometry,Point(1),Point(1),Feature 4 - geometry
+SAMPLE_F4_grup,2,2,Feature 4 - grup
+SAMPLE_F4_inform,"Deployed by Sofar Ocean; 15"" diameter","Deployed by Sofar Ocean; 15"" diameter",Feature 4 - inform
+SAMPLE_F4_lnam,022632742CBB1C90,022632742CBB1C90,Feature 4 - lnam
+SAMPLE_F4_marsys,nan,nan,Feature 4 - marsys
+SAMPLE_F4_ninfom,None,None,Feature 4 - ninfom
+SAMPLE_F4_nobjnm,None,None,Feature 4 - nobjnm
+SAMPLE_F4_ntxtds,None,None,Feature 4 - ntxtds
+SAMPLE_F4_objl,19,19,Feature 4 - objl
+SAMPLE_F4_objnam,Pillar Point Lighted Research Buoy,Pillar Point Lighted Research Buoy,Feature 4 - objnam
+SAMPLE_F4_perend,None,None,Feature 4 - perend
+SAMPLE_F4_persta,None,None,Feature 4 - persta
+SAMPLE_F4_picrep,None,None,Feature 4 - picrep
+SAMPLE_F4_prim,1,1,Feature 4 - prim
+SAMPLE_F4_rcid,21,21,Feature 4 - rcid
+SAMPLE_F4_recdat,None,None,Feature 4 - recdat
+SAMPLE_F4_recind,None,None,Feature 4 - recind
+SAMPLE_F4_rver,1,1,Feature 4 - rver
+SAMPLE_F4_scamax,nan,nan,Feature 4 - scamax
+SAMPLE_F4_scamin,499999,499999,Feature 4 - scamin
+SAMPLE_F4_sordat,20231213,20231213,Feature 4 - sordat
+SAMPLE_F4_sorind,"US,US,reprt,11thCGD,LNM 50/23","US,US,reprt,11thCGD,LNM 50/23",Feature 4 - sorind
+SAMPLE_F4_txtdsc,None,None,Feature 4 - txtdsc
+SAMPLE_F4_veracc,nan,nan,Feature 4 - veracc
+SAMPLE_F4_verlen,nan,nan,Feature 4 - verlen
+SAMPLE_FEATURE_5_SEPARATOR,--- FEATURE 5 ---,--- FEATURE 5 ---,Feature 5 sample
+SAMPLE_F5_agen,550,550,Feature 5 - agen
+SAMPLE_F5_boyshp,2.0,2.0,Feature 5 - boyshp
+SAMPLE_F5_conrad,nan,nan,Feature 5 - conrad
+SAMPLE_F5_datend,None,None,Feature 5 - datend
+SAMPLE_F5_datsta,None,None,Feature 5 - datsta
+SAMPLE_F5_dsid_dsnm,US3CA52M,US3CA52M,Feature 5 - dsid_dsnm
+SAMPLE_F5_dsid_edtn,31,31,Feature 5 - dsid_edtn
+SAMPLE_F5_dsid_updn,0,0,Feature 5 - dsid_updn
+SAMPLE_F5_fidn,642148482,642148482,Feature 5 - fidn
+SAMPLE_F5_fids,7312,7312,Feature 5 - fids
+SAMPLE_F5_geometry,Point(1),Point(1),Feature 5 - geometry
+SAMPLE_F5_grup,2,2,Feature 5 - grup
+SAMPLE_F5_inform,None,None,Feature 5 - inform
+SAMPLE_F5_lnam,0226264668821C90,0226264668821C90,Feature 5 - lnam
+SAMPLE_F5_marsys,nan,nan,Feature 5 - marsys
+SAMPLE_F5_ninfom,None,None,Feature 5 - ninfom
+SAMPLE_F5_nobjnm,None,None,Feature 5 - nobjnm
+SAMPLE_F5_ntxtds,None,None,Feature 5 - ntxtds
+SAMPLE_F5_objl,19,19,Feature 5 - objl
+SAMPLE_F5_objnam,Kinnetic Environmental CCLEAN Buoy,Kinnetic Environmental CCLEAN Buoy,Feature 5 - objnam
+SAMPLE_F5_perend,None,None,Feature 5 - perend
+SAMPLE_F5_persta,None,None,Feature 5 - persta
+SAMPLE_F5_picrep,None,None,Feature 5 - picrep
+SAMPLE_F5_prim,1,1,Feature 5 - prim
+SAMPLE_F5_rcid,22,22,Feature 5 - rcid
+SAMPLE_F5_recdat,None,None,Feature 5 - recdat
+SAMPLE_F5_recind,None,None,Feature 5 - recind
+SAMPLE_F5_rver,1,1,Feature 5 - rver
+SAMPLE_F5_scamax,nan,nan,Feature 5 - scamax
+SAMPLE_F5_scamin,499999,499999,Feature 5 - scamin
+SAMPLE_F5_sordat,20231025,20231025,Feature 5 - sordat
+SAMPLE_F5_sorind,"US,US,reprt,11thCGD,LNM 43/23","US,US,reprt,11thCGD,LNM 43/23",Feature 5 - sorind
+SAMPLE_F5_txtdsc,None,None,Feature 5 - txtdsc
+SAMPLE_F5_veracc,nan,nan,Feature 5 - veracc
+SAMPLE_F5_verlen,nan,nan,Feature 5 - verlen
+SAMPLE_FEATURE_6_SEPARATOR,--- FEATURE 6 ---,--- FEATURE 6 ---,Feature 6 sample
+SAMPLE_F6_agen,550,550,Feature 6 - agen
+SAMPLE_F6_boyshp,7.0,7.0,Feature 6 - boyshp
+SAMPLE_F6_conrad,nan,nan,Feature 6 - conrad
+SAMPLE_F6_datend,None,None,Feature 6 - datend
+SAMPLE_F6_datsta,None,None,Feature 6 - datsta
+SAMPLE_F6_dsid_dsnm,US3CA52M,US3CA52M,Feature 6 - dsid_dsnm
+SAMPLE_F6_dsid_edtn,31,31,Feature 6 - dsid_edtn
+SAMPLE_F6_dsid_updn,0,0,Feature 6 - dsid_updn
+SAMPLE_F6_fidn,18686730,18686730,Feature 6 - fidn
+SAMPLE_F6_fids,50,50,Feature 6 - fids
+SAMPLE_F6_geometry,Point(1),Point(1),Feature 6 - geometry
+SAMPLE_F6_grup,2,2,Feature 6 - grup
+SAMPLE_F6_inform,Disc-shaped buoy,Disc-shaped buoy,Feature 6 - inform
+SAMPLE_F6_lnam,0226011D230A0032,0226011D230A0032,Feature 6 - lnam
+SAMPLE_F6_marsys,nan,nan,Feature 6 - marsys
+SAMPLE_F6_ninfom,None,None,Feature 6 - ninfom
+SAMPLE_F6_nobjnm,None,None,Feature 6 - nobjnm
+SAMPLE_F6_ntxtds,None,None,Feature 6 - ntxtds
+SAMPLE_F6_objl,19,19,Feature 6 - objl
+SAMPLE_F6_objnam,NOAA Environmental Lighted Buoy 46042,NOAA Environmental Lighted Buoy 46042,Feature 6 - objnam
+SAMPLE_F6_perend,None,None,Feature 6 - perend
+SAMPLE_F6_persta,None,None,Feature 6 - persta
+SAMPLE_F6_picrep,None,None,Feature 6 - picrep
+SAMPLE_F6_prim,1,1,Feature 6 - prim
+SAMPLE_F6_rcid,23,23,Feature 6 - rcid
+SAMPLE_F6_recdat,None,None,Feature 6 - recdat
+SAMPLE_F6_recind,None,None,Feature 6 - recind
+SAMPLE_F6_rver,1,1,Feature 6 - rver
+SAMPLE_F6_scamax,nan,nan,Feature 6 - scamax
+SAMPLE_F6_scamin,499999,499999,Feature 6 - scamin
+SAMPLE_F6_sordat,20220504,20220504,Feature 6 - sordat
+SAMPLE_F6_sorind,"US,US,reprt,11thCGS,LNM 18/22","US,US,reprt,11thCGS,LNM 18/22",Feature 6 - sorind
+SAMPLE_F6_txtdsc,None,None,Feature 6 - txtdsc
+SAMPLE_F6_veracc,nan,nan,Feature 6 - veracc
+SAMPLE_F6_verlen,nan,nan,Feature 6 - verlen
+SAMPLE_FEATURE_7_SEPARATOR,--- FEATURE 7 ---,--- FEATURE 7 ---,Feature 7 sample
+SAMPLE_F7_agen,550,550,Feature 7 - agen
+SAMPLE_F7_boyshp,3.0,3.0,Feature 7 - boyshp
+SAMPLE_F7_conrad,nan,nan,Feature 7 - conrad
+SAMPLE_F7_datend,None,None,Feature 7 - datend
+SAMPLE_F7_datsta,None,None,Feature 7 - datsta
+SAMPLE_F7_dsid_dsnm,US3CA52M,US3CA52M,Feature 7 - dsid_dsnm
+SAMPLE_F7_dsid_edtn,31,31,Feature 7 - dsid_edtn
+SAMPLE_F7_dsid_updn,0,0,Feature 7 - dsid_updn
+SAMPLE_F7_fidn,782110187,782110187,Feature 7 - fidn
+SAMPLE_F7_fids,7312,7312,Feature 7 - fids
+SAMPLE_F7_geometry,Point(1),Point(1),Feature 7 - geometry
+SAMPLE_F7_grup,2,2,Feature 7 - grup
+SAMPLE_F7_inform,None,None,Feature 7 - inform
+SAMPLE_F7_lnam,02262E9E0DEB1C90,02262E9E0DEB1C90,Feature 7 - lnam
+SAMPLE_F7_marsys,nan,nan,Feature 7 - marsys
+SAMPLE_F7_ninfom,None,None,Feature 7 - ninfom
+SAMPLE_F7_nobjnm,None,None,Feature 7 - nobjnm
+SAMPLE_F7_ntxtds,None,None,Feature 7 - ntxtds
+SAMPLE_F7_objl,19,19,Feature 7 - objl
+SAMPLE_F7_objnam,UCSD CDIP Wave Buoy 254,UCSD CDIP Wave Buoy 254,Feature 7 - objnam
+SAMPLE_F7_perend,None,None,Feature 7 - perend
+SAMPLE_F7_persta,None,None,Feature 7 - persta
+SAMPLE_F7_picrep,None,None,Feature 7 - picrep
+SAMPLE_F7_prim,1,1,Feature 7 - prim
+SAMPLE_F7_rcid,24,24,Feature 7 - rcid
+SAMPLE_F7_recdat,None,None,Feature 7 - recdat
+SAMPLE_F7_recind,None,None,Feature 7 - recind
+SAMPLE_F7_rver,1,1,Feature 7 - rver
+SAMPLE_F7_scamax,nan,nan,Feature 7 - scamax
+SAMPLE_F7_scamin,499999,499999,Feature 7 - scamin
+SAMPLE_F7_sordat,20220914,20220914,Feature 7 - sordat
+SAMPLE_F7_sorind,"US,US,reprt,11thCGD,LNM 37/22","US,US,reprt,11thCGD,LNM 37/22",Feature 7 - sorind
+SAMPLE_F7_txtdsc,None,None,Feature 7 - txtdsc
+SAMPLE_F7_veracc,nan,nan,Feature 7 - veracc
+SAMPLE_F7_verlen,nan,nan,Feature 7 - verlen
+SAMPLE_FEATURE_8_SEPARATOR,--- FEATURE 8 ---,--- FEATURE 8 ---,Feature 8 sample
+SAMPLE_F8_agen,550,550,Feature 8 - agen
+SAMPLE_F8_boyshp,3.0,3.0,Feature 8 - boyshp
+SAMPLE_F8_conrad,nan,nan,Feature 8 - conrad
+SAMPLE_F8_datend,None,None,Feature 8 - datend
+SAMPLE_F8_datsta,None,None,Feature 8 - datsta
+SAMPLE_F8_dsid_dsnm,US3CA52M,US3CA52M,Feature 8 - dsid_dsnm
+SAMPLE_F8_dsid_edtn,31,31,Feature 8 - dsid_edtn
+SAMPLE_F8_dsid_updn,0,0,Feature 8 - dsid_updn
+SAMPLE_F8_fidn,491049550,491049550,Feature 8 - fidn
+SAMPLE_F8_fids,7312,7312,Feature 8 - fids
+SAMPLE_F8_geometry,Point(1),Point(1),Feature 8 - geometry
+SAMPLE_F8_grup,2,2,Feature 8 - grup
+SAMPLE_F8_inform,3' Diameter Sphere Buoy w/ 8' antenna.,3' Diameter Sphere Buoy w/ 8' antenna.,Feature 8 - inform
+SAMPLE_F8_lnam,02261D44D24E1C90,02261D44D24E1C90,Feature 8 - lnam
+SAMPLE_F8_marsys,nan,nan,Feature 8 - marsys
+SAMPLE_F8_ninfom,None,None,Feature 8 - ninfom
+SAMPLE_F8_nobjnm,None,None,Feature 8 - nobjnm
+SAMPLE_F8_ntxtds,None,None,Feature 8 - ntxtds
+SAMPLE_F8_objl,19,19,Feature 8 - objl
+SAMPLE_F8_objnam,UCSD CDIP Wave Buoy 266,UCSD CDIP Wave Buoy 266,Feature 8 - objnam
+SAMPLE_F8_perend,None,None,Feature 8 - perend
+SAMPLE_F8_persta,None,None,Feature 8 - persta
+SAMPLE_F8_picrep,None,None,Feature 8 - picrep
+SAMPLE_F8_prim,1,1,Feature 8 - prim
+SAMPLE_F8_rcid,25,25,Feature 8 - rcid
+SAMPLE_F8_recdat,None,None,Feature 8 - recdat
+SAMPLE_F8_recind,None,None,Feature 8 - recind
+SAMPLE_F8_rver,1,1,Feature 8 - rver
+SAMPLE_F8_scamax,nan,nan,Feature 8 - scamax
+SAMPLE_F8_scamin,499999,499999,Feature 8 - scamin
+SAMPLE_F8_sordat,20230614,20230614,Feature 8 - sordat
+SAMPLE_F8_sorind,"US,US,reprt,11thCGD,LNM 24/23","US,US,reprt,11thCGD,LNM 24/23",Feature 8 - sorind
+SAMPLE_F8_txtdsc,None,None,Feature 8 - txtdsc
+SAMPLE_F8_veracc,nan,nan,Feature 8 - veracc
+SAMPLE_F8_verlen,nan,nan,Feature 8 - verlen
+SAMPLE_FEATURE_9_SEPARATOR,--- FEATURE 9 ---,--- FEATURE 9 ---,Feature 9 sample
+SAMPLE_F9_agen,550,550,Feature 9 - agen
+SAMPLE_F9_boyshp,3.0,3.0,Feature 9 - boyshp
+SAMPLE_F9_conrad,nan,nan,Feature 9 - conrad
+SAMPLE_F9_datend,None,None,Feature 9 - datend
+SAMPLE_F9_datsta,None,None,Feature 9 - datsta
+SAMPLE_F9_dsid_dsnm,US3CA52M,US3CA52M,Feature 9 - dsid_dsnm
+SAMPLE_F9_dsid_edtn,31,31,Feature 9 - dsid_edtn
+SAMPLE_F9_dsid_updn,0,0,Feature 9 - dsid_updn
+SAMPLE_F9_fidn,557328013,557328013,Feature 9 - fidn
+SAMPLE_F9_fids,7312,7312,Feature 9 - fids
+SAMPLE_F9_geometry,Point(1),Point(1),Feature 9 - geometry
+SAMPLE_F9_grup,2,2,Feature 9 - grup
+SAMPLE_F9_inform,3' Diameter Sphere Buoy w/ 8' antenna.,3' Diameter Sphere Buoy w/ 8' antenna.,Feature 9 - inform
+SAMPLE_F9_lnam,02262138268D1C90,02262138268D1C90,Feature 9 - lnam
+SAMPLE_F9_marsys,nan,nan,Feature 9 - marsys
+SAMPLE_F9_ninfom,None,None,Feature 9 - ninfom
+SAMPLE_F9_nobjnm,None,None,Feature 9 - nobjnm
+SAMPLE_F9_ntxtds,None,None,Feature 9 - ntxtds
+SAMPLE_F9_objl,19,19,Feature 9 - objl
+SAMPLE_F9_objnam,UCSD CDIP Wave Buoy 267,UCSD CDIP Wave Buoy 267,Feature 9 - objnam
+SAMPLE_F9_perend,None,None,Feature 9 - perend
+SAMPLE_F9_persta,None,None,Feature 9 - persta
+SAMPLE_F9_picrep,None,None,Feature 9 - picrep
+SAMPLE_F9_prim,1,1,Feature 9 - prim
+SAMPLE_F9_rcid,26,26,Feature 9 - rcid
+SAMPLE_F9_recdat,None,None,Feature 9 - recdat
+SAMPLE_F9_recind,None,None,Feature 9 - recind
+SAMPLE_F9_rver,1,1,Feature 9 - rver
+SAMPLE_F9_scamax,nan,nan,Feature 9 - scamax
+SAMPLE_F9_scamin,499999,499999,Feature 9 - scamin
+SAMPLE_F9_sordat,20230614,20230614,Feature 9 - sordat
+SAMPLE_F9_sorind,"US,US,reprt,11thCGD,LNM 24/23","US,US,reprt,11thCGD,LNM 24/23",Feature 9 - sorind
+SAMPLE_F9_txtdsc,None,None,Feature 9 - txtdsc
+SAMPLE_F9_veracc,nan,nan,Feature 9 - veracc
+SAMPLE_F9_verlen,nan,nan,Feature 9 - verlen
+SAMPLE_FEATURE_10_SEPARATOR,--- FEATURE 10 ---,--- FEATURE 10 ---,Feature 10 sample
+SAMPLE_F10_agen,550,550,Feature 10 - agen
+SAMPLE_F10_boyshp,3.0,3.0,Feature 10 - boyshp
+SAMPLE_F10_conrad,nan,nan,Feature 10 - conrad
+SAMPLE_F10_datend,None,None,Feature 10 - datend
+SAMPLE_F10_datsta,None,None,Feature 10 - datsta
+SAMPLE_F10_dsid_dsnm,US3CA52M,US3CA52M,Feature 10 - dsid_dsnm
+SAMPLE_F10_dsid_edtn,31,31,Feature 10 - dsid_edtn
+SAMPLE_F10_dsid_updn,0,0,Feature 10 - dsid_updn
+SAMPLE_F10_fidn,169949270,169949270,Feature 10 - fidn
+SAMPLE_F10_fids,7312,7312,Feature 10 - fids
+SAMPLE_F10_geometry,Point(1),Point(1),Feature 10 - geometry
+SAMPLE_F10_grup,2,2,Feature 10 - grup
+SAMPLE_F10_inform,Whip Antenna,Whip Antenna,Feature 10 - inform
+SAMPLE_F10_lnam,02260A2138561C90,02260A2138561C90,Feature 10 - lnam
+SAMPLE_F10_marsys,nan,nan,Feature 10 - marsys
+SAMPLE_F10_ninfom,None,None,Feature 10 - ninfom
+SAMPLE_F10_nobjnm,None,None,Feature 10 - nobjnm
+SAMPLE_F10_ntxtds,None,None,Feature 10 - ntxtds
+SAMPLE_F10_objl,19,19,Feature 10 - objl
+SAMPLE_F10_objnam,Waverider buoy,Waverider buoy,Feature 10 - objnam
+SAMPLE_F10_perend,None,None,Feature 10 - perend
+SAMPLE_F10_persta,None,None,Feature 10 - persta
+SAMPLE_F10_picrep,None,None,Feature 10 - picrep
+SAMPLE_F10_prim,1,1,Feature 10 - prim
+SAMPLE_F10_rcid,27,27,Feature 10 - rcid
+SAMPLE_F10_recdat,None,None,Feature 10 - recdat
+SAMPLE_F10_recind,None,None,Feature 10 - recind
+SAMPLE_F10_rver,1,1,Feature 10 - rver
+SAMPLE_F10_scamax,nan,nan,Feature 10 - scamax
+SAMPLE_F10_scamin,499999,499999,Feature 10 - scamin
+SAMPLE_F10_sordat,20230802,20230802,Feature 10 - sordat
+SAMPLE_F10_sorind,"US,US,reprt,11thCGD,LNM 31/23","US,US,reprt,11thCGD,LNM 31/23",Feature 10 - sorind
+SAMPLE_F10_txtdsc,None,None,Feature 10 - txtdsc
+SAMPLE_F10_veracc,nan,nan,Feature 10 - veracc
+SAMPLE_F10_verlen,nan,nan,Feature 10 - verlen

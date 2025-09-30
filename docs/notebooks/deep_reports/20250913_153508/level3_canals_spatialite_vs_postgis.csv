@@ -1,0 +1,80 @@
+attribute,spatialite,postgis,notes
+METADATA_LAYER_NAME,canals,canals,Layer comparison between spatialite and postgis
+METADATA_TOTAL_FEATURES,4,4,Total features in each format
+METADATA_TOTAL_COLUMNS,37,36,Total columns in each format
+SEPARATOR_COLUMN_PRESENCE,---,---,Column presence analysis follows
+COLUMN_agen,PRESENT,PRESENT,Column presence comparison
+COLUMN_catcan,PRESENT,PRESENT,Column presence comparison
+COLUMN_condtn,PRESENT,PRESENT,Column presence comparison
+COLUMN_datend,PRESENT,PRESENT,Column presence comparison
+COLUMN_datsta,PRESENT,PRESENT,Column presence comparison
+COLUMN_dsid_dsnm,PRESENT,PRESENT,Column presence comparison
+COLUMN_dsid_edtn,PRESENT,PRESENT,Column presence comparison
+COLUMN_dsid_updn,PRESENT,PRESENT,Column presence comparison
+COLUMN_ffpt_rind,PRESENT,PRESENT,Column presence comparison
+COLUMN_fidn,PRESENT,PRESENT,Column presence comparison
+COLUMN_fids,PRESENT,PRESENT,Column presence comparison
+COLUMN_geom,PRESENT,MISSING,Column presence comparison
+COLUMN_geometry,PRESENT,MISSING,Column presence comparison
+COLUMN_grup,PRESENT,PRESENT,Column presence comparison
+COLUMN_horacc,PRESENT,PRESENT,Column presence comparison
+COLUMN_horclr,PRESENT,PRESENT,Column presence comparison
+COLUMN_horwid,PRESENT,PRESENT,Column presence comparison
+COLUMN_inform,PRESENT,PRESENT,Column presence comparison
+COLUMN_lnam,PRESENT,PRESENT,Column presence comparison
+COLUMN_lnam_refs,PRESENT,PRESENT,Column presence comparison
+COLUMN_ninfom,PRESENT,PRESENT,Column presence comparison
+COLUMN_nobjnm,PRESENT,PRESENT,Column presence comparison
+COLUMN_ntxtds,PRESENT,PRESENT,Column presence comparison
+COLUMN_objl,PRESENT,PRESENT,Column presence comparison
+COLUMN_objnam,PRESENT,PRESENT,Column presence comparison
+COLUMN_ogc_fid,PRESENT,PRESENT,Column presence comparison
+COLUMN_prim,PRESENT,PRESENT,Column presence comparison
+COLUMN_rcid,PRESENT,PRESENT,Column presence comparison
+COLUMN_recdat,PRESENT,PRESENT,Column presence comparison
+COLUMN_recind,PRESENT,PRESENT,Column presence comparison
+COLUMN_rver,PRESENT,PRESENT,Column presence comparison
+COLUMN_scamax,PRESENT,PRESENT,Column presence comparison
+COLUMN_scamin,PRESENT,PRESENT,Column presence comparison
+COLUMN_sordat,PRESENT,PRESENT,Column presence comparison
+COLUMN_sorind,PRESENT,PRESENT,Column presence comparison
+COLUMN_status,PRESENT,PRESENT,Column presence comparison
+COLUMN_txtdsc,PRESENT,PRESENT,Column presence comparison
+COLUMN_wkb_geometry,MISSING,PRESENT,Column presence comparison
+SEPARATOR_PROPERTY_COMPLETENESS,---,---,Property completeness analysis (non-empty / total)
+PROP_COMPLETENESS_agen,4/4 (100.0%),4/4 (100.0%),Prop Values MATCH (100.0%)
+PROP_COMPLETENESS_catcan,0/4 (0.0%),0/4 (0.0%),Prop Values MATCH (0.0%)
+PROP_COMPLETENESS_condtn,0/4 (0.0%),0/4 (0.0%),Prop Values MATCH (0.0%)
+PROP_COMPLETENESS_datend,0/4 (0.0%),0/4 (0.0%),Prop Values MATCH (0.0%)
+PROP_COMPLETENESS_datsta,0/4 (0.0%),0/4 (0.0%),Prop Values MATCH (0.0%)
+PROP_COMPLETENESS_dsid_dsnm,4/4 (100.0%),4/4 (100.0%),Prop Values MATCH (100.0%)
+PROP_COMPLETENESS_dsid_edtn,4/4 (100.0%),4/4 (100.0%),Prop Values MATCH (100.0%)
+PROP_COMPLETENESS_dsid_updn,4/4 (100.0%),4/4 (100.0%),Prop Values MATCH (100.0%)
+PROP_COMPLETENESS_ffpt_rind,0/4 (0.0%),0/4 (0.0%),Prop Values MATCH (0.0%)
+PROP_COMPLETENESS_fidn,4/4 (100.0%),4/4 (100.0%),Prop Values MATCH (100.0%)
+PROP_COMPLETENESS_fids,4/4 (100.0%),4/4 (100.0%),Prop Values MATCH (100.0%)
+PROP_COMPLETENESS_geometry,4/4 (100.0%),N/A,Property completeness comparison
+PROP_COMPLETENESS_grup,4/4 (100.0%),4/4 (100.0%),Prop Values MATCH (100.0%)
+PROP_COMPLETENESS_horacc,0/4 (0.0%),0/4 (0.0%),Prop Values MATCH (0.0%)
+PROP_COMPLETENESS_horclr,0/4 (0.0%),0/4 (0.0%),Prop Values MATCH (0.0%)
+PROP_COMPLETENESS_horwid,0/4 (0.0%),0/4 (0.0%),Prop Values MATCH (0.0%)
+PROP_COMPLETENESS_inform,0/4 (0.0%),0/4 (0.0%),Prop Values MATCH (0.0%)
+PROP_COMPLETENESS_lnam,4/4 (100.0%),4/4 (100.0%),Prop Values MATCH (100.0%)
+PROP_COMPLETENESS_lnam_refs,0/4 (0.0%),0/4 (0.0%),Prop Values MATCH (0.0%)
+PROP_COMPLETENESS_ninfom,0/4 (0.0%),0/4 (0.0%),Prop Values MATCH (0.0%)
+PROP_COMPLETENESS_nobjnm,0/4 (0.0%),0/4 (0.0%),Prop Values MATCH (0.0%)
+PROP_COMPLETENESS_ntxtds,0/4 (0.0%),0/4 (0.0%),Prop Values MATCH (0.0%)
+PROP_COMPLETENESS_objl,4/4 (100.0%),4/4 (100.0%),Prop Values MATCH (100.0%)
+PROP_COMPLETENESS_objnam,3/4 (75.0%),3/4 (75.0%),Prop Values MATCH (75.0%)
+PROP_COMPLETENESS_ogc_fid,4/4 (100.0%),4/4 (100.0%),Prop Values MATCH (100.0%)
+PROP_COMPLETENESS_prim,4/4 (100.0%),4/4 (100.0%),Prop Values MATCH (100.0%)
+PROP_COMPLETENESS_rcid,4/4 (100.0%),4/4 (100.0%),Prop Values MATCH (100.0%)
+PROP_COMPLETENESS_recdat,0/4 (0.0%),0/4 (0.0%),Prop Values MATCH (0.0%)
+PROP_COMPLETENESS_recind,0/4 (0.0%),0/4 (0.0%),Prop Values MATCH (0.0%)
+PROP_COMPLETENESS_rver,4/4 (100.0%),4/4 (100.0%),Prop Values MATCH (100.0%)
+PROP_COMPLETENESS_scamax,0/4 (0.0%),0/4 (0.0%),Prop Values MATCH (0.0%)
+PROP_COMPLETENESS_scamin,4/4 (100.0%),4/4 (100.0%),Prop Values MATCH (100.0%)
+PROP_COMPLETENESS_sordat,4/4 (100.0%),4/4 (100.0%),Prop Values MATCH (100.0%)
+PROP_COMPLETENESS_sorind,4/4 (100.0%),4/4 (100.0%),Prop Values MATCH (100.0%)
+PROP_COMPLETENESS_status,0/4 (0.0%),0/4 (0.0%),Prop Values MATCH (0.0%)
+PROP_COMPLETENESS_txtdsc,0/4 (0.0%),0/4 (0.0%),Prop Values MATCH (0.0%)

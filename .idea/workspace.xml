@@ -5,19 +5,35 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="2a0852ca-6674-4955-b8d6-f606e8da5fc3" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/docs/notebooks/import_s57.ipynb" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/__init__.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/maritime_module/__init__.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/maritime_module/core/__init__.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/maritime_module/core/s57_converter.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/maritime_module/core/s57_data.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/maritime_module/utils/__init__.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/maritime_module/utils/db_utils.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/maritime_module/utils/s57_utils.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/tests/__init__.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/tests/core/test_s57_converter.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/tests/core__real_data/real_test_s57_converter.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/tests/test.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/docs/notebooks/graph.ipynb" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/docs/notebooks/graph_GeoPackage.ipynb" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/docs/notebooks/graph_PostGIS.ipynb" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/docs/notebooks/graph_SpatiaLite.ipynb" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/docs/notebooks/graph_fine_GPKG.ipynb" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/docs/notebooks/graph_fine_PostGIS.ipynb" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/docs/notebooks/layers_inspect.ipynb" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/docs/notebooks/port_utils.ipynb" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/maritime_module/core/graph.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/maritime_module/core/pathfinding_lite.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/maritime_module/data/graph_config.yml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/maritime_module/utils/geometry_utils.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/maritime_module/utils/misc_utils.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/maritime_module/utils/plot_utils.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/maritime_module/utils/port_utils.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/dataSources.local.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/dataSources.local.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/dataSources.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/dataSources.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/NOAA_DB.csv" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/NoaaDB.csv" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/notebooks/enc_factory.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/docs/notebooks/enc_factory.ipynb" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/notebooks/import_s57.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/docs/notebooks/import_s57.ipynb" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/notebooks/s57utils.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/docs/notebooks/s57utils.ipynb" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pyproject.toml" beforeDir="false" afterPath="$PROJECT_DIR$/pyproject.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/maritime_module/core/s57_data.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/maritime_module/core/s57_data.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/maritime_module/utils/db_utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/maritime_module/utils/db_utils.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/maritime_module/utils/s57_utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/maritime_module/utils/s57_utils.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/uv.lock" beforeDir="false" afterPath="$PROJECT_DIR$/uv.lock" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -27,12 +43,17 @@
   <component name="FileTemplateManagerImpl">
     <option name="RECENT_TEMPLATES">
       <list>
-        <option value="Jupyter Notebook" />
         <option value="Python Script" />
+        <option value="Jupyter Notebook" />
       </list>
     </option>
   </component>
   <component name="Git.Settings">
+    <option name="RECENT_BRANCH_BY_REPOSITORY">
+      <map>
+        <entry key="$PROJECT_DIR$" value="dev" />
+      </map>
+    </option>
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
   <component name="ProjectColorInfo">{
@@ -44,43 +65,47 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;RunOnceActivity.ChatTagsLlmMigration&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.ClientConfigCleanupMigration&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.CodyAccountHistoryMigration&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.CodyAccountsIdsRefresh&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.CodyAssignOrphanedChatsToActiveAccount&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.CodyConvertUrlToCodebaseName&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.CodyHistoryLlmMigration&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.CodyMigrateChatHistory-v2&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.CodyProjectSettingsMigration&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.DeprecatedChatLlmMigration&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.ToggleCodyToolWindowAfterMigration&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;master&quot;,
-    &quot;last_opened_file_path&quot;: &quot;//wsl.localhost/Ubuntu-22.04/home/vikont_tux/python_projects/1_MaritimeModule_V1/src/maritime_module/utils&quot;,
-    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
-    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
-    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
-    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
-    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
-    &quot;settings.editor.selected.configurable&quot;: &quot;preferences.pluginManager&quot;,
-    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "RunOnceActivity.ChatTagsLlmMigration": "true",
+    "RunOnceActivity.ClientConfigCleanupMigration": "true",
+    "RunOnceActivity.CodyAccountHistoryMigration": "true",
+    "RunOnceActivity.CodyAccountsIdsRefresh": "true",
+    "RunOnceActivity.CodyAssignOrphanedChatsToActiveAccount": "true",
+    "RunOnceActivity.CodyConvertUrlToCodebaseName": "true",
+    "RunOnceActivity.CodyHistoryLlmMigration": "true",
+    "RunOnceActivity.CodyMigrateChatHistory-v2": "true",
+    "RunOnceActivity.CodyProjectSettingsMigration": "true",
+    "RunOnceActivity.DeprecatedChatLlmMigration": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
+    "RunOnceActivity.ToggleCodyToolWindowAfterMigration": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "database.data.extractors.current.export.id": "Comma-separated (CSV)_id",
+    "git-widget-placeholder": "feature-stamps",
+    "last_opened_file_path": "//wsl.localhost/Ubuntu-22.04/home/vikont_tux/python_projects_wsl2/1_MaritimeModule_V1/docs/notebooks",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "settings.editor.selected.configurable": "ml.llm.LLMThirdPartyAiProvidersConfigurable",
+    "vue.rearranger.settings.migration": "true"
   },
-  &quot;keyToStringList&quot;: {
-    &quot;DatabaseDriversLRU&quot;: [
-      &quot;postgresql&quot;
+  "keyToStringList": {
+    "DatabaseDriversLRU": [
+      "postgresql"
     ]
   }
-}</component>
+}]]></component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
+      <recent name="\\wsl.localhost\Ubuntu-22.04\home\vikont_tux\python_projects_wsl2\1_MaritimeModule_V1\docs\notebooks" />
       <recent name="\\wsl.localhost\Ubuntu-22.04\home\vikont_tux\python_projects\1_MaritimeModule_V1\src\maritime_module\utils" />
     </key>
     <key name="MoveFile.RECENT_KEYS">
+      <recent name="\\wsl.localhost\Ubuntu-22.04\home\vikont_tux\python_projects_wsl2\1_MaritimeModule_V1\docs\notebooks" />
+      <recent name="\\wsl.localhost\Ubuntu-22.04\home\vikont_tux\python_projects_wsl2\1_MaritimeModule_V1\tests\core__real_data" />
       <recent name="\\wsl.localhost\Ubuntu-22.04\home\vikont_tux\python_projects_wsl2\1_MaritimeModule_V1\data" />
       <recent name="\\wsl.localhost\Ubuntu-22.04\home\vikont_tux\python_projects_wsl2\1_MaritimeModule_V1\docs" />
       <recent name="\\wsl.localhost\Ubuntu-22.04\home\vikont_tux\python_projects\1_MaritimeModule_V1\src" />
@@ -119,7 +144,48 @@
       <workItem from="1754983612904" duration="35132000" />
       <workItem from="1755073108837" duration="3688000" />
       <workItem from="1755076959486" duration="15086000" />
-      <workItem from="1755513878815" duration="4412000" />
+      <workItem from="1755513878815" duration="21736000" />
+      <workItem from="1755583069304" duration="26454000" />
+      <workItem from="1755681897631" duration="712000" />
+      <workItem from="1755771106797" duration="28016000" />
+      <workItem from="1755852475145" duration="35025000" />
+      <workItem from="1755894939148" duration="425000" />
+      <workItem from="1756107122006" duration="31082000" />
+      <workItem from="1756153217416" duration="383000" />
+      <workItem from="1756183525463" duration="29897000" />
+      <workItem from="1756316060732" duration="5163000" />
+      <workItem from="1756362072966" duration="40135000" />
+      <workItem from="1756452458017" duration="21090000" />
+      <workItem from="1757666495408" duration="33634000" />
+      <workItem from="1757746761505" duration="2520000" />
+      <workItem from="1757754137988" duration="32964000" />
+      <workItem from="1757793044563" duration="29000" />
+      <workItem from="1757836628015" duration="31028000" />
+      <workItem from="1757930251847" duration="17981000" />
+      <workItem from="1758002224109" duration="5456000" />
+      <workItem from="1758014530265" duration="153000" />
+      <workItem from="1758014777467" duration="512000" />
+      <workItem from="1758015496743" duration="15700000" />
+      <workItem from="1758090230805" duration="28418000" />
+      <workItem from="1758180640498" duration="15560000" />
+      <workItem from="1758210378108" duration="829000" />
+      <workItem from="1758211233415" duration="52000" />
+      <workItem from="1758211364177" duration="222000" />
+      <workItem from="1758211617978" duration="4966000" />
+      <workItem from="1758269263438" duration="2967000" />
+      <workItem from="1758277173317" duration="2030000" />
+      <workItem from="1758283131188" duration="9204000" />
+      <workItem from="1758295169849" duration="13037000" />
+      <workItem from="1758350400300" duration="1072000" />
+      <workItem from="1758374234369" duration="9957000" />
+      <workItem from="1758512309235" duration="29404000" />
+      <workItem from="1758612708685" duration="21202000" />
+      <workItem from="1758698069758" duration="26699000" />
+      <workItem from="1758790368616" duration="13288000" />
+      <workItem from="1758872692430" duration="38749000" />
+      <workItem from="1758956799059" duration="23035000" />
+      <workItem from="1759128710791" duration="27672000" />
+      <workItem from="1759219300890" duration="22958000" />
     </task>
     <servers />
   </component>
@@ -127,11 +193,48 @@
     <option name="version" value="3" />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
+    <option name="RECENT_FILTERS">
+      <map>
+        <entry key="Branch">
+          <value>
+            <list>
+              <RecentGroup>
+                <option name="FILTER_VALUES">
+                  <option value="feature-stamps" />
+                </option>
+              </RecentGroup>
+              <RecentGroup>
+                <option name="FILTER_VALUES">
+                  <option value="master" />
+                </option>
+              </RecentGroup>
+              <RecentGroup>
+                <option name="FILTER_VALUES">
+                  <option value="origin/master" />
+                </option>
+              </RecentGroup>
+            </list>
+          </value>
+        </entry>
+      </map>
+    </option>
     <option name="TAB_STATES">
       <map>
         <entry key="MAIN">
           <value>
-            <State />
+            <State>
+              <option name="FILTERS">
+                <map>
+                  <entry key="branch">
+                    <value>
+                      <list>
+                        <option value="feature-stamps" />
+                      </list>
+                    </value>
+                  </entry>
+                </map>
+              </option>
+            </State>
           </value>
         </entry>
       </map>
