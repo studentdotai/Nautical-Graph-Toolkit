@@ -34,6 +34,7 @@ from shapely.geometry.base import BaseGeometry
 
 from .s57_data import ENCDataFactory
 from ..utils.s57_utils import S57Utils
+from ..utils.s57_classification import S57Classifier
 from ..utils.db_utils import PostGISConnector
 
 logger = logging.getLogger(__name__)
@@ -2707,158 +2708,1122 @@ class EdgeCleaner:
 class Weights:
     """
     Manages the application of weights to a navigation graph based on maritime features.
+
+    Integrates with S57Classifier for maritime domain knowledge and supports both
+    static (layer-based) and dynamic (vessel-specific) weight calculations.
+
+    Edge Column Conventions:
+        - ft_*  : Feature columns (S-57 layer data)
+                 Examples: ft_depth_min, ft_wreck_sounding, ft_clearance
+        - wt_*  : Weight columns (calculated penalties)
+                 Examples: wt_depth_min, wt_lndare, wt_fairwy
+        - dir_* : Directional columns (orientation data)
+                 Examples: dir_tsslpt_orient, dir_rectrc_orient
+
+    Workflow:
+        1. Initialize with data factory and optional custom classifier CSV
+        2. Apply static weights from S-57 layers (e.g., fairways, obstructions)
+        3. Calculate dynamic weights based on vessel parameters (draft, height)
+           - Uses UKC (Under Keel Clearance) terminology
+           - Fallback: ft_drgare (dredged) → ft_depth_min
+        4. Use get_edge_columns() to inspect available features and weights
+
+    UKC (Under Keel Clearance):
+        UKC = Water Depth - Vessel Draft
+        - Band 4 (Grounding): UKC ≤ 0 → impassable
+        - Band 3 (Restricted): 0 < UKC ≤ safety_margin → high penalty
+        - Band 2 (Safe): safety_margin < UKC ≤ 0.5×draft → moderate
+        - Band 1 (Deep): UKC > draft → minimal penalty
+
+    Example:
+        >>> from maritime_module.core.graph import Weights
+        >>> from maritime_module.core.s57_data import ENCDataFactory
+        >>>
+        >>> # Initialize
+        >>> factory = ENCDataFactory(source='data.gpkg')
+        >>> weights = Weights(factory, classifier_csv_path='custom_weights.csv')
+        >>>
+        >>> # Inspect available columns
+        >>> columns = weights.get_edge_columns(graph)
+        >>> weights.print_column_summary(graph)
+        >>>
+        >>> # Apply static weights from layers
+        >>> graph = weights.apply_feature_weights(
+        ...     graph,
+        ...     enc_names=['US5FL14M'],
+        ...     static_layers=['lndare', 'obstrn', 'fairwy']
+        ... )
+        >>>
+        >>> # Apply dynamic weights for specific vessel
+        >>> vessel_params = {
+        ...     'draft': 7.5,           # meters
+        ...     'height': 30.0,         # meters
+        ...     'safety_margin': 2.0,   # meters
+        ...     'vessel_type': 'cargo'
+        ... }
+        >>> graph = weights.calculate_dynamic_weights(graph, vessel_params)
     """
 
-    def __init__(self, data_factory: ENCDataFactory):
+    # Class constants for weight thresholds
+    BLOCKING_THRESHOLD = 999.0      # Value for absolute blocking constraints (land, grounding)
+    DEFAULT_MAX_PENALTY = 50.0      # Maximum cumulative penalty to prevent explosion
+    MIN_BONUS_FACTOR = 0.5          # Minimum bonus factor (maximum 50% weight reduction)
+
+    def __init__(self, data_factory: ENCDataFactory, classifier_csv_path: Optional[str] = None):
         """
         Initializes the Weights manager.
 
         Args:
             data_factory (ENCDataFactory): An initialized factory for accessing ENC data.
+            classifier_csv_path (Optional[str]): Path to custom S57 classification CSV.
+                                                 If None, uses built-in default classifier.
         """
         self.factory = data_factory
+        self.classifier = S57Classifier(csv_path=classifier_csv_path)
+
+        # Column categorization for edge data
+        # ft_* : Feature columns (data from S-57 layers, e.g., ft_depth_min, ft_wreck_sounding)
+        # wt_* : Weight columns (calculated penalties from features, e.g., wt_depth_min, wt_fairwy)
+        # dir_*: Directional columns (orientation/direction data, e.g., dir_tsslpt_orient)
+        self.feature_columns: List[str] = []
+        self.weight_columns: List[str] = []
+        self.directional_columns: List[str] = []
+        self.static_weight_columns: List[str] = []  # wt_* columns not derived from ft_*
+
+        logger.info(f"Weights manager initialized with {'custom' if classifier_csv_path else 'default'} S57 classifier")
+
+    def get_edge_columns(self, graph: nx.Graph, update_cache: bool = True) -> Dict[str, List[str]]:
+        """
+        Analyzes graph edge attributes and categorizes columns by prefix convention.
+
+        Column naming conventions:
+        - ft_*  : Feature columns containing S-57 layer data (e.g., ft_depth_min, ft_wreck_sounding)
+        - wt_*  : Weight columns containing calculated penalties (e.g., wt_depth_min, wt_lndare)
+        - dir_* : Directional columns containing orientation data (e.g., dir_tsslpt_orient)
+
+        Args:
+            graph (nx.Graph): The graph to analyze
+            update_cache (bool): If True, updates internal column lists (default: True)
+
+        Returns:
+            Dict[str, List[str]]: Dictionary with categorized column lists:
+                - 'feature_columns': List of ft_* columns
+                - 'weight_columns': List of wt_* columns (derived from features)
+                - 'static_weight_columns': List of wt_* columns NOT derived from features
+                - 'directional_columns': List of dir_* columns
+                - 'all_columns': All edge attribute columns
+
+        Example:
+            >>> weights = Weights(factory)
+            >>> columns = weights.get_edge_columns(graph)
+            >>> print(f"Features: {columns['feature_columns']}")
+            >>> print(f"Weights: {columns['weight_columns']}")
+        """
+        # Get all edge attribute keys from first edge (assumes uniform schema)
+        if graph.number_of_edges() == 0:
+            logger.warning("Graph has no edges, cannot categorize columns")
+            return {
+                'feature_columns': [],
+                'weight_columns': [],
+                'static_weight_columns': [],
+                'directional_columns': [],
+                'all_columns': []
+            }
+
+        # Sample first edge to get available attributes
+        sample_edge = next(iter(graph.edges(data=True)))
+        edge_attrs = sample_edge[2].keys() if len(sample_edge) > 2 else []
+
+        # Categorize columns by prefix
+        feature_cols = [col for col in edge_attrs if col.startswith('ft_')]
+        directional_cols = [col for col in edge_attrs if col.startswith('dir_')]
+        all_weight_cols = [col for col in edge_attrs if col.startswith('wt_')]
+
+        # Derive expected weight column names from feature columns
+        # e.g., ft_depth_min → wt_depth_min
+        feature_derived_weights = [f"wt_{col[3:]}" for col in feature_cols]
+
+        # Identify weight columns that correspond to features
+        weight_cols = [col for col in all_weight_cols if col in feature_derived_weights]
+
+        # Static weight columns are wt_* columns NOT derived from features
+        # These are typically layer-based weights (e.g., wt_lndare, wt_fairwy)
+        static_weight_cols = [col for col in all_weight_cols
+                             if col not in weight_cols and col not in directional_cols]
+
+        # Update internal cache if requested
+        if update_cache:
+            self.feature_columns = feature_cols
+            self.weight_columns = weight_cols
+            self.static_weight_columns = static_weight_cols
+            self.directional_columns = directional_cols
+
+            logger.info(f"Column categorization complete:")
+            logger.info(f"  Feature columns (ft_*): {len(feature_cols)}")
+            logger.info(f"  Weight columns (wt_* from features): {len(weight_cols)}")
+            logger.info(f"  Static weight columns (wt_* from layers): {len(static_weight_cols)}")
+            logger.info(f"  Directional columns (dir_*): {len(directional_cols)}")
+
+        return {
+            'feature_columns': feature_cols,
+            'weight_columns': weight_cols,
+            'static_weight_columns': static_weight_cols,
+            'directional_columns': directional_cols,
+            'all_columns': list(edge_attrs)
+        }
+
+    def print_column_summary(self, graph: nx.Graph) -> None:
+        """
+        Prints a detailed summary of edge columns categorized by type.
+
+        Args:
+            graph (nx.Graph): The graph to analyze
+        """
+        columns = self.get_edge_columns(graph, update_cache=False)
+
+        print("\n" + "="*60)
+        print("Edge Column Summary")
+        print("="*60)
+
+        if columns['feature_columns']:
+            print(f"\nFeature Columns (ft_*): {len(columns['feature_columns'])}")
+            for col in sorted(columns['feature_columns']):
+                print(f"  - {col}")
+
+        if columns['weight_columns']:
+            print(f"\nDynamic Weight Columns (wt_* from features): {len(columns['weight_columns'])}")
+            for col in sorted(columns['weight_columns']):
+                print(f"  - {col}")
+
+        if columns['static_weight_columns']:
+            print(f"\nStatic Weight Columns (wt_* from layers): {len(columns['static_weight_columns'])}")
+            for col in sorted(columns['static_weight_columns']):
+                print(f"  - {col}")
+
+        if columns['directional_columns']:
+            print(f"\nDirectional Columns (dir_*): {len(columns['directional_columns'])}")
+            for col in sorted(columns['directional_columns']):
+                print(f"  - {col}")
+
+        print(f"\nTotal edge attributes: {len(columns['all_columns'])}")
+        print("="*60 + "\n")
 
     def apply_feature_weights(self, graph: nx.Graph, enc_names: List[str],
-                              layer_configs: Dict[str, Dict] = None) -> nx.Graph:
+                              static_layers: List[str] = None) -> nx.Graph:
         """
         Applies weights to graph edges based on proximity to maritime features.
+        Uses S57Classifier to determine weight factors for each layer.
 
         Args:
             graph (nx.Graph): The input graph.
             enc_names (List[str]): List of ENCs to source features from.
-            layer_configs (Dict[str, Dict]): Configuration for layers and their weights.
+            static_layers (List[str]): List of layer names to apply weights from.
+                                      If None, uses default set of common navigation layers.
 
         Returns:
             nx.Graph: The graph with updated edge weights.
         """
-        if layer_configs is None:
-            layer_configs = {
-                'fairwy': {'factor': 0.8},
-                'tsslpt': {'factor': 0.7},
-                'depcnt': {'attr': 'valdco', 'values': {'5': 1.5, '10': 1.2, '20': 0.9}},
-                'resare': {'factor': 2.0},
-                'obstrn': {'factor': 5.0}
-            }
+        if static_layers is None:
+            # Default layers if not specified
+            static_layers = ['lndare', 'obstrn', 'uwtroc', 'wrecks', 'fairwy', 'tsslpt',
+                           'drgare', 'prcare', 'resare', 'cblare', 'pipare']
 
         G = graph.copy()
         edges_gdf = gpd.GeoDataFrame([
             {'u': u, 'v': v, 'geometry': LineString([u, v])} for u, v in G.edges()
         ], crs="EPSG:4326")
 
-        for layer_name, config in layer_configs.items():
+        logger.info(f"Applying static weights from {len(static_layers)} layers using S57Classifier")
+
+        for layer_name in static_layers:
+            # Get weight factor from S57Classifier
+            factor = self.classifier.get_cost_factor(layer_name.upper())
+
+            logger.debug(f"Processing layer '{layer_name}' with factor {factor}")
+
             features_gdf = self.factory.get_layer(layer_name, filter_by_enc=enc_names)
             if features_gdf.empty:
+                logger.debug(f"No features found for layer '{layer_name}', skipping")
                 continue
 
             # Spatial join to find intersecting edges
             intersecting_edges = gpd.sjoin(edges_gdf, features_gdf, how="inner", predicate="intersects")
 
+            if intersecting_edges.empty:
+                logger.debug(f"No edge intersections for layer '{layer_name}'")
+                continue
+
+            # Apply weight factor to intersecting edges
+            edges_updated = 0
             for _, edge_row in intersecting_edges.iterrows():
                 u, v = edge_row['u'], edge_row['v']
-                factor = 1.0
-
-                if 'attr' in config and 'values' in config:
-                    attr_val = str(edge_row[config['attr']])
-                    factor = config['values'].get(attr_val, 1.0)
-                elif 'factor' in config:
-                    factor = config['factor']
 
                 if 'weight' in G[u][v]:
                     G[u][v]['weight'] *= factor
                 else:
                     G[u][v]['weight'] = factor
 
+                edges_updated += 1
+
+            logger.info(f"Applied {layer_name} weights to {edges_updated} edges (factor: {factor})")
+
         return G
 
-    def calculate_dynamic_weights(self, graph: nx.Graph, vessel_parameters: Dict[str, Any]) -> nx.Graph:
+    def _calculate_dynamic_safety_margin(self, base_safety_margin: float,
+                                        weather_factor: float = 1.0,
+                                        visibility_factor: float = 1.0,
+                                        time_of_day: str = 'day') -> float:
         """
-        Calculates dynamic edge weights based on vessel parameters and feature properties
-        stored on the graph edges.
+        Calculate dynamic safety margin based on environmental conditions.
+
+        Safety margin increases in poor conditions:
+        - Poor weather (storms, high seas)
+        - Low visibility (fog, rain)
+        - Night time navigation
 
         Args:
-            graph (nx.Graph): The input graph with feature properties on edges.
-            vessel_parameters (Dict[str, Any]): Vessel parameters (e.g., draft, type).
+            base_safety_margin: Base safety margin in meters
+            weather_factor: Weather multiplier (1.0 = good, 1.5 = moderate, 2.0 = poor)
+            visibility_factor: Visibility multiplier (1.0 = good, 1.5 = reduced, 2.0 = poor)
+            time_of_day: 'day' or 'night'
 
         Returns:
-            nx.Graph: The graph with dynamically calculated weights.
+            float: Adjusted safety margin in meters
+
+        Example:
+            >>> # Good conditions
+            >>> margin = weights._calculate_dynamic_safety_margin(2.0, 1.0, 1.0, 'day')
+            >>> # margin = 2.0
+            >>>
+            >>> # Poor weather at night
+            >>> margin = weights._calculate_dynamic_safety_margin(2.0, 1.8, 1.5, 'night')
+            >>> # margin = 2.0 * 1.8 * 1.5 * 1.2 = 6.48
         """
+        # Start with base margin
+        dynamic_margin = base_safety_margin
+
+        # Apply weather conditions
+        dynamic_margin *= weather_factor
+
+        # Apply visibility conditions
+        dynamic_margin *= visibility_factor
+
+        # Night time requires extra caution
+        if time_of_day == 'night':
+            dynamic_margin *= 1.2  # 20% increase for night navigation
+
+        logger.debug(f"Dynamic safety margin: {base_safety_margin:.2f}m → {dynamic_margin:.2f}m "
+                    f"(weather={weather_factor}, visibility={visibility_factor}, time={time_of_day})")
+
+        return dynamic_margin
+
+    def calculate_dynamic_weights(self, graph: nx.Graph, vessel_parameters: Dict[str, Any],
+                                 environmental_conditions: Optional[Dict[str, Any]] = None,
+                                 max_penalty: float = None) -> nx.Graph:
+        """
+        Calculate dynamic edge weights using three-tier maritime pathfinding architecture.
+
+        Weight Formula:
+            final_weight = base_distance × blocking_factor × penalty_factor × bonus_factor
+
+        Three-Tier System:
+            Tier 1 (Blocking): Absolute constraints (use max, value=999)
+                - Land, rocks, coastlines
+                - UKC ≤ 0 (grounding)
+                - Dangerous wrecks
+
+            Tier 2 (Penalties): Conditional hazards (use multiply, capped at max_penalty)
+                - Shallow water (restricted UKC)
+                - Low clearance
+                - Wrecks, obstructions
+                - Restricted areas
+
+            Tier 3 (Bonuses): Preferences (use multiply, values 0.5-1.0)
+                - Fairways, TSS lanes
+                - Dredged areas
+                - Deep water routes
+
+        Args:
+            graph: Input graph with edge features
+            vessel_parameters: Dict with:
+                - draft (float): Vessel draft in meters
+                - height (float): Vessel height in meters
+                - safety_margin (float): Base safety margin in meters
+                - vessel_type (str): 'cargo', 'passenger', etc.
+            environmental_conditions: Optional dict with:
+                - weather_factor (float): 1.0=good, 2.0=poor
+                - visibility_factor (float): 1.0=good, 2.0=poor
+                - time_of_day (str): 'day' or 'night'
+            max_penalty: Maximum cumulative penalty (default: DEFAULT_MAX_PENALTY)
+
+        Returns:
+            nx.Graph: Graph with updated weights and metadata
+
+        Example:
+            >>> vessel_params = {
+            ...     'draft': 7.5,
+            ...     'height': 30.0,
+            ...     'safety_margin': 2.0,
+            ...     'vessel_type': 'cargo'
+            ... }
+            >>> env_conditions = {
+            ...     'weather_factor': 1.5,  # Moderate weather
+            ...     'visibility_factor': 1.2,  # Reduced visibility
+            ...     'time_of_day': 'night'
+            ... }
+            >>> graph = weights.calculate_dynamic_weights(graph, vessel_params, env_conditions)
+        """
+        # Use class constant if not specified
+        if max_penalty is None:
+            max_penalty = self.DEFAULT_MAX_PENALTY
+
+        # Validate max_penalty
+        if max_penalty <= 1.0:
+            raise ValueError(f"Max penalty must be greater than 1.0, got {max_penalty}")
+
+        # Extract vessel parameters
         vessel_type = vessel_parameters.get('vessel_type', 'cargo')
-        draft = vessel_parameters.get('draft', 8.0)
-        safety_margin = vessel_parameters.get('safety_margin', 1.0)
-        safe_depth = draft + safety_margin
+        draft = vessel_parameters.get('draft', 5.0)
+        vessel_height = vessel_parameters.get('height', 25.0)
+        base_safety_margin = vessel_parameters.get('safety_margin', 2.0)
+        clearance_safety = vessel_parameters.get('clearance_safety_margin', 3.0)
+
+        # Validate vessel parameters
+        if draft <= 0:
+            raise ValueError(f"Draft must be positive, got {draft}")
+        if vessel_height <= 0:
+            raise ValueError(f"Vessel height must be positive, got {vessel_height}")
+        if base_safety_margin < 0:
+            raise ValueError(f"Safety margin must be non-negative, got {base_safety_margin}")
+        if clearance_safety < 0:
+            raise ValueError(f"Clearance safety margin must be non-negative, got {clearance_safety}")
+
+        # Extract environmental conditions
+        if environmental_conditions is None:
+            environmental_conditions = {}
+
+        weather_factor = environmental_conditions.get('weather_factor', 1.0)
+        visibility_factor = environmental_conditions.get('visibility_factor', 1.0)
+        time_of_day = environmental_conditions.get('time_of_day', 'day')
+
+        # Validate environmental conditions
+        if weather_factor < 0:
+            raise ValueError(f"Weather factor must be non-negative, got {weather_factor}")
+        if visibility_factor < 0:
+            raise ValueError(f"Visibility factor must be non-negative, got {visibility_factor}")
+        if time_of_day not in ('day', 'night'):
+            raise ValueError(f"Time of day must be 'day' or 'night', got '{time_of_day}'")
+
+        # Calculate dynamic safety margin
+        safety_margin = self._calculate_dynamic_safety_margin(
+            base_safety_margin, weather_factor, visibility_factor, time_of_day
+        )
+
+        # Update vessel parameters with dynamic margin
+        vessel_params_adjusted = vessel_parameters.copy()
+        vessel_params_adjusted['safety_margin'] = safety_margin
 
         G = graph.copy()
 
+        logger.info(f"=== Dynamic Weight Calculation (Three-Tier System) ===")
+        logger.info(f"Vessel: type={vessel_type}, draft={draft}m, height={vessel_height}m")
+        logger.info(f"Safety margin: {base_safety_margin}m → {safety_margin:.2f}m (adjusted)")
+        logger.info(f"Environment: weather={weather_factor}, visibility={visibility_factor}, time={time_of_day}")
+        logger.info(f"Max penalty cap: {max_penalty}")
+
+        # Tracking statistics
+        stats = {
+            'edges_total': 0,
+            'edges_blocked': 0,
+            'edges_penalized': 0,
+            'edges_bonus': 0,
+        }
+
         for u, v, data in G.edges(data=True):
-            static_factor = data.get('static_weight_factor', 1.0)
-            dynamic_factor = 1.0
+            # BASE: Geographic distance
+            base_distance = data.get('base_weight', data.get('weight', 1.0))
 
-            # Depth constraints
-            depth_min = data.get('ft_depth_min')
-            if depth_min is not None:
-                if depth_min < draft:
-                    dynamic_factor = 999.0  # Impassable
-                elif depth_min < safe_depth:
-                    safety_ratio = (safe_depth - depth_min) / safety_margin
-                    dynamic_factor = 1.0 + (4.0 * safety_ratio)  # Scale from 1.0 to 5.0
-                else:
-                    dynamic_factor = 0.9  # Favor deeper water
+            # TIER 1: Absolute Blocking Constraints (use MAX)
+            blocking_factor = self._calculate_blocking_factor(data, vessel_params_adjusted)
 
-            # Depth contours
-            contours = data.get('ft_depth_contour')
-            if contours and any(c < safe_depth for c in contours):
-                dynamic_factor = max(dynamic_factor, 1.5)
+            # TIER 2: Conditional Penalties (use MULTIPLY with cap)
+            penalty_factor = self._calculate_penalty_factor(data, vessel_params_adjusted, max_penalty)
 
-            # Anchorage category
-            catach = data.get('ft_anchorage_category')
-            if catach:
-                preferred = [1, 2] if vessel_type == 'cargo' else [5, 6] if vessel_type == 'passenger' else []
-                if any(int(c) in preferred for c in catach if c is not None):
-                    dynamic_factor *= 0.8
+            # TIER 3: Preference Bonuses (use MULTIPLY)
+            bonus_factor = self._calculate_bonus_factor(data, vessel_params_adjusted)
 
-            # Wrecks
-            wreck_depth = data.get('ft_wreck')
-            if wreck_depth is not None and wreck_depth < safe_depth:
-                dynamic_factor = max(dynamic_factor, 8.0)
+            # COMBINE: final_weight = distance × blocking × penalties × bonuses
+            final_weight = base_distance * blocking_factor * penalty_factor * bonus_factor
 
-            base_weight = data.get('base_weight', data.get('weight', 1.0))
-            adjusted_weight = base_weight * static_factor * dynamic_factor
+            # Store comprehensive metadata
+            G[u][v]['weight'] = final_weight
+            G[u][v]['base_distance'] = base_distance
+            G[u][v]['blocking_factor'] = blocking_factor
+            G[u][v]['penalty_factor'] = penalty_factor
+            G[u][v]['bonus_factor'] = bonus_factor
 
-            G[u][v]['dynamic_factor'] = dynamic_factor
-            G[u][v]['adjusted_weight'] = adjusted_weight
-            G[u][v]['weight'] = adjusted_weight
+            # Store UKC for analysis
+            depth = data.get('ft_drgare')
+            if depth is None:
+                depth = data.get('ft_depth_min')
+            if depth is not None:
+                G[u][v]['ukc_meters'] = depth - draft
 
-        logger.info(f"Applied dynamic weights for vessel: {vessel_type}, draft: {draft}m")
+            # Update statistics
+            stats['edges_total'] += 1
+            if blocking_factor >= self.BLOCKING_THRESHOLD:
+                stats['edges_blocked'] += 1
+            if penalty_factor > 1.0:
+                stats['edges_penalized'] += 1
+            if bonus_factor < 1.0:
+                stats['edges_bonus'] += 1
+
+        # Log summary
+        logger.info(f"=== Weight Calculation Complete ===")
+        logger.info(f"Total edges: {stats['edges_total']:,}")
+        logger.info(f"Blocked edges: {stats['edges_blocked']:,} ({stats['edges_blocked']/stats['edges_total']*100:.1f}%)")
+        logger.info(f"Penalized edges: {stats['edges_penalized']:,} ({stats['edges_penalized']/stats['edges_total']*100:.1f}%)")
+        logger.info(f"Bonus edges: {stats['edges_bonus']:,} ({stats['edges_bonus']/stats['edges_total']*100:.1f}%)")
+
         return G
 
-    def pg_apply_static_weights_to_db(self, graph_name: str = "base", static_layers: Dict = None, usage_bands: List = None):
+    def _encode_depth_bands(self, depth: float, draft: float, safety_margin: float) -> float:
         """
-        Applies static weights to a graph stored in PostGIS.
+        Encode depth value into 4-band penalty system using UKC (Under Keel Clearance).
+
+        UKC = Water Depth - Vessel Draft
+
+        Band 4 (Grounding): UKC <= 0 → inf (impassable)
+        Band 3 (Restricted): 0 < UKC <= safety_margin → 100.0
+        Band 2 (Safe): safety_margin < UKC <= 0.5 * draft → 5.0
+        Band 1 (Deep): UKC > draft → 1.0
+
+        Args:
+            depth: Water depth in meters (from drval1, valsou, etc.)
+            draft: Vessel draft in meters
+            safety_margin: Safety buffer in meters (additional clearance required)
+
+        Returns:
+            float: Penalty factor for pathfinding
+        """
+        # Calculate Under Keel Clearance (UKC)
+        ukc = depth - draft
+
+        if ukc <= 0:
+            # Band 4: Grounding - no clearance, impassable
+            return float('inf')
+        elif ukc <= safety_margin:
+            # Band 3: Restricted - clearance less than safety margin
+            return 100.0
+        elif ukc <= 0.5 * draft:
+            # Band 2: Safe - adequate clearance but not deep
+            return 5.0
+        elif ukc > draft:
+            # Band 1: Deep - excellent clearance (UKC > draft itself)
+            return 1.0
+        else:
+            # Transitional: between 0.5*draft and 1.0*draft UKC
+            return 2.0
+
+    def _calculate_blocking_factor(self, edge_data: Dict[str, Any],
+                                   vessel_params: Dict[str, Any]) -> float:
+        """
+        Calculate Tier 1: Absolute blocking constraints.
+
+        Absolute blockers are hard constraints that should never be crossed:
+        - Land areas, coastlines
+        - Underwater rocks
+        - UKC ≤ 0 (grounding risk)
+        - Dangerous wrecks
+
+        Uses max() among all blockers - any one blocks passage.
+
+        Args:
+            edge_data: Edge attributes dictionary
+            vessel_params: Vessel parameters (draft, height, etc.)
+
+        Returns:
+            float: Blocking factor (1.0 = passable, BLOCKING_THRESHOLD = effectively impassable)
+        """
+        draft = vessel_params.get('draft', 5.0)
+        safety_margin = vessel_params.get('safety_margin', 2.0)
+
+        blocking_factor = 1.0
+
+        # Check static layer blockers (from S57Classifier)
+        for blocker in ['wt_lndare', 'wt_uwtroc', 'wt_coalne', 'wt_slcons']:
+            if blocker in edge_data:
+                factor = edge_data[blocker]
+                if factor >= self.BLOCKING_THRESHOLD:  # Classifier marked as dangerous
+                    blocking_factor = max(blocking_factor, self.BLOCKING_THRESHOLD)
+
+        # Check UKC grounding risk
+        depth = edge_data.get('ft_drgare')
+        if depth is None:
+            depth = edge_data.get('ft_depth_min')
+        if depth is not None:
+            ukc = depth - draft
+            if ukc <= 0:
+                # Grounding risk - absolute blocker
+                blocking_factor = max(blocking_factor, self.BLOCKING_THRESHOLD)
+
+        return blocking_factor
+
+    def _calculate_penalty_factor(self, edge_data: Dict[str, Any],
+                                  vessel_params: Dict[str, Any],
+                                  max_penalty: float = 50.0) -> float:
+        """
+        Calculate Tier 2: Conditional penalties (cumulative hazards).
+
+        Conditional penalties increase route cost but don't block passage:
+        - Shallow water (restricted UKC)
+        - Clearance restrictions
+        - Wrecks, obstructions, foul ground
+        - Buffer zones (buoys, cables, pipelines)
+        - Restricted/caution areas
+
+        Uses multiplication for cumulative effect, with cap to prevent explosion.
+
+        Args:
+            edge_data: Edge attributes dictionary
+            vessel_params: Vessel parameters
+            max_penalty: Maximum cumulative penalty (default: 50.0)
+
+        Returns:
+            float: Penalty factor (1.0 = no penalty, up to max_penalty)
+        """
+        draft = vessel_params.get('draft', 5.0)
+        vessel_height = vessel_params.get('height', 25.0)
+        safety_margin = vessel_params.get('safety_margin', 2.0)
+        clearance_safety = vessel_params.get('clearance_safety_margin', 3.0)
+
+        penalty_factor = 1.0
+
+        # === DEPTH PENALTIES (UKC-based) ===
+        depth = edge_data.get('ft_drgare')
+        if depth is None:
+            depth = edge_data.get('ft_depth_min')
+        if depth is not None:
+            ukc = depth - draft
+
+            if ukc > 0:  # Not blocking (blocking handled in Tier 1)
+                if ukc <= safety_margin:
+                    # Restricted: very shallow but passable
+                    penalty_factor *= 10.0
+                elif ukc <= 0.5 * draft:
+                    # Safe: adequate clearance
+                    penalty_factor *= 2.0
+                elif ukc <= draft:
+                    # Transitional: good clearance
+                    penalty_factor *= 1.5
+
+        # === CLEARANCE PENALTIES ===
+        clearance = edge_data.get('ft_clearance')
+        if clearance is not None:
+            if clearance >= vessel_height:  # Not blocking
+                if clearance < vessel_height + clearance_safety:
+                    # Restricted clearance
+                    penalty_factor *= 20.0
+
+        # === HAZARD ACCUMULATION ===
+        # Wrecks
+        wreck_depth = edge_data.get('ft_wreck_sounding')
+        if wreck_depth is not None:
+            wreck_ukc = wreck_depth - draft
+            if wreck_ukc > 0:  # Passable but hazardous
+                if wreck_ukc <= safety_margin:
+                    penalty_factor *= 5.0
+                elif wreck_ukc <= draft:
+                    penalty_factor *= 3.0
+
+        # Obstructions
+        obstrn_depth = edge_data.get('ft_obstruction_sounding')
+        if obstrn_depth is not None:
+            obstrn_ukc = obstrn_depth - draft
+            if obstrn_ukc > 0:
+                if obstrn_ukc <= safety_margin:
+                    penalty_factor *= 3.0
+
+        # Static layer penalties (conditional hazards)
+        conditional_penalties = {
+            'wt_obstrn': 3.0,      # Obstruction (if not blocking)
+            'wt_foular': 4.0,      # Foul ground
+            'wt_cblare': 2.0,      # Cable area
+            'wt_pipare': 2.0,      # Pipeline area
+            'wt_resare': 3.0,      # Restricted area
+            'wt_ctnare': 2.0,      # Caution area
+            'wt_prcare': 1.8,      # Precautionary area
+        }
+
+        for layer, default_penalty in conditional_penalties.items():
+            if layer in edge_data:
+                factor = edge_data[layer]
+                # Only apply if not an absolute blocker
+                if 1.0 < factor < self.BLOCKING_THRESHOLD:
+                    penalty_factor *= min(factor, default_penalty)
+
+        # CAP ACCUMULATION - prevent explosion
+        penalty_factor = min(penalty_factor, max_penalty)
+
+        return penalty_factor
+
+    def _calculate_bonus_factor(self, edge_data: Dict[str, Any],
+                                vessel_params: Dict[str, Any]) -> float:
+        """
+        Calculate Tier 3: Preference bonuses (safe routes).
+
+        Preference bonuses make routes safer/more desirable:
+        - Fairways, recommended tracks
+        - TSS lanes
+        - Dredged areas
+        - Deep water (UKC > draft)
+        - Preferred anchorages
+
+        Uses multiplication for stacking bonuses (values < 1.0 reduce weight).
+
+        Args:
+            edge_data: Edge attributes dictionary
+            vessel_params: Vessel parameters
+
+        Returns:
+            float: Bonus factor (0.5 - 1.0, where <1.0 = preferred route)
+        """
+        draft = vessel_params.get('draft', 5.0)
+
+        bonus_factor = 1.0
+
+        # === DEEP WATER BONUS ===
+        depth = edge_data.get('ft_drgare')
+        if depth is None:
+            depth = edge_data.get('ft_depth_min')
+        if depth is not None:
+            ukc = depth - draft
+            if ukc > draft:
+                # Excellent clearance (UKC > draft)
+                bonus_factor *= 0.9
+
+        # === NAVIGATION AIDS BONUSES ===
+        preference_bonuses = {
+            'wt_fairwy': 0.7,      # Fairway (30% reduction)
+            'wt_tsslpt': 0.8,      # TSS lane (20% reduction)
+            'wt_drgare': 0.85,     # Dredged area (15% reduction)
+            'wt_rectrc': 0.75,     # Recommended track (25% reduction)
+            'wt_dwrtcl': 0.7,      # Deep water route (30% reduction)
+        }
+
+        for layer, default_bonus in preference_bonuses.items():
+            if layer in edge_data:
+                factor = edge_data[layer]
+                # Only apply positive bonuses (factors < 1.0)
+                if factor < 1.0:
+                    bonus_factor *= max(factor, default_bonus)
+
+        # === ANCHORAGE CATEGORY BONUS ===
+        vessel_type = vessel_params.get('vessel_type', 'cargo')
+        catach = edge_data.get('ft_anchorage_category')
+        if catach:
+            preferred = [1, 2] if vessel_type == 'cargo' else [5, 6] if vessel_type == 'passenger' else []
+            if any(int(c) in preferred for c in catach if c is not None):
+                bonus_factor *= 0.95
+
+        # Ensure bonus doesn't go below reasonable minimum
+        bonus_factor = max(bonus_factor, self.MIN_BONUS_FACTOR)
+
+        return bonus_factor
+
+    def calculate_ukc_weights(self, graph: nx.Graph, draft: float = 5.0,
+                             safety_margin: float = 2.0) -> nx.Graph:
+        """
+        Calculate depth-based weights using UKC (Under Keel Clearance) terminology.
+
+        This method provides an alternative to calculate_dynamic_weights() with focus on
+        UKC calculations. It uses fallback logic: dredged areas (ft_drgare) take priority
+        over general depth (ft_depth_min).
+
+        UKC Calculation:
+            1. Use ft_drgare (dredged area depth) if available
+            2. Fallback to ft_depth_min if no dredged data
+            3. Calculate UKC = depth - draft
+            4. Apply 4-band penalty system based on UKC
+
+        Args:
+            graph (nx.Graph): Input graph with ft_depth_min and/or ft_drgare attributes
+            draft (float): Vessel draft in meters (default: 5.0)
+            safety_margin (float): Minimum safe UKC in meters (default: 2.0)
+
+        Returns:
+            nx.Graph: Graph with wt_ukc attribute added to edges
+
+        Example:
+            >>> weights = Weights(factory)
+            >>> graph = weights.calculate_ukc_weights(graph, draft=7.5, safety_margin=2.0)
+            >>> # Each edge now has 'wt_ukc' attribute with penalty factor
+        """
+        # Validate parameters
+        if draft <= 0:
+            raise ValueError(f"Draft must be positive, got {draft}")
+        if safety_margin < 0:
+            raise ValueError(f"Safety margin must be non-negative, got {safety_margin}")
+
+        G = graph.copy()
+        edges_processed = 0
+        edges_with_ukc = 0
+
+        logger.info(f"Calculating UKC weights: draft={draft}m, safety_margin={safety_margin}m")
+
+        for u, v, data in G.edges(data=True):
+            # Priority: dredged area depth > general depth area
+            depth = data.get('ft_drgare')
+            if depth is None:
+                depth = data.get('ft_depth_min')
+
+            if depth is not None:
+                # Calculate UKC and apply penalty
+                ukc_penalty = self._encode_depth_bands(depth, draft, safety_margin)
+                G[u][v]['wt_ukc'] = ukc_penalty
+
+                # Store calculated UKC value for reference
+                ukc_value = depth - draft
+                G[u][v]['ukc_meters'] = ukc_value
+
+                edges_with_ukc += 1
+
+            edges_processed += 1
+
+        logger.info(f"UKC weights applied to {edges_with_ukc}/{edges_processed} edges")
+
+        if edges_with_ukc < edges_processed:
+            logger.warning(f"{edges_processed - edges_with_ukc} edges have no depth data (ft_depth_min or ft_drgare)")
+
+        return G
+
+    def save_weighted_graph_to_gpkg(self, graph: nx.Graph, output_path: str,
+                                    include_metadata: bool = True) -> None:
+        """
+        Save a weighted graph to GeoPackage with all edge attributes preserved.
+
+        This method saves graphs with complete weight information including:
+        - Feature columns (ft_*): S-57 layer data
+        - Weight columns (wt_*): Calculated penalties
+        - Directional columns (dir_*): Orientation data
+        - Metadata: blocking_factor, penalty_factor, bonus_factor, ukc_meters
+
+        Args:
+            graph (nx.Graph): Weighted graph with edge attributes
+            output_path (str): Path to output GeoPackage file
+            include_metadata (bool): Include calculation metadata (default: True)
+
+        Example:
+            >>> weights = Weights(factory)
+            >>> graph = weights.calculate_dynamic_weights(graph, vessel_params)
+            >>> weights.save_weighted_graph_to_gpkg(graph, 'weighted_graph.gpkg')
+        """
+        save_performance = PerformanceMetrics()
+        save_performance.start_timer("save_weighted_graph_gpkg_total")
+
+        logger.info(f"Saving weighted graph to GPKG: {output_path}")
+        logger.info(f"Graph: {graph.number_of_nodes():,} nodes, {graph.number_of_edges():,} edges")
+
+        if graph.number_of_nodes() == 0:
+            logger.warning("Graph is empty, creating empty GeoPackage")
+            empty_nodes = gpd.GeoDataFrame({
+                'id': pd.Series(dtype='int64'),
+                'node_str': pd.Series(dtype='object'),
+                'geometry': gpd.GeoSeries(dtype='geometry')
+            }, crs="EPSG:4326")
+            empty_edges = gpd.GeoDataFrame({
+                'source': pd.Series(dtype='object'),
+                'target': pd.Series(dtype='object'),
+                'geometry': gpd.GeoSeries(dtype='geometry')
+            }, crs="EPSG:4326")
+            empty_nodes.to_file(output_path, layer='nodes', driver='GPKG')
+            empty_edges.to_file(output_path, layer='edges', driver='GPKG', mode='a')
+            save_performance.end_timer("save_weighted_graph_gpkg_total")
+            return
+
+        # Save nodes
+        save_performance.start_timer("nodes_processing")
+        nodes_data = []
+        for i, node in enumerate(graph.nodes()):
+            nodes_data.append({
+                'id': i,
+                'node_str': str(node),
+                'geometry': Point(node)
+            })
+        nodes_gdf = gpd.GeoDataFrame(nodes_data, geometry='geometry', crs="EPSG:4326")
+        nodes_processing_time = save_performance.end_timer("nodes_processing")
+
+        save_performance.start_timer("nodes_save")
+        nodes_gdf.to_file(output_path, layer='nodes', driver='GPKG')
+        nodes_save_time = save_performance.end_timer("nodes_save")
+        logger.info(f"Saved {len(nodes_gdf):,} nodes in {nodes_save_time:.3f}s")
+
+        # Save edges with all attributes
+        save_performance.start_timer("edges_processing")
+        edges_data = []
+        for u, v, data in graph.edges(data=True):
+            edge_dict = {
+                'source': str(u),
+                'target': str(v),
+                'geometry': LineString([u, v])
+            }
+
+            # Add all edge attributes
+            for key, value in data.items():
+                # Skip geometry (already added) and handle special types
+                if key == 'geom':
+                    continue
+
+                # Convert inf to None for storage
+                if isinstance(value, float) and math.isinf(value):
+                    edge_dict[key] = None
+                else:
+                    edge_dict[key] = value
+
+            edges_data.append(edge_dict)
+
+        edges_gdf = gpd.GeoDataFrame(edges_data, geometry='geometry', crs="EPSG:4326")
+        edges_processing_time = save_performance.end_timer("edges_processing")
+
+        save_performance.start_timer("edges_save")
+        edges_gdf.to_file(output_path, layer='edges', driver='GPKG', mode='a')
+        edges_save_time = save_performance.end_timer("edges_save")
+
+        total_time = save_performance.end_timer("save_weighted_graph_gpkg_total")
+
+        # Get column statistics
+        columns_info = self.get_edge_columns(graph, update_cache=False)
+
+        logger.info(f"Saved {len(edges_gdf):,} edges in {edges_save_time:.3f}s")
+        logger.info(f"Edge attributes saved:")
+        logger.info(f"  - Feature columns (ft_*): {len(columns_info['feature_columns'])}")
+        logger.info(f"  - Weight columns (wt_*): {len(columns_info['weight_columns']) + len(columns_info['static_weight_columns'])}")
+        logger.info(f"  - Directional columns (dir_*): {len(columns_info['directional_columns'])}")
+        logger.info(f"Total save time: {total_time:.3f}s")
+
+    def save_weighted_graph_to_postgis(self, graph: nx.Graph, table_prefix: str = "weighted_graph",
+                                      drop_existing: bool = False, schema: str = None) -> None:
+        """
+        Save a weighted graph to PostGIS with all edge attributes preserved.
+
+        This method saves graphs with complete weight information including:
+        - Feature columns (ft_*): S-57 layer data
+        - Weight columns (wt_*): Calculated penalties
+        - Directional columns (dir_*): Orientation data
+        - Metadata: blocking_factor, penalty_factor, bonus_factor, ukc_meters
+
+        Args:
+            graph (nx.Graph): Weighted graph with edge attributes
+            table_prefix (str): Prefix for table names (creates {prefix}_nodes and {prefix}_edges)
+            drop_existing (bool): Whether to drop existing tables (default: False)
+            schema (str): PostgreSQL schema name (default: None, uses factory's schema)
+
+        Example:
+            >>> weights = Weights(factory)
+            >>> graph = weights.calculate_dynamic_weights(graph, vessel_params)
+            >>> weights.save_weighted_graph_to_postgis(graph, 'vessel_cargo_graph')
+        """
+        save_performance = PerformanceMetrics()
+        save_performance.start_timer("save_weighted_graph_postgis_total")
+
+        # Check if we have a PostGIS-compatible factory
+        if not hasattr(self.factory, 'manager') or not hasattr(self.factory.manager, 'engine'):
+            raise ValueError("Factory manager with PostGIS engine is required")
+
+        if self.factory.manager.db_type != 'postgis':
+            raise ValueError(f"PostGIS engine required, got '{self.factory.manager.db_type}'")
+
+        # Use provided schema or factory's default
+        if schema is None:
+            if hasattr(self.factory.manager, 'schema'):
+                schema = self.factory.manager.schema
+            else:
+                schema = 'public'
+
+        logger.info(f"Saving weighted graph to PostGIS schema '{schema}'")
+        logger.info(f"Table prefix: {table_prefix}")
+        logger.info(f"Graph: {graph.number_of_nodes():,} nodes, {graph.number_of_edges():,} edges")
+
+        engine = self.factory.manager.engine
+        nodes_table = f"{table_prefix}_nodes"
+        edges_table = f"{table_prefix}_edges"
+
+        # Create schema if needed
+        with engine.connect() as conn:
+            conn.execute(text(f'CREATE SCHEMA IF NOT EXISTS "{schema}"'))
+            conn.commit()
+
+        # Drop existing tables if requested
+        if drop_existing:
+            save_performance.start_timer("drop_tables")
+            with engine.connect() as conn:
+                conn.execute(text(f'DROP TABLE IF EXISTS "{schema}"."{edges_table}" CASCADE'))
+                conn.execute(text(f'DROP TABLE IF EXISTS "{schema}"."{nodes_table}" CASCADE'))
+                conn.commit()
+            drop_time = save_performance.end_timer("drop_tables")
+            logger.info(f"Dropped existing tables in {drop_time:.3f}s")
+
+        if graph.number_of_nodes() == 0:
+            logger.warning("Graph is empty, creating empty PostGIS tables")
+            # Create empty tables with schema
+            with engine.connect() as conn:
+                conn.execute(text(f"""
+                    CREATE TABLE IF NOT EXISTS "{schema}"."{nodes_table}" (
+                        id SERIAL PRIMARY KEY,
+                        node_str TEXT NOT NULL,
+                        geom GEOMETRY(POINT, 4326) NOT NULL
+                    )
+                """))
+                conn.execute(text(f"""
+                    CREATE TABLE IF NOT EXISTS "{schema}"."{edges_table}" (
+                        id SERIAL PRIMARY KEY,
+                        source TEXT NOT NULL,
+                        target TEXT NOT NULL,
+                        geom GEOMETRY(LINESTRING, 4326) NOT NULL
+                    )
+                """))
+                conn.commit()
+            save_performance.end_timer("save_weighted_graph_postgis_total")
+            return
+
+        # Process and save nodes
+        save_performance.start_timer("nodes_processing")
+        nodes_data = []
+        for i, node in enumerate(graph.nodes()):
+            nodes_data.append({
+                'id': i,
+                'node_str': str(node),
+                'geometry': Point(node)
+            })
+        nodes_gdf = gpd.GeoDataFrame(nodes_data, geometry='geometry', crs="EPSG:4326")
+        nodes_processing_time = save_performance.end_timer("nodes_processing")
+
+        save_performance.start_timer("nodes_save")
+        nodes_gdf.to_postgis(
+            name=nodes_table,
+            con=engine,
+            schema=schema,
+            if_exists='replace',
+            index=False
+        )
+        nodes_save_time = save_performance.end_timer("nodes_save")
+        logger.info(f"Saved {len(nodes_gdf):,} nodes in {nodes_save_time:.3f}s")
+
+        # Process and save edges with all attributes
+        save_performance.start_timer("edges_processing")
+        edges_data = []
+        for u, v, data in graph.edges(data=True):
+            edge_dict = {
+                'source': str(u),
+                'target': str(v),
+                'geometry': LineString([u, v])
+            }
+
+            # Add all edge attributes
+            for key, value in data.items():
+                # Skip geometry (already added) and handle special types
+                if key == 'geom':
+                    continue
+
+                # Convert inf to None for storage
+                if isinstance(value, float) and math.isinf(value):
+                    edge_dict[key] = None
+                else:
+                    edge_dict[key] = value
+
+            edges_data.append(edge_dict)
+
+        edges_gdf = gpd.GeoDataFrame(edges_data, geometry='geometry', crs="EPSG:4326")
+        edges_processing_time = save_performance.end_timer("edges_processing")
+
+        save_performance.start_timer("edges_save")
+        edges_gdf.to_postgis(
+            name=edges_table,
+            con=engine,
+            schema=schema,
+            if_exists='replace',
+            index=False
+        )
+        edges_save_time = save_performance.end_timer("edges_save")
+
+        # Create spatial indexes
+        save_performance.start_timer("index_creation")
+        with engine.connect() as conn:
+            conn.execute(text(f'CREATE INDEX IF NOT EXISTS "{nodes_table}_geom_idx" ON "{schema}"."{nodes_table}" USING GIST (geometry)'))
+            conn.execute(text(f'CREATE INDEX IF NOT EXISTS "{edges_table}_geom_idx" ON "{schema}"."{edges_table}" USING GIST (geometry)'))
+            conn.commit()
+        index_time = save_performance.end_timer("index_creation")
+
+        total_time = save_performance.end_timer("save_weighted_graph_postgis_total")
+
+        # Get column statistics
+        columns_info = self.get_edge_columns(graph, update_cache=False)
+
+        logger.info(f"Saved {len(edges_gdf):,} edges in {edges_save_time:.3f}s")
+        logger.info(f"Created spatial indexes in {index_time:.3f}s")
+        logger.info(f"Edge attributes saved:")
+        logger.info(f"  - Feature columns (ft_*): {len(columns_info['feature_columns'])}")
+        logger.info(f"  - Weight columns (wt_*): {len(columns_info['weight_columns']) + len(columns_info['static_weight_columns'])}")
+        logger.info(f"  - Directional columns (dir_*): {len(columns_info['directional_columns'])}")
+        logger.info(f"Total save time: {total_time:.3f}s")
+
+    def _encode_clearance_meters(self, clearance: float, vessel_height: float,
+                                 safety_margin: float) -> float:
+        """
+        Encode vertical clearance using precise meter-based thresholds.
+
+        For bridges, cables, and overhead pipelines.
+
+        Args:
+            clearance: Vertical clearance in meters (from verclr attribute)
+            vessel_height: Maximum vessel height in meters (mast/antenna)
+            safety_margin: Vertical safety buffer in meters
+
+        Returns:
+            float: Penalty factor for pathfinding
+        """
+        required_clearance = vessel_height + safety_margin
+
+        if clearance < vessel_height:
+            # Impassable - clearance less than vessel height
+            return float('inf')
+        elif clearance < required_clearance:
+            # Restricted - clearance less than required (vessel + safety)
+            return self.DEFAULT_MAX_PENALTY
+        else:
+            # Safe clearance
+            return 1.0
+
+    def pg_apply_static_weights_to_db(self, graph_name: str = "base", static_layers: List[str] = None, usage_bands: List = None):
+        """
+        Applies static weights to a graph stored in PostGIS using S57Classifier.
         This is a placeholder for a more complex DB-side implementation.
-        For now, it demonstrates the concept.
+
+        Args:
+            graph_name: Name of the graph (default: "base")
+            static_layers: List of layer names to apply (uses S57Classifier for factors)
+            usage_bands: List of usage bands to filter ENCs (default: ['3', '4', '5', '6'])
         """
         if self.factory.manager.db_type != 'postgis':
             logger.warning("This method is optimized for PostGIS and may not be efficient for other backends.")
             return
 
         if static_layers is None:
-            static_layers = {
-                'lndare': {'factor': 999.0},
-                'obstrn': {'factor': 5.0},
-            }
+            static_layers = ['lndare', 'obstrn', 'uwtroc', 'wrecks', 'fairwy', 'tsslpt',
+                           'drgare', 'prcare', 'resare', 'cblare', 'pipare']
 
         if usage_bands is None:
             usage_bands = ['3', '4', '5', '6']
 
         edges_table = f"graph_edges_{graph_name}" if graph_name != "base" else "graph_edges"
 
-        # This would involve complex SQL to perform spatial joins and updates.
-        # The logic is similar to `apply_feature_weights` but implemented in SQL.
-        logger.info(f"Applying static weights to PostGIS graph '{graph_name}' (conceptual).")
+        logger.info(f"Applying static weights to PostGIS graph '{graph_name}' using S57Classifier")
 
         # Example of what the SQL might look like for one layer
-        for layer_name, config in static_layers.items():
-            factor = config['factor']
+        for layer_name in static_layers:
+            # Get factor from S57Classifier
+            factor = self.classifier.get_cost_factor(layer_name.upper())
+
             sql = f"""
             UPDATE "{self.graph_schema}"."{edges_table}" e
             SET weight = weight * {factor}
@@ -2868,14 +3833,20 @@ class Weights:
                 AND substring(l.dsid_dsnm from 3 for 1) IN ({','.join([f"'{b}'" for b in usage_bands])})
             );
             """
-            logger.debug(f"Executing SQL for layer {layer_name}: {sql}")
+            logger.debug(f"Executing SQL for layer {layer_name} with factor {factor}: {sql}")
             # In a real implementation, you would execute this SQL.
             # self.factory.manager.engine.execute(text(sql))
 
     def pg_calculate_dynamic_weights_in_db(self, graph_name: str = "base", vessel_parameters: Dict = None):
         """
-        Calculates dynamic edge weights directly in PostGIS.
+        Calculates dynamic edge weights directly in PostGIS using 4-band depth encoding.
         This is a placeholder for a more complex DB-side implementation.
+
+        Implements:
+        - Band 4 (Grounding): depth <= draft → 999999 (impassable)
+        - Band 3 (Restricted): draft < depth <= draft + safety_margin → 100.0
+        - Band 2 (Safe): draft + safety_margin < depth <= 1.5 * draft → 5.0
+        - Band 1 (Deep): depth > 2.0 * draft → 1.0
         """
         if self.factory.manager.db_type != 'postgis':
             logger.warning("This method is optimized for PostGIS and may not be efficient for other backends.")
@@ -2884,26 +3855,60 @@ class Weights:
         if vessel_parameters is None:
             vessel_parameters = {}
 
-        draft = vessel_parameters.get("draft", 8.0)
-        safe_depth = draft + vessel_parameters.get("safety_margin", 1.0)
+        draft = vessel_parameters.get("draft", 5.0)
+        vessel_height = vessel_parameters.get("height", 25.0)
+        safety_margin = vessel_parameters.get("safety_margin", 2.0)
+        clearance_safety = vessel_parameters.get("clearance_safety_margin", 3.0)
 
         edges_table = f"graph_edges_{graph_name}" if graph_name != "base" else "graph_edges"
 
-        # Example SQL for updating weights based on depth
-        sql = f"""
+        logger.info(f"Calculating dynamic weights in PostGIS: draft={draft}m, height={vessel_height}m")
+
+        # SQL for 4-band depth encoding
+        depth_band_sql = f"""
         UPDATE "{self.graph_schema}"."{edges_table}"
         SET adjusted_weight = base_weight *
             CASE
-                WHEN ft_depth_min < {draft} THEN 999.0
-                WHEN ft_depth_min < {safe_depth} THEN (1.0 + 4.0 * ({safe_depth} - ft_depth_min) / ({safe_depth} - {draft}))
-                ELSE 0.9
+                -- Band 4: Grounding (impassable)
+                WHEN ft_depth_min <= {draft} THEN 999999.0
+                -- Band 3: Restricted
+                WHEN ft_depth_min <= {draft + safety_margin} THEN 100.0
+                -- Band 2: Safe
+                WHEN ft_depth_min <= {1.5 * draft} THEN 5.0
+                -- Band 1: Deep (preferred)
+                WHEN ft_depth_min > {2.0 * draft} THEN 1.0
+                -- Transitional
+                ELSE 2.0
             END
         WHERE ft_depth_min IS NOT NULL;
         """
-        logger.debug(f"Executing dynamic weight SQL: {sql}")
-        # self.factory.manager.engine.execute(text(sql))
 
-        logger.info(f"Calculated dynamic weights in PostGIS for graph '{graph_name}'.")
+        # SQL for clearance encoding
+        clearance_sql = f"""
+        UPDATE "{self.graph_schema}"."{edges_table}"
+        SET adjusted_weight = GREATEST(adjusted_weight, base_weight *
+            CASE
+                -- Impassable
+                WHEN ft_clearance < {vessel_height} THEN 999999.0
+                -- Restricted
+                WHEN ft_clearance < {vessel_height + clearance_safety} THEN 50.0
+                -- Safe
+                ELSE 1.0
+            END
+        )
+        WHERE ft_clearance IS NOT NULL;
+        """
+
+        logger.debug(f"Depth encoding SQL: {depth_band_sql}")
+        logger.debug(f"Clearance encoding SQL: {clearance_sql}")
+
+        # In a real implementation, you would execute these SQL statements
+        # with self.factory.manager.engine.connect() as conn:
+        #     conn.execute(text(depth_band_sql))
+        #     conn.execute(text(clearance_sql))
+        #     conn.commit()
+
+        logger.info(f"Calculated dynamic weights in PostGIS for graph '{graph_name}' (placeholder).")
 
 
 def main_config_example() -> None:

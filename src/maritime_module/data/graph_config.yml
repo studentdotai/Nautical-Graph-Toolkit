@@ -62,19 +62,29 @@
       bridge_search_radius: 3
 
   # --- Weighting Configuration ---
+  # Weight values are retrieved from S57Classifier
+  # Users can customize by editing CSV: S57Classifier.generate_static_files()
   weight_settings:
-    land_crossing_protection:
-      enabled: true
-      penalties:
-        minor_crossing: 10
-        moderate_crossing: 100
-        major_crossing: 1000
-        blocked: 9999
+    # Path to custom S57 classification CSV (null = use built-in defaults)
+    classifier_csv_path: null
+
+    # Static layers: weight factors retrieved from S57Classifier during graph construction
+    # List only the layer names - actual weight values come from the classifier
     static_layers:
-      lndare: { factor: 999.0 }
-      obstrn: { factor: 5.0 }
-      fairwy: { factor: 0.8 }
-      tsslpt: { factor: 0.7 }
+      - lndare      # Land area (DANGEROUS - high penalty)
+      - obstrn      # Obstruction (DANGEROUS - high penalty)
+      - uwtroc      # Underwater rock (DANGEROUS - high penalty)
+      - wrecks      # Wrecks (DANGEROUS - high penalty)
+      - fairwy      # Fairway (SAFE - preferred route)
+      - tsslpt      # Traffic separation lane (CAUTION - moderate penalty)
+      - drgare      # Dredged area (SAFE - slight preference)
+      - prcare      # Precautionary area (CAUTION - moderate penalty)
+      - resare      # Restricted area (CAUTION - moderate penalty)
+      - cblare      # Cable area (CAUTION - moderate penalty)
+      - pipare      # Pipeline area (CAUTION - moderate penalty)
+
+    # Dynamic properties: computed at pathfinding runtime via spatial queries
+    # These query actual feature attributes for real-time decision making
     dynamic_properties:
       depth_min:
         layer: 'depare'
@@ -84,3 +94,12 @@
         layer: 'wrecks'
         attribute: 'valsou'
         query_type: 'min'
+
+    # Land crossing protection: additional penalties for pathfinding operations
+    land_crossing_protection:
+      enabled: true
+      penalties:
+        minor_crossing: 10
+        moderate_crossing: 100
+        major_crossing: 1000
+        blocked: 9999
