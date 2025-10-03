@@ -31,7 +31,7 @@ class S57Classifier:
     """
 
     # The default S-57 object classification database.
-    # Format: 'ACRONYM': (NavClass, Category, BaseCost, RiskMultiplier, BufferMeters, Description)
+    # Format: 'ACRONYM': (NavClass, Category, BaseCost, RiskMultiplier, BufferMeters, Description, ImportantAttributes)
     # Output Columns:
         # Acronym - S57 object code
         # NavClass - 0/1/2/3 classification
@@ -42,6 +42,7 @@ class S57Classifier:
         # Traversable - Yes/No
         # Priority - Processing order (0-3)
         # Description - Human-readable name
+        # ImportantAttributes - List of key S-57 attributes for feature extraction
 
     _DEFAULT_CLASSIFICATION_DB: Dict[str, Tuple[Any, ...]] = {
             # ==================== INFORMATIONAL (0) ====================
@@ -58,7 +59,7 @@ class S57Classifier:
             'AIRARE': (NavClass.INFORMATIONAL, 'Terrestrial', 0, 0, 0, 'Airport/airfield'),
             'BUISGL': (NavClass.INFORMATIONAL, 'Terrestrial', 0, 0, 0, 'Building single'),
             'BUIREL': (NavClass.INFORMATIONAL, 'Terrestrial', 0, 0, 0, 'Building religious'),
-            'CANALS': (NavClass.INFORMATIONAL, 'Terrestrial', 0, 0, 0, 'Canal'),
+            'CANALS': (NavClass.INFORMATIONAL, 'Terrestrial', 0, 0, 0, 'Canal', ['horclr']),
             'CANBNK': (NavClass.INFORMATIONAL, 'Terrestrial', 0, 0, 0, 'Canal bank'),
             'LAKARE': (NavClass.INFORMATIONAL, 'Terrestrial', 0, 0, 0, 'Lake area'),
             'LAKSHR': (NavClass.INFORMATIONAL, 'Terrestrial', 0, 0, 0, 'Lake shore'),
@@ -120,7 +121,7 @@ class S57Classifier:
             'OSPARE': (NavClass.INFORMATIONAL, 'Industrial', 0, 0, 0, 'Offshore production area'),
             'PRDARE': (NavClass.INFORMATIONAL, 'Industrial', 0, 0, 0, 'Production/storage area'),
             'SILTNK': (NavClass.INFORMATIONAL, 'Industrial', 0, 0, 0, 'Silo/tank'),
-            'CONVYR': (NavClass.INFORMATIONAL, 'Industrial', 0, 0, 0, 'Conveyor'),
+            'CONVYR': (NavClass.INFORMATIONAL, 'Industrial', 0, 0, 0, 'Conveyor', ['verclr']),
             'LOGPON': (NavClass.INFORMATIONAL, 'Industrial', 0, 0, 0, 'Log pond'),
             'bunsta': (NavClass.INFORMATIONAL, 'Industrial', 0, 0, 0, 'Bunker station'),
             'refdmp': (NavClass.INFORMATIONAL, 'Industrial', 0, 0, 0, 'Refuse dump'),
@@ -128,13 +129,13 @@ class S57Classifier:
 
             # ==================== SAFE (1) ====================
             # Preferred Routes
-            'FAIRWY': (NavClass.SAFE, 'Route', -50, 0.5, 0, 'Fairway - preferred route'),
+            'FAIRWY': (NavClass.SAFE, 'Route', -50, 0.5, 0, 'Fairway - preferred route', ['drval1']),
             'NAVLNE': (NavClass.SAFE, 'Route', -40, 0.5, 0, 'Navigation line'),
-            'RCRTCL': (NavClass.SAFE, 'Route', -50, 0.5, 0, 'Recommended route centerline'),
-            'RECTRC': (NavClass.SAFE, 'Route', -40, 0.5, 0, 'Recommended track'),
+            'RCRTCL': (NavClass.SAFE, 'Route', -50, 0.5, 0, 'Recommended route centerline', ['drval1']),
+            'RECTRC': (NavClass.SAFE, 'Route', -40, 0.5, 0, 'Recommended track', ['drval1']),
             'RCTLPT': (NavClass.SAFE, 'Route', -40, 0.5, 0, 'Recommended traffic lane part'),
-            'DWRTCL': (NavClass.SAFE, 'Route', -50, 0.5, 0, 'Deep water route centerline'),
-            'DWRTPT': (NavClass.SAFE, 'Route', -40, 0.5, 0, 'Deep water route part'),
+            'DWRTCL': (NavClass.SAFE, 'Route', -50, 0.5, 0, 'Deep water route centerline', ['drval1']),
+            'DWRTPT': (NavClass.SAFE, 'Route', -40, 0.5, 0, 'Deep water route part', ['drval1']),
             'FERYRT': (NavClass.SAFE, 'Route', -20, 0.8, 50, 'Ferry route'),
             'SUBTLN': (NavClass.SAFE, 'Route', -30, 0.6, 100, 'Submarine transit lane'),
             'TRFLNE': (NavClass.SAFE, 'Route', -30, 0.7, 0, 'Traffic line'),
@@ -153,21 +154,21 @@ class S57Classifier:
             'boywtw': (NavClass.SAFE, 'Aid', 10, 1.0, 50, 'Buoy waterway'),
 
             # Deep Water Areas
-            'DEPARE': (NavClass.SAFE, 'Depth', 0, 1.0, 0, 'Depth area - check vessel draft'),
-            'SWPARE': (NavClass.SAFE, 'Depth', -20, 0.8, 0, 'Swept area'),
-            'DRGARE': (NavClass.SAFE, 'Depth', -10, 0.9, 0, 'Dredged area'),
+            'DEPARE': (NavClass.SAFE, 'Depth', 0, 1.0, 0, 'Depth area - check vessel draft', ['drval1']),
+            'SWPARE': (NavClass.SAFE, 'Depth', -20, 0.8, 0, 'Swept area', ['drval1']),
+            'DRGARE': (NavClass.SAFE, 'Depth', -10, 0.9, 0, 'Dredged area', ['drval1']),
             'SEAARE': (NavClass.SAFE, 'Area', 0, 1.0, 0, 'Sea area/named water'),
             'wtwprf': (NavClass.SAFE, 'Depth', -10, 0.9, 0, 'Waterway profile'),
 
             # Anchorage & Berths
             'ACHARE': (NavClass.SAFE, 'Anchorage', 20, 1.5, 100, 'Anchorage area'),
             'ACHBRT': (NavClass.SAFE, 'Anchorage', 15, 1.3, 75, 'Anchor berth'),
-            'BERTHS': (NavClass.SAFE, 'Port', 25, 1.5, 50, 'Berth'),
+            'BERTHS': (NavClass.SAFE, 'Port', 25, 1.5, 50, 'Berth', ['drval1']),
 
             # Port Areas
             'HRBARE': (NavClass.SAFE, 'Port', 10, 1.2, 0, 'Harbour area administrative'),
             'HRBFAC': (NavClass.SAFE, 'Port', 15, 1.3, 25, 'Harbour facility'),
-            'DOCARE': (NavClass.SAFE, 'Port', 20, 1.4, 50, 'Dock area'),
+            'DOCARE': (NavClass.SAFE, 'Port', 20, 1.4, 50, 'Dock area', ['horclr']),
             'FRPARE': (NavClass.SAFE, 'Port', 10, 1.2, 0, 'Free port area'),
             'SMCFAC': (NavClass.SAFE, 'Port', 15, 1.2, 50, 'Small craft facility'),
             'prtare': (NavClass.SAFE, 'Port', 10, 1.2, 0, 'Port area'),
@@ -185,7 +186,7 @@ class S57Classifier:
             'FSHZNE': (NavClass.CAUTION, 'Restricted', 80, 3.0, 100, 'Fishery zone'),
             'FSHFAC': (NavClass.CAUTION, 'Restricted', 100, 4.0, 150, 'Fishing facility'),
             'FSHGRD': (NavClass.CAUTION, 'Restricted', 80, 3.0, 100, 'Fishing ground'),
-            'MARCUL': (NavClass.CAUTION, 'Restricted', 100, 4.0, 150, 'Marine farm/culture'),
+            'MARCUL': (NavClass.CAUTION, 'Restricted', 100, 4.0, 150, 'Marine farm/culture', ['valsou']),
             'excnst': (NavClass.CAUTION, 'Restricted', 120, 4.5, 150, 'Exceptional navigation structure'),
 
             # Traffic Separation
@@ -196,7 +197,7 @@ class S57Classifier:
             'TSSRON': (NavClass.CAUTION, 'Traffic', 90, 4.5, 200, 'TSS roundabout'),
             'TSEZNE': (NavClass.CAUTION, 'Traffic', 60, 3.0, 100, 'Traffic separation zone'),
             'ISTZNE': (NavClass.CAUTION, 'Traffic', 70, 3.5, 100, 'Inshore traffic zone'),
-            'TWRTPT': (NavClass.CAUTION, 'Traffic', 50, 2.5, 50, 'Two-way route part'),
+            'TWRTPT': (NavClass.CAUTION, 'Traffic', 50, 2.5, 50, 'Two-way route part', ['drval1']),
             'rtplpt': (NavClass.CAUTION, 'Traffic', 60, 3.0, 100, 'Route planning point'),
             'lg_sdm': (NavClass.CAUTION, 'Traffic', 80, 4.0, 150, 'Max permitted ship dimensions'),
             'lg_vsp': (NavClass.CAUTION, 'Traffic', 70, 3.5, 100, 'Max permitted vessel speed'),
@@ -227,11 +228,11 @@ class S57Classifier:
 
             # Cables & Pipelines
             'CBLARE': (NavClass.CAUTION, 'Cable', 80, 3.0, 150, 'Cable area'),
-            'CBLSUB': (NavClass.CAUTION, 'Cable', 100, 4.0, 200, 'Cable submarine'),
-            'CBLOHD': (NavClass.CAUTION, 'Cable', 120, 5.0, 100, 'Cable overhead'),
+            'CBLSUB': (NavClass.CAUTION, 'Cable', 100, 4.0, 200, 'Cable submarine', ['drval1']),
+            'CBLOHD': (NavClass.CAUTION, 'Cable', 120, 5.0, 100, 'Cable overhead', ['verclr', 'vercsa']),
             'PIPARE': (NavClass.CAUTION, 'Pipeline', 80, 3.0, 150, 'Pipeline area'),
-            'PIPSOL': (NavClass.CAUTION, 'Pipeline', 100, 4.0, 200, 'Pipeline submarine/on land'),
-            'PIPOHD': (NavClass.CAUTION, 'Pipeline', 120, 5.0, 100, 'Pipeline overhead'),
+            'PIPSOL': (NavClass.CAUTION, 'Pipeline', 100, 4.0, 200, 'Pipeline submarine/on land', ['drval1']),
+            'PIPOHD': (NavClass.CAUTION, 'Pipeline', 120, 5.0, 100, 'Pipeline overhead', ['verclr']),
             'CHNWIR': (NavClass.CAUTION, 'Infrastructure', 80, 3.5, 100, 'Chain/Wire'),
             'cblohd': (NavClass.CAUTION, 'Cable', 120, 5.0, 100, 'Cable overhead'),
             'pipohd': (NavClass.CAUTION, 'Pipeline', 120, 5.0, 100, 'Pipeline overhead'),
@@ -241,12 +242,12 @@ class S57Classifier:
             'MORFAC': (NavClass.CAUTION, 'Port', 70, 3.0, 100, 'Mooring/warping facility'),
             'HULKES': (NavClass.CAUTION, 'Infrastructure', 80, 3.5, 150, 'Hulk'),
             'PONTON': (NavClass.CAUTION, 'Infrastructure', 70, 3.0, 100, 'Pontoon'),
-            'FLODOC': (NavClass.CAUTION, 'Infrastructure', 80, 3.5, 150, 'Floating dock'),
-            'CRANES': (NavClass.CAUTION, 'Infrastructure', 60, 2.5, 100, 'Crane'),
+            'FLODOC': (NavClass.CAUTION, 'Infrastructure', 80, 3.5, 150, 'Floating dock', ['drval1', 'horclr']),
+            'CRANES': (NavClass.CAUTION, 'Infrastructure', 60, 2.5, 100, 'Crane', ['verclr']),
             'OFSPLF': (NavClass.CAUTION, 'Infrastructure', 100, 4.0, 200, 'Offshore platform'),
             'BUAARE': (NavClass.CAUTION, 'Area', 50, 2.0, 100, 'Built-up area'),
             'CTSARE': (NavClass.CAUTION, 'Port', 70, 3.0, 100, 'Cargo transshipment area'),
-            'LOKBSN': (NavClass.CAUTION, 'Infrastructure', 80, 3.5, 150, 'Lock basin'),
+            'LOKBSN': (NavClass.CAUTION, 'Infrastructure', 80, 3.5, 150, 'Lock basin', ['horclr']),
             'lokare': (NavClass.CAUTION, 'Infrastructure', 80, 3.5, 150, 'Lock area'),
             'lkbspt': (NavClass.CAUTION, 'Infrastructure', 80, 3.5, 150, 'Lock basin part'),
             'hulkes': (NavClass.CAUTION, 'Infrastructure', 80, 3.5, 150, 'Hulk'),
@@ -264,9 +265,9 @@ class S57Classifier:
 
             # ==================== DANGEROUS (3) ====================
             # Critical Obstructions
-            'UWTROC': (NavClass.DANGEROUS, 'Obstruction', 1000, 100.0, 500, 'Underwater rock/awash rock'),
-            'OBSTRN': (NavClass.DANGEROUS, 'Obstruction', 1000, 100.0, 500, 'Obstruction'),
-            'WRECKS': (NavClass.DANGEROUS, 'Obstruction', 1000, 100.0, 500, 'Wreck'),
+            'UWTROC': (NavClass.DANGEROUS, 'Obstruction', 1000, 100.0, 500, 'Underwater rock/awash rock', ['valsou']),
+            'OBSTRN': (NavClass.DANGEROUS, 'Obstruction', 1000, 100.0, 500, 'Obstruction', ['valsou', 'catobs']),
+            'WRECKS': (NavClass.DANGEROUS, 'Obstruction', 1000, 100.0, 500, 'Wreck', ['valsou', 'catwrk']),
             'FOULAR': (NavClass.DANGEROUS, 'Obstruction', 1000, 80.0, 400, 'Foul area'),
             'ACHPNT': (NavClass.DANGEROUS, 'Obstruction', 800, 60.0, 300, 'Anchor on seabed'),
             'PILPNT': (NavClass.DANGEROUS, 'Obstruction', 900, 70.0, 400, 'Pile'),
@@ -279,17 +280,17 @@ class S57Classifier:
             'BOYISD': (NavClass.DANGEROUS, 'Aid', 1000, 90.0, 500, 'Buoy isolated danger'),
 
             # Bridges & Overhead Structures
-            'BRIDGE': (NavClass.DANGEROUS, 'Structure', 1000, 100.0, 300, 'Bridge'),
+            'BRIDGE': (NavClass.DANGEROUS, 'Structure', 1000, 100.0, 300, 'Bridge', ['verclr', 'horclr']),
             'PYLONS': (NavClass.DANGEROUS, 'Structure', 900, 80.0, 300, 'Pylon/bridge support'),
-            'GATCON': (NavClass.DANGEROUS, 'Structure', 900, 80.0, 300, 'Gate'),
-            'TUNNEL': (NavClass.DANGEROUS, 'Structure', 800, 70.0, 200, 'Tunnel'),
+            'GATCON': (NavClass.DANGEROUS, 'Structure', 900, 80.0, 300, 'Gate', ['verclr', 'drval1', 'horclr']),
+            'TUNNEL': (NavClass.DANGEROUS, 'Structure', 800, 70.0, 200, 'Tunnel', ['verclr', 'horclr']),
             'brgare': (NavClass.DANGEROUS, 'Structure', 1000, 100.0, 300, 'Bridge area'),
             'bridge': (NavClass.DANGEROUS, 'Structure', 1000, 100.0, 300, 'Bridge'),
             'gatcon': (NavClass.DANGEROUS, 'Structure', 900, 80.0, 300, 'Gate'),
 
             # Coastline & Shoreline
             'COALNE': (NavClass.DANGEROUS, 'Coastline', 1000, 100.0, 500, 'Coastline'),
-            'SLCONS': (NavClass.DANGEROUS, 'Coastline', 900, 90.0, 400, 'Shoreline construction'),
+            'SLCONS': (NavClass.DANGEROUS, 'Coastline', 900, 90.0, 400, 'Shoreline construction', ['horclr']),
             'CAUSWY': (NavClass.DANGEROUS, 'Structure', 1000, 100.0, 500, 'Causeway'),
             'DAMCON': (NavClass.DANGEROUS, 'Structure', 1000, 100.0, 500, 'Dam'),
             'DYKCON': (NavClass.DANGEROUS, 'Structure', 900, 90.0, 400, 'Dyke'),
@@ -303,7 +304,7 @@ class S57Classifier:
             'RAPIDS': (NavClass.DANGEROUS, 'Environmental', 900, 80.0, 400, 'Rapids'),
 
             # Port Infrastructure - Hard Obstructions
-            'DRYDOC': (NavClass.DANGEROUS, 'Infrastructure', 1000, 100.0, 300, 'Dry dock'),
+            'DRYDOC': (NavClass.DANGEROUS, 'Infrastructure', 1000, 100.0, 300, 'Dry dock', ['drval1', 'horclr']),
             'GRIDRN': (NavClass.DANGEROUS, 'Infrastructure', 900, 90.0, 300, 'Gridiron'),
             'TOWERS': (NavClass.DANGEROUS, 'Structure', 1000, 100.0, 400, 'Tower'),
             'STSLNE': (NavClass.DANGEROUS, 'Coastline', 1000, 100.0, 500, 'Straight territorial sea baseline'),
