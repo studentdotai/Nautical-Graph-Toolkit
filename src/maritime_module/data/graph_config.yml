@@ -68,13 +68,27 @@
     # Path to custom S57 classification CSV (null = use built-in defaults)
     classifier_csv_path: null
 
+    # Default vessel parameters for dynamic weight calculations
+    default_vessel:
+      draft: 7.5              # meters - vessel draft (depth below waterline)
+      height: 30.0            # meters - air draft (height above waterline)
+      beam: 25.0              # meters - vessel width
+      length: 150.0           # meters - vessel length
+      vessel_type: 'cargo'    # cargo, tanker, passenger, fishing
+      safety_margin: 2.0      # meters - UKC safety buffer (Under Keel Clearance)
+      clearance_safety: 3.0   # meters - vertical clearance buffer (bridges)
+
     # Static layers: weight factors retrieved from S57Classifier during graph construction
     # List only the layer names - actual weight values come from the classifier
+    # Three-tier system: SAFE (bonus), CAUTION (penalty), DANGEROUS (blocking)
+    # Distance-based degradation: features degrade one tier when within buffer distance
     static_layers:
-      - lndare      # Land area (DANGEROUS - high penalty)
+      - lndare      # Land area (DANGEROUS - absolute blocker)
       - obstrn      # Obstruction (DANGEROUS - high penalty)
       - uwtroc      # Underwater rock (DANGEROUS - high penalty)
       - wrecks      # Wrecks (DANGEROUS - high penalty)
+      - slcons      # Shoreline construction (DANGEROUS - blocker)
+      - coalne      # Coastline (DANGEROUS - blocker)
       - fairwy      # Fairway (SAFE - preferred route)
       - tsslpt      # Traffic separation lane (CAUTION - moderate penalty)
       - drgare      # Dredged area (SAFE - slight preference)
@@ -82,6 +96,9 @@
       - resare      # Restricted area (CAUTION - moderate penalty)
       - cblare      # Cable area (CAUTION - moderate penalty)
       - pipare      # Pipeline area (CAUTION - moderate penalty)
+      - rectrc      # Recommended track (SAFE - preferred route)
+      - dwrtcl      # Deep water route centerline (SAFE - preferred route)
+
 
     # Dynamic properties: computed at pathfinding runtime via spatial queries
     # These query actual feature attributes for real-time decision making

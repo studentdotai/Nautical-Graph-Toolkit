@@ -105,6 +105,40 @@ class PostGISConnector(DatabaseConnector):
                         summary_data.append({'schema': schema_name, 'table': table_name, 'feature_count': 'Error'})
         return pd.DataFrame(summary_data)
 
+    def get_table(self, table_name: str, schema_name: str = None, limit: int = None) -> 'gpd.GeoDataFrame':
+        """
+        Returns the actual table data as a GeoDataFrame.
+
+        Args:
+            table_name: Name of the table to retrieve
+            schema_name: Schema containing the table (defaults to self.schema)
+            limit: Maximum number of rows to return (None for all rows)
+
+        Returns:
+            GeoDataFrame with the table data
+        """
+        import geopandas as gpd
+
+        schema_name = schema_name or self.schema
+        self.connect()
+
+        # Build query
+        query = f'SELECT * FROM "{schema_name}"."{table_name}"'
+        if limit:
+            query += f' LIMIT {limit}'
+
+        try:
+            # Try to load as GeoDataFrame (if geometry column exists)
+            gdf = gpd.read_postgis(query, self.engine, geom_col='geometry')
+            logger.info(f"Loaded {len(gdf)} rows from '{schema_name}.{table_name}'")
+            return gdf
+        except Exception as e:
+            # Fallback to regular DataFrame if no geometry column
+            logger.warning(f"Could not load as GeoDataFrame: {e}. Loading as DataFrame.")
+            df = pd.read_sql(query, self.engine)
+            logger.info(f"Loaded {len(df)} rows from '{schema_name}.{table_name}'")
+            return df
+
     def validate_database_integrity(self, check_layers: List[str] = None) -> pd.DataFrame:
         """
         Comprehensive database validation for operational awareness.
@@ -269,6 +303,108 @@ class PostGISConnector(DatabaseConnector):
             logger.error(f"Failed to drop schema '{schema_name}': {e}")
             raise
 
+    def drop_columns(self, table_name: str, columns: Union[str, List[str]],
+                     schema_name: str = None) -> Dict[str, Any]:
+        """
+        Drops one or more columns from a PostGIS table.
+
+        Args:
+            table_name: Name of the table
+            columns: Single column name (str) or list of column names to drop
+            schema_name: Schema containing the table (defaults to self.schema)
+
+        Returns:
+            Dict with:
+                - columns_dropped: Number of columns successfully dropped
+                - columns_failed: Number of columns that failed to drop
+                - columns_not_found: Number of columns that didn't exist
+                - details: List of {column, status, message} dicts
+
+        Example:
+            connector = PostGISConnector(db_params)
+
+            # Drop single column
+            result = connector.drop_columns('edges_table', 'wt_static_factor', 'graph')
+
+            # Drop multiple columns
+            result = connector.drop_columns(
+                'edges_table',
+                ['final_weight', 'wt_static_factor', 'old_column'],
+                'graph'
+            )
+        """
+        schema_name = schema_name or self.schema
+
+        # Normalize to list
+        if isinstance(columns, str):
+            columns = [columns]
+
+        if not self.engine:
+            self.connect()
+
+        results = {
+            'columns_dropped': 0,
+            'columns_failed': 0,
+            'columns_not_found': 0,
+            'details': []
+        }
+
+        try:
+            with self.engine.connect() as connection:
+                inspector = inspect(self.engine)
+
+                # Get existing columns in table
+                try:
+                    existing_columns = [col['name'] for col in inspector.get_columns(table_name, schema=schema_name)]
+                except Exception as e:
+                    logger.error(f"Table '{schema_name}.{table_name}' does not exist or cannot be accessed: {e}")
+                    raise ValueError(f"Table '{schema_name}.{table_name}' not found")
+
+                # Process each column
+                for column in columns:
+                    if column not in existing_columns:
+                        logger.debug(f"Column '{column}' does not exist in '{schema_name}.{table_name}', skipping")
+                        results['columns_not_found'] += 1
+                        results['details'].append({
+                            'column': column,
+                            'status': 'not_found',
+                            'message': 'Column does not exist'
+                        })
+                        continue
+
+                    try:
+                        with connection.begin():
+                            drop_sql = text(f'ALTER TABLE "{schema_name}"."{table_name}" DROP COLUMN IF EXISTS "{column}"')
+                            connection.execute(drop_sql)
+
+                        logger.info(f"Successfully dropped column '{column}' from '{schema_name}.{table_name}'")
+                        results['columns_dropped'] += 1
+                        results['details'].append({
+                            'column': column,
+                            'status': 'dropped',
+                            'message': 'Successfully dropped'
+                        })
+                    except Exception as e:
+                        logger.error(f"Failed to drop column '{column}' from '{schema_name}.{table_name}': {e}")
+                        results['columns_failed'] += 1
+                        results['details'].append({
+                            'column': column,
+                            'status': 'failed',
+                            'message': str(e)
+                        })
+
+            # Log summary
+            logger.info(f"Column drop summary for '{schema_name}.{table_name}': "
+                       f"{results['columns_dropped']} dropped, "
+                       f"{results['columns_not_found']} not found, "
+                       f"{results['columns_failed']} failed")
+
+        except Exception as e:
+            logger.error(f"Failed to drop columns from '{schema_name}.{table_name}': {e}")
+            raise
+
+        return results
+
 
 class FileDBConnector(DatabaseConnector):
     """Handles preparation for file-based databases like GeoPackage and SpatiaLite."""
@@ -291,3 +427,159 @@ class FileDBConnector(DatabaseConnector):
         # Ensure parent directory exists
         self.file_path.parent.mkdir(parents=True, exist_ok=True)
         logger.info(f"Output destination '{self.file_path}' is ready.")
+
+    def drop_columns(self, layer_name: str, columns: Union[str, List[str]]) -> Dict[str, Any]:
+        """
+        Drops one or more columns from a layer in a file-based database (GeoPackage/SpatiaLite).
+
+        Uses SQLite ALTER TABLE to drop columns (requires SQLite 3.35.0+ for multiple columns).
+        Falls back to GDAL ogr2ogr for older SQLite versions or unsupported formats.
+
+        Args:
+            layer_name: Name of the layer/table
+            columns: Single column name (str) or list of column names to drop
+
+        Returns:
+            Dict with:
+                - columns_dropped: Number of columns successfully dropped
+                - columns_failed: Number of columns that failed to drop
+                - columns_not_found: Number of columns that didn't exist
+                - details: List of {column, status, message} dicts
+
+        Example:
+            connector = FileDBConnector('output.gpkg')
+
+            # Drop single column
+            result = connector.drop_columns('edges', 'wt_static_factor')
+
+            # Drop multiple columns
+            result = connector.drop_columns(
+                'edges',
+                ['final_weight', 'wt_static_factor', 'old_column']
+            )
+        """
+        import sqlite3
+
+        # Normalize to list
+        if isinstance(columns, str):
+            columns = [columns]
+
+        if not self.file_path.exists():
+            raise FileNotFoundError(f"Database file '{self.file_path}' does not exist")
+
+        results = {
+            'columns_dropped': 0,
+            'columns_failed': 0,
+            'columns_not_found': 0,
+            'details': []
+        }
+
+        try:
+            # Connect to SQLite database
+            conn = sqlite3.connect(str(self.file_path))
+            cursor = conn.cursor()
+
+            # Get existing columns in layer
+            cursor.execute(f"PRAGMA table_info({layer_name})")
+            existing_columns = [row[1] for row in cursor.fetchall()]
+
+            if not existing_columns:
+                raise ValueError(f"Layer '{layer_name}' does not exist in '{self.file_path}'")
+
+            # Process each column
+            for column in columns:
+                if column not in existing_columns:
+                    logger.debug(f"Column '{column}' does not exist in layer '{layer_name}', skipping")
+                    results['columns_not_found'] += 1
+                    results['details'].append({
+                        'column': column,
+                        'status': 'not_found',
+                        'message': 'Column does not exist'
+                    })
+                    continue
+
+                try:
+                    # Try SQLite 3.35+ syntax first
+                    cursor.execute(f'ALTER TABLE "{layer_name}" DROP COLUMN "{column}"')
+                    conn.commit()
+
+                    logger.info(f"Successfully dropped column '{column}' from layer '{layer_name}'")
+                    results['columns_dropped'] += 1
+                    results['details'].append({
+                        'column': column,
+                        'status': 'dropped',
+                        'message': 'Successfully dropped'
+                    })
+                except sqlite3.OperationalError as e:
+                    if 'no such column' in str(e).lower():
+                        # Column already doesn't exist
+                        results['columns_not_found'] += 1
+                        results['details'].append({
+                            'column': column,
+                            'status': 'not_found',
+                            'message': 'Column does not exist'
+                        })
+                    elif 'near "DROP"' in str(e) or 'syntax error' in str(e).lower():
+                        # Old SQLite version - need to use recreate strategy
+                        logger.warning(f"SQLite version doesn't support DROP COLUMN, using recreate strategy for '{column}'")
+                        try:
+                            # Get column definitions (excluding the one to drop)
+                            cursor.execute(f"PRAGMA table_info({layer_name})")
+                            cols_info = cursor.fetchall()
+                            keep_columns = [col[1] for col in cols_info if col[1] != column]
+
+                            if not keep_columns:
+                                raise ValueError(f"Cannot drop column '{column}' - it's the only column")
+
+                            # Create temporary table without the column
+                            cols_str = ', '.join([f'"{col}"' for col in keep_columns])
+                            cursor.execute(f'CREATE TABLE "{layer_name}_temp" AS SELECT {cols_str} FROM "{layer_name}"')
+                            cursor.execute(f'DROP TABLE "{layer_name}"')
+                            cursor.execute(f'ALTER TABLE "{layer_name}_temp" RENAME TO "{layer_name}"')
+                            conn.commit()
+
+                            logger.info(f"Successfully dropped column '{column}' using recreate strategy")
+                            results['columns_dropped'] += 1
+                            results['details'].append({
+                                'column': column,
+                                'status': 'dropped',
+                                'message': 'Successfully dropped (recreate strategy)'
+                            })
+                        except Exception as recreate_error:
+                            logger.error(f"Failed to drop column '{column}' using recreate strategy: {recreate_error}")
+                            results['columns_failed'] += 1
+                            results['details'].append({
+                                'column': column,
+                                'status': 'failed',
+                                'message': f'Recreate strategy failed: {str(recreate_error)}'
+                            })
+                    else:
+                        logger.error(f"Failed to drop column '{column}': {e}")
+                        results['columns_failed'] += 1
+                        results['details'].append({
+                            'column': column,
+                            'status': 'failed',
+                            'message': str(e)
+                        })
+                except Exception as e:
+                    logger.error(f"Failed to drop column '{column}': {e}")
+                    results['columns_failed'] += 1
+                    results['details'].append({
+                        'column': column,
+                        'status': 'failed',
+                        'message': str(e)
+                    })
+
+            conn.close()
+
+            # Log summary
+            logger.info(f"Column drop summary for '{layer_name}' in '{self.file_path.name}': "
+                       f"{results['columns_dropped']} dropped, "
+                       f"{results['columns_not_found']} not found, "
+                       f"{results['columns_failed']} failed")
+
+        except Exception as e:
+            logger.error(f"Failed to drop columns from layer '{layer_name}': {e}")
+            raise
+
+        return results
