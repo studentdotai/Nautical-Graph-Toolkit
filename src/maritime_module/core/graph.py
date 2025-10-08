@@ -3571,12 +3571,17 @@ class Weights:
         Dynamically generate feature extraction configuration from S57Classifier.
 
         Reads ImportantAttributes from classifier database and groups them by attribute type:
-        - drval1 → ft_depth (list of layers with depth data)
+        - drval1 → ft_depth (FILTERED - only DEPARE, DRGARE, SWPARE for navigational depths)
         - valsou → ft_sounding (list of layers with sounding data)
         - depth → ft_sounding_point (SOUNDG layer depth attribute from ADD_SOUNDG_DEPTH)
         - verclr/vercsa → ft_ver_clearance (vertical clearance, uses minimum of both)
         - horclr → ft_hor_clearance (horizontal clearance)
         - catwrk, catobs → ft_category (categorical data)
+
+        IMPORTANT: ft_depth filtering prevents false blocking in harbors/coastal waters.
+        Infrastructure layers (BERTHS, GATCON, DRYDOC, FLODOC) have drval1=0 for moored vessels,
+        not transit depths. Only DEPARE, DRGARE, SWPARE are used for ft_depth to ensure accurate
+        UKC calculations and blocking_factor determination.
 
         Returns:
             Dict[str, Dict]: Feature layers configuration
@@ -3591,8 +3596,9 @@ class Weights:
         Example:
             weights = Weights(factory)
             config = weights.get_feature_layers_from_classifier()
-            # cblohd has both verclr and vercsa:
-            # {'column': 'ft_ver_clearance', 'attributes': ['verclr', 'vercsa'], 'aggregation': 'min'}
+            # Only navigational depth layers for ft_depth:
+            # depare, drgare, swpare → ft_depth
+            # Excluded: berths, fairwy, gatcon, drydoc, etc.
         """
         # Attribute type mapping: S57 attribute → (ft_column_name, aggregation, group)
         # group allows combining multiple attributes into same column
@@ -3606,6 +3612,24 @@ class Weights:
             'catwrk': ('ft_wreck_category', 'first', 'category'),
             'catobs': ('ft_obstruction_category', 'first', 'category'),
         }
+
+        # DEPTH LAYER FILTER: Only use these layers for ft_depth to avoid false blocking
+        # These layers represent actual navigable water depths, not infrastructure/berthing depths
+        # Excluded layers (BERTHS, GATCON, DRYDOC, FLODOC) may have drval1=0 for moored vessels
+        NAVIGATIONAL_DEPTH_LAYERS = {
+            'depare',  # Depth area - primary source of charted depths
+            'drgare',  # Dredged area - maintained navigational depths
+            'swpare',  # Swept area - verified clear depths
+        }
+
+        # Optional: Route-specific depth layers (commented out - can enable if needed)
+        # ROUTE_DEPTH_LAYERS = {
+        #     'fairwy',   # Fairway - preferred route depths
+        #     'dwrtcl',   # Deep water route centerline
+        #     'dwrtpt',   # Deep water route part
+        #     'rcrtcl',   # Recommended route centerline
+        #     'rectrc',   # Recommended track
+        # }
 
         feature_layers = {}
 
@@ -3622,6 +3646,13 @@ class Weights:
                     attr_lower = attr.lower()
                     if attr_lower in attribute_mapping:
                         column_name, aggregation, group = attribute_mapping[attr_lower]
+
+                        # FILTER: Skip drval1 (depth) attributes for non-navigational layers
+                        # This prevents infrastructure depths (berths, gates, dry docks) from blocking navigation
+                        if attr_lower == 'drval1' and column_name == 'ft_depth':
+                            if layer_name not in NAVIGATIONAL_DEPTH_LAYERS:
+                                logger.debug(f"Skipping drval1 from '{layer_name}' - not in navigational depth layers")
+                                continue
 
                         if column_name not in attrs_by_column:
                             attrs_by_column[column_name] = {
@@ -4252,7 +4283,8 @@ class Weights:
                 ('blocking_factor', 'DOUBLE PRECISION'),
                 ('penalty_factor', 'DOUBLE PRECISION'),
                 ('bonus_factor', 'DOUBLE PRECISION'),
-                ('ukc_meters', 'DOUBLE PRECISION')
+                ('ukc_meters', 'DOUBLE PRECISION'),
+                ('ft_depth_sources', 'JSONB')  # Diagnostic: track which layers contribute to ft_depth
             ]
 
             for col_name, col_type in weight_calc_columns:
@@ -4296,7 +4328,10 @@ class Weights:
             conn.commit()
             logger.info(f"Initialized weight calculation columns with default values")
 
-            # Step 1: Add columns if they don't exist
+            # Step 1: Add columns if they don't exist (including _sources tracking columns)
+            source_tracked_columns = {'ft_depth', 'ft_sounding', 'ft_sounding_point',
+                                     'ft_ver_clearance', 'ft_hor_clearance'}
+
             for layer_name, config in feature_layers_config.items():
                 target_column = config['column']
 
@@ -4323,6 +4358,23 @@ class Weights:
                     conn.execute(alter_sql)
                     conn.commit()
                     logger.info(f"Added column '{target_column}' to {edges_table}")
+
+                # Add _sources column for tracked features
+                if target_column in source_tracked_columns:
+                    sources_column = f"{target_column}_sources"
+                    result_sources = conn.execute(
+                        check_column_sql,
+                        {'schema': schema_name, 'table': edges_table, 'column': sources_column}
+                    ).fetchone()
+
+                    if not result_sources:
+                        alter_sources_sql = text(f"""
+                            ALTER TABLE "{schema_name}"."{edges_table}"
+                            ADD COLUMN {sources_column} JSONB
+                        """)
+                        conn.execute(alter_sources_sql)
+                        conn.commit()
+                        logger.info(f"Added column '{sources_column}' (JSONB) to {edges_table}")
 
             # Step 2: Enrich edges with features using spatial joins
             for layer_name, config in feature_layers_config.items():
@@ -4412,32 +4464,122 @@ class Weights:
                 # Build the aggregation logic based on aggregation type
                 if aggregation == 'min':
                     update_logic = f"LEAST(e.{target_column}, i.agg_value)"
+                    within_band_order = 'agg_value ASC'  # MIN within same band
                 elif aggregation == 'max':
                     update_logic = f"GREATEST(e.{target_column}, i.agg_value)"
+                    within_band_order = 'agg_value DESC'  # MAX within same band
                 else:
                     # For 'first', 'mean', or other: use new value if existing is NULL, otherwise keep existing
                     update_logic = f"i.agg_value"
+                    within_band_order = 'agg_value ASC'  # Arbitrary but deterministic
 
-                update_sql = text(f"""
-                    WITH intersecting_features AS (
-                        SELECT
-                            e.id,
-                            {agg_func}({attr_expression}) as agg_value
-                        FROM "{schema_name}"."{edges_table}" e
-                        JOIN "{enc_schema}"."{layer_name}" f
-                            ON ST_Intersects(e.geometry, f.{layer_geom_col})
-                        WHERE {attr_expression} IS NOT NULL
-                        {enc_filter}
-                        GROUP BY e.id
-                    )
-                    UPDATE "{schema_name}"."{edges_table}" e
-                    SET {target_column} = CASE
-                        WHEN e.{target_column} IS NULL THEN i.agg_value
-                        ELSE {update_logic}
-                    END
-                    FROM intersecting_features i
-                    WHERE e.id = i.id
-                """)
+                # ALL ft_* columns now use usage band prioritization + source tracking
+                # Usage band priority: 6 (Berthing) > 5 (Harbour) > 4 (Approach) > 3 (Coastal) > 2 (General) > 1 (Overview)
+                # Within same usage band, use aggregation (MIN/MAX/etc.)
+                #
+                # Track sources for important columns (depth, clearances, soundings)
+                track_sources = target_column in ['ft_depth', 'ft_sounding', 'ft_sounding_point',
+                                                   'ft_ver_clearance', 'ft_hor_clearance']
+                sources_column = f"{target_column}_sources"
+
+                if target_column.startswith('ft_'):
+                    # Usage band prioritization for all feature columns
+                    if track_sources:
+                        # With source tracking
+                        update_sql = text(f"""
+                            WITH intersecting_features AS (
+                                SELECT
+                                    e.id,
+                                    f.dsid_dsnm,
+                                    SUBSTRING(f.dsid_dsnm, 3, 1)::INTEGER as usage_band,
+                                    {agg_func}({attr_expression}) as agg_value
+                                FROM "{schema_name}"."{edges_table}" e
+                                JOIN "{enc_schema}"."{layer_name}" f
+                                    ON ST_Intersects(e.geometry, f.{layer_geom_col})
+                                WHERE {attr_expression} IS NOT NULL
+                                {enc_filter}
+                                GROUP BY e.id, f.dsid_dsnm
+                            ),
+                            best_per_edge AS (
+                                SELECT DISTINCT ON (id)
+                                    id,
+                                    dsid_dsnm,
+                                    usage_band,
+                                    agg_value
+                                FROM intersecting_features
+                                ORDER BY id, usage_band DESC, {within_band_order}
+                            ),
+                            all_sources_per_edge AS (
+                                SELECT
+                                    id,
+                                    jsonb_object_agg(
+                                        dsid_dsnm || '_' || '{layer_name}',
+                                        jsonb_build_object(
+                                            'value', agg_value,
+                                            'usage_band', usage_band
+                                        )
+                                    ) as sources
+                                FROM intersecting_features
+                                GROUP BY id
+                            )
+                            UPDATE "{schema_name}"."{edges_table}" e
+                            SET {target_column} = b.agg_value,
+                                {sources_column} = COALESCE(e.{sources_column}, '{{}}'::jsonb) || s.sources
+                            FROM best_per_edge b
+                            JOIN all_sources_per_edge s ON b.id = s.id
+                            WHERE e.id = b.id
+                        """)
+                    else:
+                        # Without source tracking (lighter weight)
+                        update_sql = text(f"""
+                            WITH intersecting_features AS (
+                                SELECT
+                                    e.id,
+                                    f.dsid_dsnm,
+                                    SUBSTRING(f.dsid_dsnm, 3, 1)::INTEGER as usage_band,
+                                    {agg_func}({attr_expression}) as agg_value
+                                FROM "{schema_name}"."{edges_table}" e
+                                JOIN "{enc_schema}"."{layer_name}" f
+                                    ON ST_Intersects(e.geometry, f.{layer_geom_col})
+                                WHERE {attr_expression} IS NOT NULL
+                                {enc_filter}
+                                GROUP BY e.id, f.dsid_dsnm
+                            ),
+                            best_per_edge AS (
+                                SELECT DISTINCT ON (id)
+                                    id,
+                                    agg_value
+                                FROM intersecting_features
+                                ORDER BY id, usage_band DESC, {within_band_order}
+                            )
+                            UPDATE "{schema_name}"."{edges_table}" e
+                            SET {target_column} = b.agg_value
+                            FROM best_per_edge b
+                            WHERE e.id = b.id
+                        """)
+
+                else:
+                    # Standard update for non-depth columns
+                    update_sql = text(f"""
+                        WITH intersecting_features AS (
+                            SELECT
+                                e.id,
+                                {agg_func}({attr_expression}) as agg_value
+                            FROM "{schema_name}"."{edges_table}" e
+                            JOIN "{enc_schema}"."{layer_name}" f
+                                ON ST_Intersects(e.geometry, f.{layer_geom_col})
+                            WHERE {attr_expression} IS NOT NULL
+                            {enc_filter}
+                            GROUP BY e.id
+                        )
+                        UPDATE "{schema_name}"."{edges_table}" e
+                        SET {target_column} = CASE
+                            WHEN e.{target_column} IS NULL THEN i.agg_value
+                            ELSE {update_logic}
+                        END
+                        FROM intersecting_features i
+                        WHERE e.id = i.id
+                    """)
 
                 try:
                     result = conn.execute(update_sql)
