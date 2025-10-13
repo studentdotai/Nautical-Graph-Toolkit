@@ -1658,11 +1658,11 @@ class BaseGraph:
             nodes_save_time = save_performance.end_timer("nodes_save_time")
             logger.info(f"Saved {len(nodes_gdf):,} nodes to PostGIS in {nodes_save_time:.3f}s")
 
-            # Process edges
+            # Process edges - save ALL edge attributes dynamically
             save_performance.start_timer("edges_processing_time")
             edges_data = []
             for i, (u, v, data) in enumerate(graph.edges(data=True)):
-                edges_data.append({
+                edge_dict = {
                     'id': i,
                     'source_str': str(u),
                     'target_str': str(v),
@@ -1670,9 +1670,20 @@ class BaseGraph:
                     'source_y': u[1],
                     'target_x': v[0],
                     'target_y': v[1],
-                    'weight': data.get('weight', 0.0),
                     'geometry': LineString([u, v])
-                })
+                }
+
+                # Add all edge attributes from the graph
+                # Skip 'geom' if it exists as we're using 'geometry' for GeoDataFrame
+                for key, value in data.items():
+                    if key not in edge_dict and key != 'geom':
+                        # Handle geometry objects that might be stored in edge data
+                        if hasattr(value, '__geo_interface__'):
+                            # Skip additional geometry attributes to avoid conflicts
+                            continue
+                        edge_dict[key] = value
+
+                edges_data.append(edge_dict)
             edges_gdf = gpd.GeoDataFrame(edges_data, geometry='geometry', crs="EPSG:4326")
             edges_processing_time = save_performance.end_timer("edges_processing_time")
 
@@ -1772,14 +1783,26 @@ class BaseGraph:
             load_performance.record_metric("edges_loaded", len(edges_gdf))
 
             load_performance.start_timer("edges_processing_time")
+            # Define columns to skip when loading edge attributes
+            skip_columns = {'id', 'source_str', 'target_str', 'geometry'}
+
             for _, row in edges_gdf.iterrows():
                 source = ast.literal_eval(row['source_str'])
                 target = ast.literal_eval(row['target_str'])
-                G.add_edge(source, target,
-                          weight=row['weight'],
-                          geom=row['geometry'].__geo_interface__,
-                          source_x=row['source_x'], source_y=row['source_y'],
-                          target_x=row['target_x'], target_y=row['target_y'])
+
+                # Build edge attributes dictionary from ALL columns
+                edge_attrs = {}
+                for col in edges_gdf.columns:
+                    if col not in skip_columns:
+                        value = row[col]
+                        # Handle pandas NA/NaN values
+                        if pd.notna(value):
+                            edge_attrs[col] = value
+
+                # Store geometry as 'geom' key (PostGIS column 'geometry' → graph key 'geom')
+                edge_attrs['geom'] = row['geometry'].__geo_interface__
+
+                G.add_edge(source, target, **edge_attrs)
             edges_processing_time = load_performance.end_timer("edges_processing_time")
 
             logger.info(f"Loaded and processed {len(edges_gdf):,} edges in {edges_load_time + edges_processing_time:.3f}s")
@@ -1915,46 +1938,10 @@ class BaseGraph:
                 trans.execute(text(f'CREATE SCHEMA IF NOT EXISTS {schema_name}'))
 
                 # Drop existing tables if requested
+                # Note: Now using to_postgis() which handles dynamic schema creation
                 if drop_existing:
                     trans.execute(text(f'DROP TABLE IF EXISTS {edges_qualified} CASCADE'))
                     trans.execute(text(f'DROP TABLE IF EXISTS {nodes_qualified} CASCADE'))
-
-                # Create optimized tables with indexes
-                trans.execute(text(f"""
-                    CREATE TABLE IF NOT EXISTS {nodes_qualified} (
-                        id INTEGER PRIMARY KEY,
-                        node_str TEXT NOT NULL,
-                        x DOUBLE PRECISION NOT NULL,
-                        y DOUBLE PRECISION NOT NULL,
-                        geometry GEOMETRY(POINT, 4326) NOT NULL
-                    )
-                """))
-
-                trans.execute(text(f"""
-                    CREATE TABLE IF NOT EXISTS {edges_qualified} (
-                        id SERIAL PRIMARY KEY,
-                        source_str TEXT NOT NULL,
-                        target_str TEXT NOT NULL,
-                        source_x DOUBLE PRECISION NOT NULL,
-                        source_y DOUBLE PRECISION NOT NULL,
-                        target_x DOUBLE PRECISION NOT NULL,
-                        target_y DOUBLE PRECISION NOT NULL,
-                        weight DOUBLE PRECISION NOT NULL,
-                        geometry GEOMETRY(LINESTRING, 4326) NOT NULL
-                    )
-                """))
-
-                # Validate index names
-                nodes_geom_idx = self._validate_identifier(f"{nodes_table}_geom_idx", "index name")
-                edges_geom_idx = self._validate_identifier(f"{edges_table}_geom_idx", "index name")
-                nodes_str_idx = self._validate_identifier(f"{nodes_table}_node_str_idx", "index name")
-                edges_src_tgt_idx = self._validate_identifier(f"{edges_table}_source_target_idx", "index name")
-
-                # Create indexes immediately (better for bulk insert)
-                trans.execute(text(f'CREATE INDEX IF NOT EXISTS "{nodes_geom_idx}" ON {nodes_qualified} USING GIST (geometry)'))
-                trans.execute(text(f'CREATE INDEX IF NOT EXISTS "{edges_geom_idx}" ON {edges_qualified} USING GIST (geometry)'))
-                trans.execute(text(f'CREATE INDEX IF NOT EXISTS "{nodes_str_idx}" ON {nodes_qualified} (node_str)'))
-                trans.execute(text(f'CREATE INDEX IF NOT EXISTS "{edges_src_tgt_idx}" ON {edges_qualified} (source_str, target_str)'))
 
                 setup_time = save_performance.end_timer("schema_setup_time")
                 logger.info(f"Schema and tables setup completed in {setup_time:.3f}s")
@@ -1975,52 +1962,85 @@ class BaseGraph:
                     'id': i,
                     'node_str': str(node),
                     'x': x,
-                    'y': y
+                    'y': y,
+                    'geometry': Point(node)
                 })
+            nodes_gdf = gpd.GeoDataFrame(nodes_data, geometry='geometry', crs="EPSG:4326")
             nodes_processing_time = save_performance.end_timer("nodes_processing_time")
             logger.info(f"Processed {len(nodes_data):,} nodes in {nodes_processing_time:.3f}s")
 
-            # Bulk insert nodes using COPY in chunks
+            # Save nodes using GeoPandas to_postgis
             save_performance.start_timer("nodes_save_time")
-            with get_raw_connection() as raw_conn:
-                nodes_chunks = 0
-                for node_chunk in _process_in_chunks(nodes_data, chunk_size):
-                    _bulk_copy_nodes(node_chunk, raw_conn)
-                    nodes_chunks += 1
-                    if nodes_chunks % 10 == 0:
-                        logger.info(f"Inserted {nodes_chunks * chunk_size:,} nodes...")
-
+            nodes_gdf.to_postgis(
+                name=nodes_table,
+                con=engine,
+                schema=self.graph_schema,
+                if_exists='replace',
+                index=False
+            )
             nodes_save_time = save_performance.end_timer("nodes_save_time")
-            logger.info(f"Saved {len(nodes_data):,} nodes to PostGIS in {nodes_save_time:.3f}s using COPY")
+            logger.info(f"Saved {len(nodes_data):,} nodes to PostGIS in {nodes_save_time:.3f}s")
 
-            # Prepare edges data
+            # Prepare edges data - include ALL edge attributes
             save_performance.start_timer("edges_processing_time")
             edges_data = []
             for u, v, data in graph.edges(data=True):
-                edges_data.append({
+                edge_dict = {
                     'source_str': str(u),
                     'target_str': str(v),
                     'source_x': u[0],
                     'source_y': u[1],
                     'target_x': v[0],
                     'target_y': v[1],
-                    'weight': data.get('weight', 0.0)
-                })
+                    'geometry': LineString([u, v])
+                }
+
+                # Add all edge attributes from the graph
+                # Skip 'geom' if it exists as we're using 'geometry' for GeoDataFrame
+                for key, value in data.items():
+                    if key not in edge_dict and key != 'geom':
+                        # Handle geometry objects that might be stored in edge data
+                        if hasattr(value, '__geo_interface__'):
+                            # Skip additional geometry attributes to avoid conflicts
+                            continue
+                        edge_dict[key] = value
+
+                edges_data.append(edge_dict)
             edges_processing_time = save_performance.end_timer("edges_processing_time")
             logger.info(f"Processed {len(edges_data):,} edges in {edges_processing_time:.3f}s")
 
-            # Bulk insert edges using COPY in chunks
+            # Convert edges to GeoDataFrame and save with to_postgis
+            # Note: Using to_postgis instead of COPY to support dynamic schema with all edge attributes
             save_performance.start_timer("edges_save_time")
-            with get_raw_connection() as raw_conn:
-                edges_chunks = 0
-                for edge_chunk in _process_in_chunks(edges_data, chunk_size):
-                    _bulk_copy_edges(edge_chunk, raw_conn)
-                    edges_chunks += 1
-                    if edges_chunks % 10 == 0:
-                        logger.info(f"Inserted {edges_chunks * chunk_size:,} edges...")
-
+            edges_gdf = gpd.GeoDataFrame(edges_data, geometry='geometry', crs="EPSG:4326")
+            edges_gdf.to_postgis(
+                name=edges_table,
+                con=engine,
+                schema=self.graph_schema,
+                if_exists='replace',  # Replace to create table with dynamic schema
+                index=False,
+                chunksize=chunk_size
+            )
             edges_save_time = save_performance.end_timer("edges_save_time")
-            logger.info(f"Saved {len(edges_data):,} edges to PostGIS in {edges_save_time:.3f}s using COPY")
+            logger.info(f"Saved {len(edges_data):,} edges to PostGIS in {edges_save_time:.3f}s")
+
+            # Create indexes for better query performance
+            save_performance.start_timer("index_creation_time")
+            with engine.connect() as conn:
+                # Validate index names
+                nodes_geom_idx = self._validate_identifier(f"{nodes_table}_geom_idx", "index name")
+                edges_geom_idx = self._validate_identifier(f"{edges_table}_geom_idx", "index name")
+                nodes_str_idx = self._validate_identifier(f"{nodes_table}_node_str_idx", "index name")
+                edges_src_tgt_idx = self._validate_identifier(f"{edges_table}_source_target_idx", "index name")
+
+                # Create spatial and lookup indexes
+                conn.execute(text(f'CREATE INDEX IF NOT EXISTS "{nodes_geom_idx}" ON {nodes_qualified} USING GIST (geometry)'))
+                conn.execute(text(f'CREATE INDEX IF NOT EXISTS "{edges_geom_idx}" ON {edges_qualified} USING GIST (geometry)'))
+                conn.execute(text(f'CREATE INDEX IF NOT EXISTS "{nodes_str_idx}" ON {nodes_qualified} (node_str)'))
+                conn.execute(text(f'CREATE INDEX IF NOT EXISTS "{edges_src_tgt_idx}" ON {edges_qualified} (source_str, target_str)'))
+                conn.commit()
+            index_time = save_performance.end_timer("index_creation_time")
+            logger.info(f"Created indexes in {index_time:.3f}s")
 
             # Update table statistics for query optimization
             save_performance.start_timer("stats_update_time")

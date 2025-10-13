@@ -8,6 +8,7 @@ This module is designed to be self-contained and focused on core routing logic.
 
 import logging
 import math
+from pathlib import Path
 from typing import Tuple, Optional, Union, Type, Any
 
 import networkx as nx
@@ -81,7 +82,8 @@ class Astar:
             logger.error(f"An error occurred while finding the nearest node: {e}")
             return None
 
-    def compute_route(self, start_point: Point, end_point: Point) -> Optional[LineString]:
+    def compute_route(self, start_point: Point, end_point: Point,
+                      weight_key: str = 'adjusted_weight') -> Optional[LineString]:
         """
         Computes the shortest route between a start and end point using the A* algorithm.
 
@@ -91,6 +93,8 @@ class Astar:
         Args:
             start_point (Point): The starting geographic point.
             end_point (Point): The destination geographic point.
+            weight_key (str): The edge attribute to use for pathfinding cost.
+                              Defaults to 'adjusted_weight' for vessel-specific routing.
 
         Returns:
             Optional[LineString]: A LineString representing the computed route,
@@ -115,7 +119,7 @@ class Astar:
                 start_node,
                 end_node,
                 heuristic=self._heuristic,
-                weight='weight'
+                weight=weight_key
             )
             # Prepend the original start point and append the original end point
             full_path_coords = [start_point.coords[0]] + path + [end_point.coords[0]]
@@ -202,13 +206,16 @@ class AstarImproved(Astar):
         # The heuristic is inverted (1/pq) to favor straighter paths (higher pq value).
         return distance * (1 / pq if pq > 0 else float('inf'))
 
-    def compute_route_improved(self, start_point: Point, end_point: Point) -> Optional[LineString]:
+    def compute_route_improved(self, start_point: Point, end_point: Point,
+                               weight_key: str = 'adjusted_weight') -> Optional[LineString]:
         """
         Computes a route using the improved A* heuristic.
 
         Args:
             start_point (Point): The starting geographic point.
             end_point (Point): The destination geographic point.
+            weight_key (str): The edge attribute to use for pathfinding cost.
+                              Defaults to 'adjusted_weight' for vessel-specific routing.
 
         Returns:
             Optional[LineString]: A LineString representing the computed route,
@@ -229,7 +236,7 @@ class AstarImproved(Astar):
                 source=start_node,
                 target=end_node,
                 heuristic=lambda u, v: self._improved_heuristic(u, v, start_node),
-                weight='weight'
+                weight=weight_key
             )
             full_path_coords = [start_point.coords[0]] + path + [end_point.coords[0]]
             route_linestring = LineString(full_path_coords)
@@ -294,7 +301,8 @@ class Route:
         return total_distance_nm
 
     def base_route(self, departure_point: Point, arrival_point: Point,
-                   astar_impl: Type['Astar'] = Astar) -> Optional[Tuple[LineString, float]]:
+                   astar_impl: Type['Astar'] = Astar,
+                   weight_key: str = 'adjusted_weight') -> Optional[Tuple[LineString, float]]:
         """
         Computes a route using the specified A* implementation and calculates its distance.
 
@@ -302,6 +310,7 @@ class Route:
             departure_point (Point): The starting geographic point.
             arrival_point (Point): The destination geographic point.
             astar_impl (Type[Astar]): The A* class to use for pathfinding (e.g., Astar or AstarImproved).
+            weight_key (str): The edge attribute to use for pathfinding cost. Defaults to 'adjusted_weight'.
 
         Returns:
             Optional[Tuple[LineString, float]]: A tuple containing the route LineString
@@ -315,9 +324,9 @@ class Route:
 
         # Compute the route using the appropriate method
         if isinstance(pathfinder, AstarImproved):
-            route_geom = pathfinder.compute_route_improved(departure_point, arrival_point)
+            route_geom = pathfinder.compute_route_improved(departure_point, arrival_point, weight_key=weight_key)
         else:
-            route_geom = pathfinder.compute_route(departure_point, arrival_point)
+            route_geom = pathfinder.compute_route(departure_point, arrival_point, weight_key=weight_key)
 
         if route_geom is None:
             logger.warning("Route computation failed. No path found.")
@@ -370,3 +379,345 @@ class Route:
         except Exception as e:
             logger.error(f"Failed to load route '{route_name}': {e}")
             return None
+
+    def detailed_route(self, departure_point: Point, arrival_point: Point,
+                      astar_impl: Type['Astar'] = Astar,
+                      weight_key: str = 'adjusted_weight',
+                      collect_edge_stats: bool = True) -> Optional[dict]:
+        """
+        Computes a route and collects detailed edge statistics for each segment.
+
+        This method performs pathfinding and then extracts all available edge attributes
+        along the route, providing comprehensive information about weight calculations,
+        directional factors, and safety margins.
+
+        Args:
+            departure_point (Point): The starting geographic point.
+            arrival_point (Point): The destination geographic point.
+            astar_impl (Type[Astar]): The A* class to use for pathfinding.
+            weight_key (str): The edge attribute to use for pathfinding cost. Defaults to 'adjusted_weight'.
+            collect_edge_stats (bool): Whether to collect detailed edge statistics.
+
+        Returns:
+            Optional[dict]: A dictionary containing:
+                - 'route_geometry': LineString of the route
+                - 'total_distance_nm': Total distance in nautical miles
+                - 'num_edges': Number of edges in the route
+                - 'edge_details': List of dicts with per-edge statistics (if collect_edge_stats=True)
+
+            Returns None if no route is found.
+
+        Edge Statistics Collected (per edge):
+            - edge_id: Tuple of (source_node, target_node)
+            - source_lon, source_lat: Source node coordinates
+            - target_lon, target_lat: Target node coordinates
+            - segment_distance_nm: Distance of this edge segment
+            - base_weight: Original edge weight (distance)
+            - adjusted_weight: Final weight after all factors
+            - blocking_factor: Blocking multiplier (>= 1000 = blocked)
+            - penalty_factor: Penalty multiplier (> 1.0)
+            - bonus_factor: Bonus multiplier (< 1.0)
+            - ukc_meters: Under-keel clearance in meters (if available)
+            - dir_forward: Edge bearing/heading in degrees (if available)
+            - dir_diff: Angular difference from feature orientation (if available)
+            - wt_dir: Directional weight factor (if available)
+            - ft_orient: Feature orientation in degrees (if available)
+            - ft_orient_rev: Reverse feature orientation (if available)
+            - ft_trafic: Traffic flow code (if available)
+            - ft_depth: Feature depth (if available)
+            - ft_ver_clearance: Vertical clearance (if available)
+            - ft_sounding: Sounding value from features like wrecks/obstructions (if available)
+            - ft_sounding_point: Depth from SOUNDG layer (if available)
+            - ft_hor_clearance: Horizontal clearance (if available)
+
+        Example:
+            route_computer = Route(graph, manager)
+            detailed_info = route_computer.detailed_route(
+                Point(-122.4, 37.8),
+                Point(-122.0, 37.6)
+            )
+
+            if detailed_info:
+                print(f"Route distance: {detailed_info['total_distance_nm']:.2f} nm")
+                print(f"Number of segments: {detailed_info['num_edges']}")
+
+                # Export edge details to CSV
+                import pandas as pd
+                df = pd.DataFrame(detailed_info['edge_details'])
+                df.to_csv('route_analysis.csv', index=False)
+        """
+        logger.info(f"Computing detailed route with {astar_impl.__name__}...")
+
+        # First, compute the route using base pathfinding
+        result = self.base_route(departure_point, arrival_point, astar_impl, weight_key=weight_key)
+
+        if result is None:
+            logger.warning("No route found - cannot collect edge statistics.")
+            return None
+
+        route_geom, total_distance = result
+
+        # Extract the path nodes (excluding prepended/appended start/end points)
+        coords = list(route_geom.coords)
+        # Remove first and last coords if they match the input points
+        if len(coords) > 2:
+            path_nodes = coords[1:-1]  # Remove prepended start and appended end
+        else:
+            path_nodes = coords
+
+        # Build the detailed response
+        detailed_info = {
+            'route_geometry': route_geom,
+            'total_distance_nm': total_distance,
+            'num_edges': len(path_nodes) - 1 if len(path_nodes) > 1 else 0,
+            'edge_details': [],
+            'summary_stats': {}
+        }
+
+        if not collect_edge_stats or len(path_nodes) < 2:
+            logger.info("Edge statistics collection skipped or insufficient path nodes.")
+            return detailed_info
+
+        # Collect edge statistics
+        logger.info(f"Collecting statistics for {detailed_info['num_edges']} edges...")
+
+        edge_details = []
+        for i in range(len(path_nodes) - 1):
+            source_node = path_nodes[i]
+            target_node = path_nodes[i + 1]
+
+            # Check if edge exists in graph
+            if not self.graph.has_edge(source_node, target_node):
+                logger.warning(f"Edge {source_node} -> {target_node} not found in graph")
+                continue
+
+            # Get all edge data
+            edge_data = self.graph[source_node][target_node]
+
+            # Calculate segment distance
+            segment_geom = LineString([source_node, target_node])
+            segment_distance_nm = self._calculate_route_distance(segment_geom)
+
+            # Start by copying all data from the graph edge. This is more robust
+            # as it automatically includes any and all attributes present.
+            edge_stats = edge_data.copy()
+
+            # Add or overwrite specific metadata for this route segment.
+            edge_stats.update({
+                'edge_index': i,
+                'source_lon': source_node[0],
+                'source_lat': source_node[1],
+                'target_lon': target_node[0],
+                'target_lat': target_node[1],
+                'segment_distance_nm': round(segment_distance_nm, 4),
+                # Ensure 'id' exists for consistency, using a generated one if needed.
+                'edge_id': edge_data.get('id', f"{source_node} -> {target_node}")
+            })
+
+            edge_details.append(edge_stats)
+
+        detailed_info['edge_details'] = edge_details
+
+        logger.info(f"Collected detailed statistics for {len(edge_details)} edges")
+        return detailed_info
+
+    def save_route_to_file(self, route_name: str, output_path: Union[str, 'Path'],
+                          output_format: str = 'auto', layer_name: str = 'route',
+                          route_properties: Optional[dict] = None) -> bool:
+        """
+        Loads a route from the data manager and exports it to a file (GeoPackage or GeoJSON).
+
+        This method is useful for exporting routes stored in PostGIS to portable file formats,
+        or for converting routes from one format to another.
+
+        Args:
+            route_name (str): The name of the route to load from the data manager.
+            output_path (Union[str, Path]): The output file path.
+            output_format (str): The output format ('gpkg', 'geojson', or 'auto' to infer from extension).
+                                Defaults to 'auto'.
+            layer_name (str): The layer name for GeoPackage output. Defaults to 'route'.
+            route_properties (Optional[dict]): Additional properties to attach to the route feature.
+                                              If None, default properties (route_name, distance) are added.
+
+        Returns:
+            bool: True if the route was successfully exported, False otherwise.
+
+        Example:
+            # Export PostGIS route to GeoJSON
+            route_computer = Route(graph, postgis_manager)
+            route_computer.save_route_to_file('my_route', 'output/my_route.geojson')
+
+            # Export to GeoPackage with custom properties
+            route_computer.save_route_to_file(
+                'my_route',
+                'output/routes.gpkg',
+                layer_name='maritime_routes',
+                route_properties={'vessel_type': 'cargo', 'draft': 12.5}
+            )
+        """
+        from pathlib import Path
+        import geopandas as gpd
+        from shapely.geometry import mapping
+
+        output_path = Path(output_path)
+
+        # Load the route from the data manager
+        logger.info(f"Loading route '{route_name}' for export to file...")
+        route_geom = self.load_route(route_name)
+
+        if route_geom is None:
+            logger.error(f"Cannot export route '{route_name}' - route not found or failed to load.")
+            return False
+
+        # Determine output format
+        if output_format == 'auto':
+            ext = output_path.suffix.lower()
+            if ext == '.gpkg':
+                output_format = 'gpkg'
+            elif ext in ['.geojson', '.json']:
+                output_format = 'geojson'
+            else:
+                logger.error(f"Cannot auto-detect format from extension '{ext}'. "
+                           "Please specify output_format explicitly ('gpkg' or 'geojson').")
+                return False
+
+        # Validate format
+        if output_format not in ['gpkg', 'geojson']:
+            logger.error(f"Unsupported output format '{output_format}'. Use 'gpkg' or 'geojson'.")
+            return False
+
+        # Calculate route distance
+        route_distance = self._calculate_route_distance(route_geom)
+
+        # Prepare properties
+        if route_properties is None:
+            properties = {
+                'route_name': route_name,
+                'distance_nm': round(route_distance, 2)
+            }
+        else:
+            properties = route_properties.copy()
+            # Ensure route_name and distance are always included
+            properties['route_name'] = route_name
+            properties['distance_nm'] = round(route_distance, 2)
+
+        # Create GeoDataFrame
+        gdf = gpd.GeoDataFrame(
+            [properties],
+            geometry=[route_geom],
+            crs='EPSG:4326'
+        )
+
+        # Ensure output directory exists
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Export to file
+        try:
+            if output_format == 'gpkg':
+                gdf.to_file(output_path, driver='GPKG', layer=layer_name)
+                logger.info(f"Route '{route_name}' successfully exported to GeoPackage: {output_path} (layer: {layer_name})")
+            elif output_format == 'geojson':
+                gdf.to_file(output_path, driver='GeoJSON')
+                logger.info(f"Route '{route_name}' successfully exported to GeoJSON: {output_path}")
+
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to export route '{route_name}' to {output_format.upper()}: {e}")
+            return False
+
+    def save_detailed_route_to_file(self, detailed_route_info: dict, output_path: Union[str, Path],
+                                    output_format: str = 'auto', layer_name: str = 'route_edges',
+                                    include_summary: bool = True) -> bool:
+        """
+        Saves detailed route with all edge statistics to a file (CSV, GeoJSON, or GeoPackage).
+
+        This exports the complete edge-by-edge analysis including all weight factors,
+        directional attributes, safety margins, and feature information.
+
+        Args:
+            detailed_route_info (dict): The dictionary returned by detailed_route() method
+            output_path (Union[str, Path]): The output file path
+            output_format (str): Output format ('csv', 'geojson', 'gpkg', or 'auto' to infer)
+            layer_name (str): Layer name for GeoPackage output (default: 'route_edges')
+            include_summary (bool): If True, also export summary stats as a separate layer/file
+
+        Returns:
+            bool: True if export was successful, False otherwise
+
+        Example:
+            route_computer = Route(graph, manager)
+            detailed_info = route_computer.detailed_route(start, end)
+
+            # Export to CSV with all columns
+            route_computer.save_detailed_route_to_file(detailed_info, 'route_analysis.csv')
+
+            # Export to GeoPackage with geometries and summary
+            route_computer.save_detailed_route_to_file(
+                detailed_info,
+                'route_analysis.gpkg',
+                include_summary=True
+            )
+        """
+        import pandas as pd
+        import geopandas as gpd
+
+        output_path = Path(output_path)
+
+        if not detailed_route_info or not detailed_route_info.get('edge_details'):
+            logger.error("No edge details to export")
+            return False
+
+        # Determine output format
+        if output_format == 'auto':
+            ext = output_path.suffix.lower()
+            if ext == '.csv':
+                output_format = 'csv'
+            elif ext == '.gpkg':
+                output_format = 'gpkg'
+            elif ext in ['.geojson', '.json']:
+                output_format = 'geojson'
+            else:
+                logger.error(f"Cannot auto-detect format from extension '{ext}'")
+                return False
+
+        try:
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+
+            edge_details = detailed_route_info['edge_details']
+
+            if output_format == 'csv':
+                # Export edge details to CSV
+                df = pd.DataFrame(edge_details)
+                df.to_csv(output_path, index=False)
+                logger.info(f"Exported {len(df)} edge records to CSV: {output_path}")
+
+            elif output_format in ['gpkg', 'geojson']:
+                # Create geometries for each edge segment
+                geometries = []
+                for edge in edge_details:
+                    source = (edge['source_lon'], edge['source_lat'])
+                    target = (edge['target_lon'], edge['target_lat'])
+                    geometries.append(LineString([source, target]))
+
+                # Create GeoDataFrame with all columns
+                gdf = gpd.GeoDataFrame(
+                    edge_details,
+                    geometry=geometries,
+                    crs='EPSG:4326'
+                )
+
+                if output_format == 'gpkg':
+                    # Save edge details
+                    gdf.to_file(output_path, driver='GPKG', layer=layer_name)
+                    logger.info(f"Exported {len(gdf)} edge segments to GeoPackage layer '{layer_name}': {output_path}")
+
+                else:  # geojson
+                    gdf.to_file(output_path, driver='GeoJSON')
+                    logger.info(f"Exported {len(gdf)} edge segments to GeoJSON: {output_path}")
+
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to export detailed route: {e}")
+            return False
