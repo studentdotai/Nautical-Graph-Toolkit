@@ -6,14 +6,128 @@ This guide covers common issues you may encounter when working with the Maritime
 
 ## Table of Contents
 
-1. [Environment Setup Issues](#environment-setup-issues)
-2. [Port Selection Issues](#port-selection-issues)
-3. [Database Connection Issues](#database-connection-issues)
-4. [Data Source Issues](#data-source-issues)
-5. [Graph Creation Issues](#graph-creation-issues)
-6. [Performance Issues](#performance-issues)
-7. [Visualization Issues](#visualization-issues)
-8. [Pathfinding Issues](#pathfinding-issues)
+1. [SQLite RTREE Issues](#sqlite-rtree-issues) ⚠️ **Most Common**
+2. [GeoPackage File I/O Issues](#geopackage-file-io-issues)
+3. [Environment Setup Issues](#environment-setup-issues)
+4. [Port Selection Issues](#port-selection-issues)
+5. [Database Connection Issues](#database-connection-issues)
+6. [Data Source Issues](#data-source-issues)
+7. [Graph Creation Issues](#graph-creation-issues)
+8. [Performance Issues](#performance-issues)
+9. [Visualization Issues](#visualization-issues)
+10. [Pathfinding Issues](#pathfinding-issues)
+
+---
+
+## SQLite RTREE Issues
+
+### Issue: "no such module: rtree" error
+
+**Symptoms:**
+```python
+sqlite3.OperationalError: no such module: rtree
+# or during enrichment:
+✗ Enrichment failed: no such module: rtree
+```
+
+**Cause:**
+- GeoPackage and SpatiaLite backends require SQLite with RTREE support
+- Python's built-in sqlite3 may not have RTREE compiled in
+- SpatiaLite uses RTREE for spatial indexing (10-100x performance improvement)
+
+**Solution (Automatic):**
+This project includes `pysqlite3-binary` which provides RTREE support automatically.
+
+1. **Verify installation:**
+   ```bash
+   uv sync
+   # or
+   pip install pysqlite3-binary
+   ```
+
+2. **Test RTREE availability:**
+   ```python
+   try:
+       import pysqlite3 as sqlite3
+   except ImportError:
+       import sqlite3
+
+   conn = sqlite3.connect(':memory:')
+   conn.execute('CREATE VIRTUAL TABLE test USING rtree(id, minx, maxx, miny, maxy)')
+   print("✓ RTREE is available")
+   conn.close()
+   ```
+
+3. **If still failing:**
+   ```bash
+   # Reinstall dependencies
+   uv sync --reinstall
+   # or
+   pip install --force-reinstall pysqlite3-binary
+   ```
+
+**Why this happens:**
+- `uv` and some Python distributions bundle SQLite without RTREE
+- `pysqlite3-binary` provides a pre-compiled SQLite with RTREE enabled
+- The code automatically uses `pysqlite3` if available, falls back to system `sqlite3`
+
+**Affected operations:**
+- `enrich_edges_with_features_gpkg()`
+- `apply_static_weights_gpkg()`
+- `calculate_dynamic_weights_gpkg()`
+- `calculate_directional_weights_gpkg()`
+- All GeoPackage/SpatiaLite spatial queries
+
+**See also:** `docs/SETUP.md` - "SQLite RTREE Requirement" section
+
+---
+
+## GeoPackage File I/O Issues
+
+### Issue: Pyogrio warnings during GeoPackage save/load
+
+**Symptoms:**
+```python
+RuntimeWarning: Value '(-118.212, 33.505)' of field edges.weight parsed incompletely to real 0.
+# Multiple similar warnings during save_graph_to_gpkg()
+```
+
+**Status:** ✅ **RESOLVED in current version**
+
+The codebase now uses the Fiona engine for GeoPackage read/write operations, which provides better fault tolerance than pyogrio:
+
+**What changed:**
+- All `gpd.read_file()` operations now use `engine='fiona'` for better reliability
+- Initial graph writes to GeoPackage use `engine='fiona'`
+- Append operations (`mode='a'`) continue using pyogrio (more stable for this operation)
+
+**Technical details:**
+- **Read operations** (10 locations): `gpd.read_file(path, layer=..., engine='fiona')`
+- **Write operations** (4 locations): `gdf.to_file(path, layer=..., engine='fiona')`
+- **Append operations** (6 locations): `gdf.to_file(path, layer=..., mode='a')` (pyogrio default)
+
+**Why this helps:**
+- Fiona provides direct GDAL/OGR interface without intermediate layers
+- Better handling of edge cases and type conversion
+- More robust field parsing
+
+**If you still see warnings:**
+1. Ensure you're using the latest version:
+   ```bash
+   cd /path/to/maritime_module
+   git pull origin feature-stamps
+   uv sync
+   ```
+
+2. Verify fiona is properly installed:
+   ```bash
+   .venv/bin/python -c "import fiona; print(f'Fiona version: {fiona.__version__}')"
+   ```
+
+3. Check GeoPackage file integrity:
+   ```bash
+   ogrinfo docs/notebooks/output/base_graph_PG.gpkg -al -summary
+   ```
 
 ---
 
@@ -334,6 +448,88 @@ Killed (process terminated by OS)
    )
    ```
 
+### Issue: Fine grid (<0.1 NM) has disconnected components with visible gaps
+
+**Symptoms:**
+```
+INFO - Found 462 disconnected components. Starting bridging process...
+# or
+WARNING - Graph is not connected. Many components found.
+# Visual inspection shows regular vertical or horizontal gaps between node clusters
+```
+
+**Explanation:**
+When creating very fine grids (spacing <0.1 NM), you may encounter artificial gaps between components due to:
+- **Spatial subdivision boundaries**: For performance, PostGIS creates graphs using spatial subdivision (2x2, 4x4, or larger grids depending on node density). At ultra-fine resolutions (0.02 NM), this can create 16+ regions with visible seam lines between them.
+- **Numerical precision limits**: Floating-point arithmetic can create tiny gaps at subdivision boundaries
+- **Grid generation artifacts**: Regular rectangular grids may have alignment issues at region boundaries
+
+These gaps typically appear as distinctive vertical or horizontal lines separating otherwise well-connected regions, aligned with subdivision boundaries.
+
+**Solutions:**
+
+1. **Enable component bridging** (Recommended for spacing <0.1 NM):
+   ```python
+   # In notebook settings
+   fine_grid_spacing_nm = 0.02  # Ultra-fine spacing
+   fine_graph_max_edge_factor = 3.0  # Allow longer edges for bridging
+   fine_graph_bridge_components = True  # Enable automatic bridging
+
+   # The algorithm will:
+   # 1. Detect subdivision grid size (2x2, 4x4, etc.) based on node count
+   # 2. Calculate all subdivision seam lines (not just the center midpoint)
+   # 3. Find boundary nodes near any seam line
+   # 4. Apply full 8-way connectivity at seam boundaries for proper navigation
+   # 5. Use limited bridging elsewhere to maintain graph quality
+   ```
+
+2. **How the bridging strategy works**:
+   - **Seam detection**: Automatically detects NxN subdivision grids:
+     - 4x4 grid (>4M nodes): 3 vertical + 3 horizontal seam lines
+     - 3x3 grid (>1M nodes): 2 vertical + 2 horizontal seam lines
+     - 2x2 grid (>250K nodes): 1 vertical + 1 horizontal seam line
+   - **Two-tier bridging**:
+     - **Full seam bridging**: Nodes near subdivision boundaries get up to 8 connections (standard grid connectivity)
+     - **Sparse bridging**: Other boundary nodes get limited connections (1-3 edges)
+   - **Distance limit**: Bridge edges limited to `max_edge_factor * spacing` distance
+
+3. **Increase max_edge_factor** to allow slightly longer edges:
+   ```python
+   # Default is 2.0, try 3.0-5.0 for fine grids
+   fine_graph_max_edge_factor = 3.0
+
+   # This allows edges up to 3x the spacing length
+   # For 0.02 NM spacing: edges up to 0.06 NM
+   ```
+
+4. **Slightly increase spacing** if bridging doesn't fully resolve (rarely needed):
+   ```python
+   # Move from 0.02 to 0.05 or 0.08 NM
+   fine_grid_spacing_nm = 0.05
+   fine_graph_bridge_components = True  # Still recommended for <0.1 NM
+   ```
+
+**Expected behavior with bridging enabled (0.02 NM, 4x4 grid):**
+```
+INFO - Found 462 disconnected components. Starting bridging process...
+INFO - Detected 4x4 subdivision grid (16 regions)
+INFO - Vertical seam lines: ['-122.6967', '-122.4714', '-122.2461']
+INFO - Horizontal seam lines: ['37.3040', '37.6081', '37.9121']
+INFO - Identified boundary nodes for 462 components
+INFO - Found 125,430 boundary nodes near subdivision lines
+INFO - Bridged components 0 and 1 with 127 edges (seam strategy)
+INFO - Bridged components 2 and 3 with 3 edges (sparse strategy)
+INFO - Component bridging completed in 3.21s
+INFO - Added 2,847 bridge edges
+INFO - Components reduced from 462 to 1
+```
+
+**Performance impact:**
+- Adds <5% to total graph creation time
+- More efficient than increasing spacing significantly
+- Preserves fine-resolution detail while maintaining full connectivity
+- Scales automatically with subdivision grid size (2x2, 4x4, 8x8, etc.)
+
 ---
 
 ## Performance Issues
@@ -599,10 +795,12 @@ print(f"GeoPackage: {'✓ Exists' if data_file.exists() else '✗ Not found'}")
 
 ### Common Parameter Values
 
-| Use Case | expansion | spacing_nm | reduce_distance_nm |
-|----------|-----------|------------|-------------------|
-| Quick test | 12 | 0.5 | 5 |
-| Coastal route | 24 | 0.3 | 3 |
-| Open ocean | 36 | 0.5 | 0 |
-| High precision | 24 | 0.2 | 0 |
-| Large area | 50 | 0.5 | 5 |
+| Use Case | expansion | spacing_nm | reduce_distance_nm | max_edge_factor | bridge_components |
+|----------|-----------|------------|-------------------|-----------------|-------------------|
+| Quick test | 12 | 0.5 | 5 | 2.0 | False |
+| Coastal route | 24 | 0.3 | 3 | 2.0 | False |
+| Open ocean | 36 | 0.5 | 0 | 2.0 | False |
+| High precision | 24 | 0.2 | 0 | 2.0 | False |
+| Very fine grid | 24 | 0.06 | 0 | 3.0 | True |
+| Ultra-fine grid | 24 | 0.02 | 0 | 3.0 | True |
+| Large area | 50 | 0.5 | 5 | 2.0 | False |

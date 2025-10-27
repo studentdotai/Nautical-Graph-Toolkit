@@ -17,7 +17,15 @@ import math
 import os
 import re
 import shutil
-import sqlite3
+import sys
+# Import pysqlite3-binary first (has RTREE support)
+# Force it into sys.modules to prevent builtin sqlite3 from being used
+try:
+    import pysqlite3
+    sys.modules['sqlite3'] = pysqlite3  # Replace builtin in module cache
+    sqlite3 = pysqlite3
+except ImportError:
+    import sqlite3  # Fallback to builtin if pysqlite3 not available
 import subprocess
 import time
 from contextlib import contextmanager
@@ -774,7 +782,7 @@ class BaseGraph:
 
         return final_result
 
-    def create_base_graph(self, grid_data: Union[str, Dict[str, Any]], spacing_nm: float = 0.1, keep_largest_component: bool = False, max_points: int = 1000000) -> nx.Graph:
+    def create_base_graph(self, grid_data: Union[str, Dict[str, Any]], spacing_nm: float = 0.1, keep_largest_component: bool = False, max_points: int = 1000000, max_edge_factor: float = 3, bridge_components: bool = False) -> nx.Graph:
         """
         Constructs a graph from a grid GeoJSON or grid dictionary from create_base_grid.
 
@@ -784,6 +792,12 @@ class BaseGraph:
             keep_largest_component (bool): If True, only the largest connected component of the graph
                                           is returned, which helps avoid issues with isolated nodes.
             max_points (int): Maximum points per subdivision to avoid memory issues.
+            max_edge_factor (float): Multiplier for max edge length relative to spacing. Also used
+                                    for bridging distance if bridge_components=True.
+            bridge_components (bool): If True, attempts to bridge nearby disconnected components
+                                     before selecting the largest component. Useful for fine grids
+                                     with numerical precision gaps. Uses max_edge_factor * spacing
+                                     as the maximum bridge distance.
 
         Returns:
             nx.Graph: The constructed graph.
@@ -852,7 +866,11 @@ class BaseGraph:
         self.performance.record_metric("polygon_type", type(polygon).__name__)
 
         logger.info(f"Starting subgraph creation for {type(polygon).__name__} with area {polygon_area:.6f} deg²")
-        graph = self.create_grid_subgraph(polygon, spacing_deg, max_points=max_points)
+        graph = self.create_grid_subgraph(polygon, spacing_deg, max_points=max_points, max_edge_factor=max_edge_factor)
+
+        # Bridge disconnected components if requested
+        if bridge_components and graph.number_of_nodes() > 0:
+            graph = self._bridge_disconnected_components(graph, spacing_deg, max_edge_factor)
 
         if keep_largest_component and graph.number_of_nodes() > 0:
             self.performance.start_timer("largest_component_selection_time")
@@ -875,6 +893,240 @@ class BaseGraph:
 
         # Log performance summary
         self.performance.log_summary("Base Graph Creation")
+
+        return graph
+
+    def _bridge_disconnected_components(self, graph: nx.Graph, spacing_deg: float, max_edge_factor: float) -> nx.Graph:
+        """
+        Bridges nearby disconnected components in the graph by adding edges between close nodes.
+
+        This method addresses the issue where fine grids (<0.1 NM) can have artificial gaps due to
+        numerical precision or slight misalignments. It identifies disconnected components and adds
+        bridge edges between components that are within max_edge_factor * spacing distance.
+
+        The method is optimized for graphs created with spatial subdivision, targeting boundary
+        regions where subdivisions meet (common source of disconnections).
+
+        Args:
+            graph: The input graph with potential disconnected components
+            spacing_deg: Grid spacing in decimal degrees
+            max_edge_factor: Multiplier for maximum bridge distance (relative to spacing)
+
+        Returns:
+            Graph with bridge edges added between nearby components
+        """
+        self.performance.start_timer("component_bridging_time")
+
+        if nx.is_connected(graph):
+            logger.info("Graph is already fully connected. No bridging needed.")
+            self.performance.end_timer("component_bridging_time")
+            return graph
+
+        # Get all connected components
+        components = list(nx.connected_components(graph))
+        num_components = len(components)
+
+        logger.info(f"Found {num_components} disconnected components. Starting bridging process...")
+        logger.info(f"Note: Gaps often occur at spatial subdivision boundaries during graph creation")
+
+        max_bridge_distance = spacing_deg * max_edge_factor
+        bridges_added = 0
+
+        # Calculate graph bounds to identify potential subdivision boundaries
+        all_nodes = list(graph.nodes())
+        all_x = [node[0] for node in all_nodes]
+        all_y = [node[1] for node in all_nodes]
+        min_x, max_x = min(all_x), max(all_x)
+        min_y, max_y = min(all_y), max(all_y)
+
+        # Detect subdivision grid size based on node distribution
+        # The database creates NxN grids (2x2, 4x4, etc.) based on point density
+        # We need to identify all subdivision lines, not just the 2x2 midpoint
+
+        # Calculate potential grid divisions by analyzing coordinate distributions
+        # For a 4x4 grid, we'd have 3 vertical and 3 horizontal seam lines
+        range_x = max_x - min_x
+        range_y = max_y - min_y
+
+        # Estimate grid size based on graph size (larger graphs = finer subdivision)
+        n_nodes = graph.number_of_nodes()
+        if n_nodes > 4_000_000:
+            grid_size = 4  # 4x4 = 16 regions
+        elif n_nodes > 1_000_000:
+            grid_size = 3  # 3x3 = 9 regions
+        elif n_nodes > 250_000:
+            grid_size = 2  # 2x2 = 4 regions
+        else:
+            grid_size = 1  # No subdivision
+
+        # Generate all subdivision line coordinates
+        subdivision_x_lines = []
+        subdivision_y_lines = []
+
+        if grid_size > 1:
+            for i in range(1, grid_size):
+                # Vertical seam lines
+                x_line = min_x + (range_x * i / grid_size)
+                subdivision_x_lines.append(x_line)
+                # Horizontal seam lines
+                y_line = min_y + (range_y * i / grid_size)
+                subdivision_y_lines.append(y_line)
+
+        # Tolerance for identifying nodes near subdivision boundaries
+        boundary_tolerance = spacing_deg * 2
+
+        logger.info(f"Graph bounds: X=[{min_x:.4f}, {max_x:.4f}], Y=[{min_y:.4f}, {max_y:.4f}]")
+        logger.info(f"Detected {grid_size}x{grid_size} subdivision grid ({grid_size**2} regions)")
+        if subdivision_x_lines:
+            logger.info(f"Vertical seam lines: {[f'{x:.4f}' for x in subdivision_x_lines]}")
+            logger.info(f"Horizontal seam lines: {[f'{y:.4f}' for y in subdivision_y_lines]}")
+
+        # Build spatial index for efficient nearest neighbor search
+        # For each component, prioritize boundary nodes near subdivision lines
+        component_boundary_nodes = []
+
+        for i, component in enumerate(components):
+            boundary_nodes = []
+            subdivision_boundary_nodes = []  # Nodes specifically near subdivision lines
+
+            for node in component:
+                # Check if this is a boundary node (has fewer than max possible neighbors)
+                num_neighbors = len(list(graph.neighbors(node)))
+                if num_neighbors < 8:  # 8 is max for rectangular grid (4 cardinal + 4 diagonal)
+                    boundary_nodes.append(node)
+
+                    # Check if node is near ANY subdivision boundary line
+                    near_x_boundary = any(abs(node[0] - x_line) < boundary_tolerance
+                                         for x_line in subdivision_x_lines)
+                    near_y_boundary = any(abs(node[1] - y_line) < boundary_tolerance
+                                         for y_line in subdivision_y_lines)
+
+                    if near_x_boundary or near_y_boundary:
+                        subdivision_boundary_nodes.append(node)
+
+            if boundary_nodes:
+                component_boundary_nodes.append({
+                    'index': i,
+                    'nodes': boundary_nodes,
+                    'subdivision_nodes': subdivision_boundary_nodes,
+                    'size': len(component)
+                })
+
+        logger.info(f"Identified boundary nodes for {len(component_boundary_nodes)} components")
+
+        # Count nodes near subdivision boundaries
+        total_subdivision_nodes = sum(len(c['subdivision_nodes']) for c in component_boundary_nodes)
+        logger.info(f"Found {total_subdivision_nodes} boundary nodes near subdivision lines")
+
+        # Try to bridge components by finding close boundary nodes
+        # Prioritize subdivision boundary nodes for faster bridging
+        # We'll use a numpy array for efficient distance calculations
+        for i in range(len(component_boundary_nodes)):
+            comp_i = component_boundary_nodes[i]
+
+            # Prioritize subdivision boundary nodes if available, otherwise use all boundary nodes
+            if len(comp_i['subdivision_nodes']) > 0:
+                nodes_i = np.array(comp_i['subdivision_nodes'])
+                using_subdivision_i = True
+            else:
+                nodes_i = np.array(comp_i['nodes'])
+                using_subdivision_i = False
+
+            for j in range(i + 1, len(component_boundary_nodes)):
+                comp_j = component_boundary_nodes[j]
+
+                # Prioritize subdivision boundary nodes if available
+                if len(comp_j['subdivision_nodes']) > 0:
+                    nodes_j = np.array(comp_j['subdivision_nodes'])
+                    using_subdivision_j = True
+                else:
+                    nodes_j = np.array(comp_j['nodes'])
+                    using_subdivision_j = False
+
+                # Calculate all pairwise distances between boundary nodes
+                # Using broadcasting: (n, 1, 2) - (1, m, 2) = (n, m, 2)
+                diff = nodes_i[:, np.newaxis, :] - nodes_j[np.newaxis, :, :]
+                distances = np.sqrt(np.sum(diff ** 2, axis=2))
+
+                # Find node pairs within bridge distance
+                close_pairs = np.where(distances <= max_bridge_distance)
+
+                if len(close_pairs[0]) > 0:
+                    # For subdivision boundary bridging, create a full seam connection
+                    # For general boundaries, limit connections to avoid over-connecting
+                    pair_distances = distances[close_pairs]
+                    sorted_indices = np.argsort(pair_distances)
+
+                    # Determine bridging strategy based on node types
+                    if using_subdivision_i and using_subdivision_j:
+                        # FULL SEAM: Connect all close pairs at subdivision boundaries
+                        # This ensures proper navigation across region boundaries
+                        max_bridges_per_pair = len(sorted_indices)  # Connect all close pairs
+                        bridge_strategy = "seam"
+                    else:
+                        # LIMITED: Only a few connections for general boundaries
+                        max_bridges_per_pair = 3
+                        bridge_strategy = "sparse"
+
+                    added_for_pair = 0
+                    # Track which nodes have been connected to avoid redundant edges
+                    connected_i = {}
+                    connected_j = {}
+
+                    for idx in sorted_indices[:max_bridges_per_pair]:
+                        node_i_idx = close_pairs[0][idx]
+                        node_j_idx = close_pairs[1][idx]
+
+                        # Skip if either node already has enough bridge connections
+                        # For seam bridging, allow more connections per node
+                        max_connections_per_node = 8 if bridge_strategy == "seam" else 1
+
+                        if (connected_i.get(node_i_idx, 0) >= max_connections_per_node or
+                            connected_j.get(node_j_idx, 0) >= max_connections_per_node):
+                            continue
+
+                        node_i = tuple(nodes_i[node_i_idx])
+                        node_j = tuple(nodes_j[node_j_idx])
+                        distance = pair_distances[idx]
+
+                        # Add the bridge edge
+                        graph.add_edge(node_i, node_j, weight=float(distance))
+                        bridges_added += 1
+                        added_for_pair += 1
+
+                        # Track connections
+                        connected_i[node_i_idx] = connected_i.get(node_i_idx, 0) + 1
+                        connected_j[node_j_idx] = connected_j.get(node_j_idx, 0) + 1
+
+                        # Convert degrees to nautical miles (1° ≈ 60 NM)
+                        distance_nm = distance * 60.0
+                        logger.debug(f"Added bridge between components {comp_i['index']} and {comp_j['index']}: "
+                                   f"distance={distance:.6f}° ({distance_nm:.3f}NM)")
+
+                    if added_for_pair > 0:
+                        bridge_type = ""
+                        if using_subdivision_i and using_subdivision_j:
+                            bridge_type = f" [subdivision seam: {added_for_pair} edges]"
+                        elif using_subdivision_i or using_subdivision_j:
+                            bridge_type = f" [mixed: {added_for_pair} edges]"
+                        else:
+                            bridge_type = f" [general: {added_for_pair} edges]"
+
+                        logger.info(f"Bridged components {comp_i['index']} (size={comp_i['size']}) "
+                                  f"and {comp_j['index']} (size={comp_j['size']}){bridge_type}")
+
+        bridging_time = self.performance.end_timer("component_bridging_time")
+
+        # Check final connectivity
+        final_num_components = nx.number_connected_components(graph)
+
+        logger.info(f"Component bridging completed in {bridging_time:.3f}s")
+        logger.info(f"Added {bridges_added} bridge edges")
+        logger.info(f"Components reduced from {num_components} to {final_num_components}")
+
+        self.performance.record_metric("bridge_edges_added", bridges_added)
+        self.performance.record_metric("components_before_bridge", num_components)
+        self.performance.record_metric("components_after_bridge", final_num_components)
 
         return graph
 
@@ -1083,42 +1335,67 @@ class BaseGraph:
             empty_nodes = gpd.GeoDataFrame({
                 'id': pd.Series(dtype='int64'),
                 'node_str': pd.Series(dtype='object'),
+                'x': pd.Series(dtype='float64'),
+                'y': pd.Series(dtype='float64'),
                 'geometry': gpd.GeoSeries(dtype='geometry')
             }, crs="EPSG:4326")
             empty_edges = gpd.GeoDataFrame({
+                'source_id': pd.Series(dtype='int64'),
+                'target_id': pd.Series(dtype='int64'),
                 'source': pd.Series(dtype='object'),
                 'target': pd.Series(dtype='object'),
+                'source_x': pd.Series(dtype='float64'),
+                'source_y': pd.Series(dtype='float64'),
+                'target_x': pd.Series(dtype='float64'),
+                'target_y': pd.Series(dtype='float64'),
                 'weight': pd.Series(dtype='float64'),
                 'geometry': gpd.GeoSeries(dtype='geometry')
             }, crs="EPSG:4326")
 
-            empty_nodes.to_file(output_path, layer='nodes', driver='GPKG')
+            empty_nodes.to_file(output_path, layer='nodes', driver='GPKG', engine='fiona')
+            # Use pyogrio for append mode (fiona doesn't support GPKG append well)
             empty_edges.to_file(output_path, layer='edges', driver='GPKG', mode='a')
 
             save_performance.end_timer("save_graph_total")
             save_performance.log_summary("Graph Save Operation (Empty)")
             return
 
-        # Nodes
+        # Nodes - Build node ID mapping
         save_performance.start_timer("nodes_processing_time")
+        node_to_id = {node: i for i, node in enumerate(graph.nodes())}
         nodes_data = []
-        for i, node in enumerate(graph.nodes()):
-            nodes_data.append({'id': i, 'node_str': str(node), 'geometry': Point(node)})
+        for node, node_id in node_to_id.items():
+            x, y = node
+            nodes_data.append({
+                'id': node_id,
+                'node_str': str(node),
+                'x': x,
+                'y': y,
+                'geometry': Point(node)
+            })
         nodes_gdf = gpd.GeoDataFrame(nodes_data, geometry='geometry', crs="EPSG:4326")
         nodes_processing_time = save_performance.end_timer("nodes_processing_time")
 
         save_performance.start_timer("nodes_save_time")
-        nodes_gdf.to_file(output_path, layer='nodes', driver='GPKG')
+        nodes_gdf.to_file(output_path, layer='nodes', driver='GPKG', engine='fiona')
         nodes_save_time = save_performance.end_timer("nodes_save_time")
         logger.info(f"Saved {len(nodes_gdf):,} nodes to {output_path} in {nodes_save_time:.3f}s")
 
-        # Edges
+        # Edges - Include all coordinate and ID columns
         save_performance.start_timer("edges_processing_time")
         edges_data = []
         for u, v, data in graph.edges(data=True):
+            source_x, source_y = u
+            target_x, target_y = v
             edges_data.append({
+                'source_id': node_to_id[u],
+                'target_id': node_to_id[v],
                 'source': str(u),
                 'target': str(v),
+                'source_x': source_x,
+                'source_y': source_y,
+                'target_x': target_x,
+                'target_y': target_y,
                 'weight': data.get('weight', 0.0),
                 'geometry': LineString([u, v])
             })
@@ -1126,12 +1403,78 @@ class BaseGraph:
         edges_processing_time = save_performance.end_timer("edges_processing_time")
 
         save_performance.start_timer("edges_save_time")
+        # Use pyogrio for append mode (fiona doesn't support GPKG append well)
         edges_gdf.to_file(output_path, layer='edges', driver='GPKG', mode='a')
         edges_save_time = save_performance.end_timer("edges_save_time")
         logger.info(f"Saved {len(edges_gdf):,} edges to {output_path} in {edges_save_time:.3f}s")
 
         total_save_time = save_performance.end_timer("save_graph_total")
         save_performance.log_summary("Graph Save Operation")
+
+    def save_grid_to_gpkg(self, geometry: BaseGeometry, layer_name: str, output_path: str):
+        """
+        Saves a grid geometry to an existing GeoPackage file as a new layer.
+
+        This function is used to persist grid geometries (navigable_area, land_area, etc.)
+        created by create_fine_grid() to enable apply_static_weights_gpkg() optimization.
+
+        Args:
+            geometry (BaseGeometry): Shapely geometry to save (Polygon or MultiPolygon)
+            layer_name (str): Name of the layer to create (e.g., 'navigable_area', 'land_area')
+            output_path (str): Path to the GeoPackage file (must already exist with edges/nodes)
+
+        Raises:
+            FileNotFoundError: If output_path doesn't exist
+            ValueError: If geometry is None or empty
+
+        Example:
+            # After creating fine grid
+            grid_result = fine_graph.create_fine_grid(
+                route_buffer=buffer,
+                enc_names=enc_names,
+                return_geometries=True
+            )
+
+            # Save navigable water areas for LNDARE optimization
+            fine_graph.save_grid_to_gpkg(
+                geometry=grid_result['main_grid_geom'],
+                layer_name='navigable_area',
+                output_path=output_dir / 'fine_graph_01.gpkg'
+            )
+
+            # Optionally save land areas for debugging
+            if grid_result['subtract_grid_geom'] is not None:
+                fine_graph.save_grid_to_gpkg(
+                    geometry=grid_result['subtract_grid_geom'],
+                    layer_name='land_area',
+                    output_path=output_dir / 'fine_graph_01.gpkg'
+                )
+        """
+        from pathlib import Path
+
+        output_file = Path(output_path)
+
+        if not output_file.exists():
+            raise FileNotFoundError(f"GeoPackage file not found: {output_path}")
+
+        if geometry is None or geometry.is_empty:
+            logger.warning(f"Skipping save_grid_to_gpkg for layer '{layer_name}': geometry is empty")
+            return
+
+        logger.info(f"Saving grid geometry to layer '{layer_name}' in {output_path}")
+
+        # Create GeoDataFrame with the geometry
+        grid_gdf = gpd.GeoDataFrame({
+            'id': [1],
+            'grid_type': [layer_name],
+            'created_at': [pd.Timestamp.now().isoformat()],
+            'geometry': [geometry]
+        }, geometry='geometry', crs="EPSG:4326")
+
+        # Append to existing GeoPackage (use pyogrio for append mode)
+        grid_gdf.to_file(output_path, layer=layer_name, driver='GPKG', mode='a')
+
+        logger.info(f"Successfully saved grid geometry to layer '{layer_name}'")
 
     def export_postgis_to_gpkg(self, graph_name: str, output_path: str,
                                 schema_name: str = 'graph') -> Dict[str, int]:
@@ -1282,32 +1625,70 @@ class BaseGraph:
                 logger.info(f"Removed partial output file due to error")
             raise
 
-    def load_graph_from_gpkg(self, gpkg_path: str) -> nx.Graph:
+    @staticmethod
+    def _parse_numpy_tuple(tuple_str: str) -> tuple:
+        """
+        Parse a tuple string that contains numpy types like np.float64().
+
+        Handles strings like: "(np.float64(-122.878), np.float64(37.001))"
+
+        Args:
+            tuple_str: String representation of a tuple with numpy types
+
+        Returns:
+            tuple: Parsed tuple with plain Python float values
+        """
+        import re
+
+        # Remove outer parentheses and split by comma
+        inner = tuple_str.strip()[1:-1]  # Remove '(' and ')'
+
+        # Pattern to match np.float64(value) or np.int64(value)
+        pattern = r'np\.\w+\(([-\d.e+]+)\)'
+
+        # Extract all numeric values
+        values = []
+        for match in re.finditer(pattern, inner):
+            values.append(float(match.group(1)))
+
+        return tuple(values)
+
+    def load_graph_from_gpkg(self, gpkg_path: str, directed: bool = True) -> nx.Graph:
         """
         Loads a graph from a GeoPackage file.
 
         Args:
             gpkg_path (str): Path to the GeoPackage file.
+            directed (bool): If True, creates directed graph (nx.DiGraph).
+                           If False, creates undirected graph (nx.Graph).
+                           Default: True.
 
         Returns:
-            nx.Graph: The loaded graph.
+            nx.Graph: The loaded graph (nx.DiGraph if directed=True, nx.Graph if directed=False).
         """
         load_performance = PerformanceMetrics()
         load_performance.start_timer("load_graph_total")
         load_performance.record_metric("input_path", gpkg_path)
 
-        G = nx.Graph()
+        G = nx.DiGraph() if directed else nx.Graph()
+        logger.info(f"Loading {'directed' if directed else 'undirected'} graph from {gpkg_path}")
 
         # Load nodes
         load_performance.start_timer("nodes_load_time")
-        nodes_gdf = gpd.read_file(gpkg_path, layer='nodes')
+        nodes_gdf = gpd.read_file(gpkg_path, layer='nodes', engine='fiona')
         nodes_load_time = load_performance.end_timer("nodes_load_time")
 
         load_performance.record_metric("nodes_loaded", len(nodes_gdf))
 
         load_performance.start_timer("nodes_processing_time")
         for _, row in nodes_gdf.iterrows():
-            node_key = ast.literal_eval(row['node_str'])
+            # Handle both regular tuples and numpy-typed tuples
+            node_str = row['node_str']
+            try:
+                node_key = ast.literal_eval(node_str)
+            except (ValueError, SyntaxError):
+                # If literal_eval fails (e.g., due to np.float64), parse manually
+                node_key = self._parse_numpy_tuple(node_str)
             G.add_node(node_key, point=row['geometry'])
         nodes_processing_time = load_performance.end_timer("nodes_processing_time")
 
@@ -1315,16 +1696,34 @@ class BaseGraph:
 
         # Load edges
         load_performance.start_timer("edges_load_time")
-        edges_gdf = gpd.read_file(gpkg_path, layer='edges')
+        edges_gdf = gpd.read_file(gpkg_path, layer='edges', engine='fiona')
         edges_load_time = load_performance.end_timer("edges_load_time")
 
         load_performance.record_metric("edges_loaded", len(edges_gdf))
 
         load_performance.start_timer("edges_processing_time")
         for _, row in edges_gdf.iterrows():
-            source = ast.literal_eval(row['source'])
-            target = ast.literal_eval(row['target'])
-            G.add_edge(source, target, weight=row['weight'], geom=row['geometry'].__geo_interface__)
+            # Handle both regular tuples and numpy-typed tuples
+            try:
+                source = ast.literal_eval(row['source'])
+            except (ValueError, SyntaxError):
+                source = self._parse_numpy_tuple(row['source'])
+
+            try:
+                target = ast.literal_eval(row['target'])
+            except (ValueError, SyntaxError):
+                target = self._parse_numpy_tuple(row['target'])
+
+            # Build edge attributes dictionary, including all columns from the GPKG
+            edge_attrs = {}
+            for col in edges_gdf.columns:
+                if col not in ['source', 'target', 'geometry', 'fid']:
+                    edge_attrs[col] = row[col]
+
+            # Always include geometry
+            edge_attrs['geom'] = row['geometry'].__geo_interface__
+
+            G.add_edge(source, target, **edge_attrs)
         edges_processing_time = load_performance.end_timer("edges_processing_time")
 
         logger.info(f"Loaded and processed {len(edges_gdf):,} edges in {edges_load_time + edges_processing_time:.3f}s")
@@ -1397,139 +1796,95 @@ class BaseGraph:
         logger.info(f"Target: {target_path}")
 
         try:
-            # Step 1: Create target file as copy of source structure
-            perf.start_timer("copy_structure_time")
+            # Use GeoPandas approach instead of raw SQL to avoid SpatiaLite dependency
+            # This is slower but more reliable across different environments
+
+            # Step 1: Copy source file to target
+            perf.start_timer("copy_file_time")
             shutil.copy2(source_path, target_path)
-            copy_time = perf.end_timer("copy_structure_time")
-            logger.info(f"Copied file structure in {copy_time:.3f}s")
+            copy_time = perf.end_timer("copy_file_time")
+            logger.info(f"Copied file in {copy_time:.3f}s")
 
-            # Step 2: Connect to target file and modify edges
-            perf.start_timer("database_operations_time")
-            conn = sqlite3.connect(target_path)
-            conn.enable_load_extension(True)
-
-            # Load SpatiaLite extension
-            try:
-                conn.load_extension("mod_spatialite")
-            except sqlite3.OperationalError:
-                # Try alternative name
-                try:
-                    conn.load_extension("libspatialite")
-                except sqlite3.OperationalError:
-                    logger.warning("Could not load SpatiaLite extension, continuing without spatial functions")
-
-            cursor = conn.cursor()
-
-            # Get original edge count
-            cursor.execute("SELECT COUNT(*) FROM edges")
-            original_count = cursor.fetchone()[0]
-
+            # Step 2: Read edges from target file
+            perf.start_timer("read_edges_time")
+            import geopandas as gpd
+            edges_gdf = gpd.read_file(target_path, layer='edges', engine='fiona')
+            original_count = len(edges_gdf)
             logger.info(f"Original edges: {original_count:,}")
+            read_time = perf.end_timer("read_edges_time")
+            logger.info(f"Read edges in {read_time:.3f}s")
 
-            # Get node count
+            # Step 3: Create reverse edges by swapping source/target and coordinates
+            perf.start_timer("create_reverse_edges_time")
+            reverse_edges = edges_gdf.copy()
+
+            # Swap source/target columns (both string and ID versions if they exist)
+            if 'source' in reverse_edges.columns and 'target' in reverse_edges.columns:
+                reverse_edges['source'], reverse_edges['target'] = edges_gdf['target'].copy(), edges_gdf['source'].copy()
+
+            if 'source_id' in reverse_edges.columns and 'target_id' in reverse_edges.columns:
+                reverse_edges['source_id'], reverse_edges['target_id'] = edges_gdf['target_id'].copy(), edges_gdf['source_id'].copy()
+
+            # Swap coordinate columns if they exist
+            if 'source_x' in reverse_edges.columns and 'target_x' in reverse_edges.columns:
+                reverse_edges['source_x'], reverse_edges['target_x'] = edges_gdf['target_x'].copy(), edges_gdf['source_x'].copy()
+
+            if 'source_y' in reverse_edges.columns and 'target_y' in reverse_edges.columns:
+                reverse_edges['source_y'], reverse_edges['target_y'] = edges_gdf['target_y'].copy(), edges_gdf['source_y'].copy()
+
+            # Note: We keep the same geometry direction (not reversed)
+            # This is fine because routing only uses source/target node IDs
+
+            reverse_count = len(reverse_edges)
+            reverse_time = perf.end_timer("create_reverse_edges_time")
+            logger.info(f"Created {reverse_count:,} reverse edges in {reverse_time:.3f}s")
+
+            # Step 4: Append reverse edges to the file
+            perf.start_timer("write_reverse_edges_time")
+            # Use pyogrio for append mode (fiona doesn't support GPKG append well)
+            reverse_edges.to_file(target_path, layer='edges', driver='GPKG', mode='a')
+            write_time = perf.end_timer("write_reverse_edges_time")
+            logger.info(f"Wrote reverse edges in {write_time:.3f}s")
+
+            # Step 5: Verify final count and get nodes
+            perf.start_timer("verify_time")
+            import sqlite3
+            conn = sqlite3.connect(target_path)
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM edges")
+            final_count = cursor.fetchone()[0]
             cursor.execute("SELECT COUNT(*) FROM nodes")
             nodes_count = cursor.fetchone()[0]
-
-            logger.info(f"Nodes: {nodes_count:,}")
-
-            # Step 3: Create reverse edges by swapping source/target
-            perf.start_timer("insert_reverse_edges_time")
-
-            # Check if we have source_x, source_y columns (full schema)
-            cursor.execute("PRAGMA table_info(edges)")
-            columns = [row[1] for row in cursor.fetchall()]
-            has_coord_columns = 'source_x' in columns and 'source_y' in columns
-
-            if has_coord_columns:
-                # Full schema with coordinate columns
-                insert_reverse_sql = """
-                    INSERT INTO edges (source, target, weight, geometry)
-                    SELECT
-                        target as source,
-                        source as target,
-                        weight,
-                        ST_Reverse(geometry) as geometry
-                    FROM edges
-                    WHERE fid <= ?
-                """
-            else:
-                # Simplified schema
-                insert_reverse_sql = """
-                    INSERT INTO edges (source, target, weight, geometry)
-                    SELECT
-                        target as source,
-                        source as target,
-                        weight,
-                        ST_Reverse(geometry) as geometry
-                    FROM edges
-                    WHERE fid <= ?
-                """
-
-            cursor.execute(insert_reverse_sql, (original_count,))
-            reverse_count = cursor.rowcount
-
-            reverse_time = perf.end_timer("insert_reverse_edges_time")
-            logger.info(f"Inserted {reverse_count:,} reverse edges in {reverse_time:.3f}s")
-
-            # Step 4: Update spatial index
-            perf.start_timer("update_spatial_index_time")
-
-            # Drop old spatial index
-            try:
-                cursor.execute("SELECT DisableSpatialIndex('edges', 'geometry')")
-                cursor.execute("SELECT DiscardGeometryColumn('edges', 'geometry')")
-            except:
-                pass  # Index might not exist
-
-            # Recreate spatial index
-            try:
-                cursor.execute("SELECT RecoverGeometryColumn('edges', 'geometry', 4326, 'LINESTRING', 'XY')")
-                cursor.execute("SELECT CreateSpatialIndex('edges', 'geometry')")
-            except Exception as e:
-                logger.warning(f"Could not create spatial index: {e}")
-
-            index_time = perf.end_timer("update_spatial_index_time")
-            logger.info(f"Updated spatial index in {index_time:.3f}s")
-
-            # Commit and close
-            conn.commit()
             conn.close()
+            verify_time = perf.end_timer("verify_time")
+            logger.info(f"Final edge count: {final_count:,} (verified in {verify_time:.3f}s)")
 
-            db_time = perf.end_timer("database_operations_time")
+            total_time = perf.end_timer("convert_to_directed_gpkg_total")
+
+            # Prepare summary
+            summary = {
+                'original_edges': original_count,
+                'directed_edges': final_count,
+                'nodes_copied': nodes_count,
+                'conversion_time_seconds': total_time
+            }
+
+            logger.info(f"=== Conversion Complete ===")
+            logger.info(f"Nodes: {nodes_count:,}")
+            logger.info(f"Undirected edges: {original_count:,}")
+            logger.info(f"Directed edges: {final_count:,}")
+            logger.info(f"Total time: {total_time:.3f}s")
+            logger.info(f"Edge creation rate: {final_count / total_time:,.0f} edges/sec")
+
+            perf.log_summary("File-based Directed Graph Conversion")
+
+            return summary
 
         except Exception as e:
             logger.error(f"Failed to convert file-based graph to directed: {e}")
             if target_file.exists():
                 target_file.unlink()  # Clean up failed conversion
             raise
-
-        total_time = perf.end_timer("convert_to_directed_gpkg_total")
-
-        # Get final edge count
-        final_conn = sqlite3.connect(target_path)
-        final_cursor = final_conn.cursor()
-        final_cursor.execute("SELECT COUNT(*) FROM edges")
-        final_edges = final_cursor.fetchone()[0]
-        final_conn.close()
-
-        # Prepare summary
-        summary = {
-            'original_edges': original_count,
-            'directed_edges': final_edges,
-            'nodes_copied': nodes_count,
-            'conversion_time_seconds': total_time
-        }
-
-        logger.info(f"=== Conversion Complete ===")
-        logger.info(f"Nodes: {nodes_count:,}")
-        logger.info(f"Undirected edges: {original_count:,}")
-        logger.info(f"Directed edges: {final_edges:,}")
-        logger.info(f"Total time: {total_time:.3f}s")
-        logger.info(f"Edge creation rate: {final_edges / total_time:,.0f} edges/sec")
-
-        perf.log_summary("File-based Directed Graph Conversion")
-
-        return summary
 
     def save_graph_to_postgis(self, graph: nx.Graph, table_prefix: str = "graph",
                               drop_existing: bool = False):
@@ -1728,15 +2083,18 @@ class BaseGraph:
             logger.error(f"Error saving graph to PostGIS: {e}")
             raise
 
-    def load_graph_from_postgis(self, table_prefix: str = "graph") -> nx.Graph:
+    def load_graph_from_postgis(self, table_prefix: str = "graph", directed: bool = True) -> nx.Graph:
         """
         Loads a graph from PostGIS database tables.
 
         Args:
             table_prefix (str): Prefix for table names (loads from {prefix}_nodes and {prefix}_edges).
+            directed (bool): If True, creates directed graph (nx.DiGraph).
+                           If False, creates undirected graph (nx.Graph).
+                           Default: True.
 
         Returns:
-            nx.Graph: The loaded graph.
+            nx.Graph: The loaded graph (nx.DiGraph if directed=True, nx.Graph if directed=False).
         """
         load_performance = PerformanceMetrics()
         load_performance.start_timer("load_graph_postgis_total")
@@ -1750,13 +2108,13 @@ class BaseGraph:
         nodes_table = f"{table_prefix}_nodes"
         edges_table = f"{table_prefix}_edges"
 
-        logger.info(f"Loading graph from PostGIS schema '{self.graph_schema}' tables: {nodes_table}, {edges_table}")
+        logger.info(f"Loading {'directed' if directed else 'undirected'} graph from PostGIS schema '{self.graph_schema}' tables: {nodes_table}, {edges_table}")
 
         try:
 
             engine = self.factory.manager.engine
 
-            G = nx.Graph()
+            G = nx.DiGraph() if directed else nx.Graph()
 
             # Load nodes
             load_performance.start_timer("nodes_load_time")
@@ -1768,7 +2126,11 @@ class BaseGraph:
 
             load_performance.start_timer("nodes_processing_time")
             for _, row in nodes_gdf.sort_values(by='id').iterrows():
-                node_key = ast.literal_eval(row['node_str'])
+                # Handle both regular tuples and numpy-typed tuples
+                try:
+                    node_key = ast.literal_eval(row['node_str'])
+                except (ValueError, SyntaxError):
+                    node_key = self._parse_numpy_tuple(row['node_str'])
                 G.add_node(node_key, point=row['geometry'], x=row['x'], y=row['y'])
             nodes_processing_time = load_performance.end_timer("nodes_processing_time")
 
@@ -1787,8 +2149,16 @@ class BaseGraph:
             skip_columns = {'id', 'source_str', 'target_str', 'geometry'}
 
             for _, row in edges_gdf.iterrows():
-                source = ast.literal_eval(row['source_str'])
-                target = ast.literal_eval(row['target_str'])
+                # Handle both regular tuples and numpy-typed tuples
+                try:
+                    source = ast.literal_eval(row['source_str'])
+                except (ValueError, SyntaxError):
+                    source = self._parse_numpy_tuple(row['source_str'])
+
+                try:
+                    target = ast.literal_eval(row['target_str'])
+                except (ValueError, SyntaxError):
+                    target = self._parse_numpy_tuple(row['target_str'])
 
                 # Build edge attributes dictionary from ALL columns
                 edge_attrs = {}
@@ -1854,8 +2224,10 @@ class BaseGraph:
 
         # Validate table names to prevent SQL injection
         validated_prefix = self._validate_identifier(table_prefix, "table prefix")
-        nodes_table = f"{validated_prefix}_nodes"
-        edges_table = f"{validated_prefix}_edges"
+        # Convert to lowercase to avoid PostgreSQL auto-lowercasing issues with uppercase identifiers
+        validated_prefix_lower = validated_prefix.lower()
+        nodes_table = f"{validated_prefix_lower}_nodes"
+        edges_table = f"{validated_prefix_lower}_edges"
 
         # Build qualified names once for reuse
         nodes_qualified = self._build_qualified_name(self.graph_schema, nodes_table)
@@ -1953,13 +2325,14 @@ class BaseGraph:
                 save_performance.log_summary("PostGIS Optimized Save Operation (Empty)")
                 return
 
-            # Prepare nodes data
+            # Prepare nodes data with ID mapping
             save_performance.start_timer("nodes_processing_time")
+            node_to_id = {node: i for i, node in enumerate(graph.nodes())}
             nodes_data = []
-            for i, node in enumerate(graph.nodes()):
+            for node, node_id in node_to_id.items():
                 x, y = node
                 nodes_data.append({
-                    'id': i,
+                    'id': node_id,
                     'node_str': str(node),
                     'x': x,
                     'y': y,
@@ -1981,11 +2354,14 @@ class BaseGraph:
             nodes_save_time = save_performance.end_timer("nodes_save_time")
             logger.info(f"Saved {len(nodes_data):,} nodes to PostGIS in {nodes_save_time:.3f}s")
 
-            # Prepare edges data - include ALL edge attributes
+            # Prepare edges data - include ALL edge attributes including IDs
             save_performance.start_timer("edges_processing_time")
             edges_data = []
-            for u, v, data in graph.edges(data=True):
+            for edge_id, (u, v, data) in enumerate(graph.edges(data=True)):
                 edge_dict = {
+                    'id': edge_id,  # Add sequential ID column for convert_to_directed_postgis compatibility
+                    'source_id': node_to_id[u],
+                    'target_id': node_to_id[v],
                     'source_str': str(u),
                     'target_str': str(v),
                     'source_x': u[0],
@@ -2029,15 +2405,19 @@ class BaseGraph:
             with engine.connect() as conn:
                 # Validate index names
                 nodes_geom_idx = self._validate_identifier(f"{nodes_table}_geom_idx", "index name")
-                edges_geom_idx = self._validate_identifier(f"{edges_table}_geom_idx", "index name")
+                nodes_id_idx = self._validate_identifier(f"{nodes_table}_id_idx", "index name")
                 nodes_str_idx = self._validate_identifier(f"{nodes_table}_node_str_idx", "index name")
-                edges_src_tgt_idx = self._validate_identifier(f"{edges_table}_source_target_idx", "index name")
+                edges_geom_idx = self._validate_identifier(f"{edges_table}_geom_idx", "index name")
+                edges_src_tgt_str_idx = self._validate_identifier(f"{edges_table}_source_target_str_idx", "index name")
+                edges_src_tgt_id_idx = self._validate_identifier(f"{edges_table}_source_target_id_idx", "index name")
 
                 # Create spatial and lookup indexes
                 conn.execute(text(f'CREATE INDEX IF NOT EXISTS "{nodes_geom_idx}" ON {nodes_qualified} USING GIST (geometry)'))
-                conn.execute(text(f'CREATE INDEX IF NOT EXISTS "{edges_geom_idx}" ON {edges_qualified} USING GIST (geometry)'))
+                conn.execute(text(f'CREATE INDEX IF NOT EXISTS "{nodes_id_idx}" ON {nodes_qualified} (id)'))
                 conn.execute(text(f'CREATE INDEX IF NOT EXISTS "{nodes_str_idx}" ON {nodes_qualified} (node_str)'))
-                conn.execute(text(f'CREATE INDEX IF NOT EXISTS "{edges_src_tgt_idx}" ON {edges_qualified} (source_str, target_str)'))
+                conn.execute(text(f'CREATE INDEX IF NOT EXISTS "{edges_geom_idx}" ON {edges_qualified} USING GIST (geometry)'))
+                conn.execute(text(f'CREATE INDEX IF NOT EXISTS "{edges_src_tgt_str_idx}" ON {edges_qualified} (source_str, target_str)'))
+                conn.execute(text(f'CREATE INDEX IF NOT EXISTS "{edges_src_tgt_id_idx}" ON {edges_qualified} (source_id, target_id)'))
                 conn.commit()
             index_time = save_performance.end_timer("index_creation_time")
             logger.info(f"Created indexes in {index_time:.3f}s")
@@ -2075,10 +2455,19 @@ class BaseGraph:
 
         Workflow:
             1. Create new directed edges table with same structure as source
-            2. Copy all original edges (A → B) with forward direction
+            2. Copy all original edges (A → B) with forward direction (preserves original IDs)
             3. Create reverse edges (B → A) by swapping source/target columns
-            4. Create spatial and attribute indexes
-            5. Copy nodes table unchanged (nodes are direction-agnostic)
+            4. Assign reverse edge IDs: reverse_id = max_forward_id + forward_edge_id
+            5. Create spatial and attribute indexes
+            6. Copy nodes table unchanged (nodes are direction-agnostic)
+
+        ID Assignment Strategy:
+            - Forward edges: Keep original IDs from source (1 to N)
+            - Reverse edges: max(forward_id) + forward_edge_id
+            - Example: If forward edge has id=100, reverse edge has id=max_id+100
+            - This allows easy lookup of opposite edge:
+              * If id <= max_forward_id: opposite = max_forward_id + id
+              * If id > max_forward_id: opposite = id - max_forward_id
 
         Args:
             source_table_prefix (str): Source table prefix (e.g., 'graph_base')
@@ -2105,6 +2494,8 @@ class BaseGraph:
                 target_table_prefix='graph_directed'
             )
             print(f"Converted {stats['original_edges']:,} → {stats['directed_edges']:,} edges")
+            print(f"Forward edge IDs: 1 to {stats['original_edges']}")
+            print(f"Reverse edge IDs: {stats['original_edges']+1} to {stats['directed_edges']}")
         """
         perf = PerformanceMetrics()
         perf.start_timer("convert_to_directed_total")
@@ -2194,6 +2585,11 @@ class BaseGraph:
                 # Step 4: Insert reverse edges (B → A) by swapping columns
                 perf.start_timer("insert_reverse_edges_time")
 
+                # Get max ID from forward edges to calculate reverse edge IDs
+                max_id_sql = text(f"SELECT COALESCE(MAX(id), 0) FROM {target_edges_qualified}")
+                max_id = conn.execute(max_id_sql).scalar()
+                logger.info(f"Max forward edge ID: {max_id:,}")
+
                 # Detect if we have the full column set or simplified schema
                 check_columns_sql = text(f"""
                     SELECT column_name
@@ -2212,11 +2608,13 @@ class BaseGraph:
 
                 if has_coord_columns:
                     # Full schema with coordinate columns
+                    # Reverse edge ID = max_forward_id + forward_edge_id
                     insert_reverse_sql = text(f"""
                         INSERT INTO {target_edges_qualified}
-                            (source_str, target_str, source_x, source_y,
+                            (id, source_str, target_str, source_x, source_y,
                              target_x, target_y, weight, geometry)
                         SELECT
+                            {max_id} + id as id,
                             target_str as source_str,
                             source_str as target_str,
                             target_x as source_x,
@@ -2231,8 +2629,9 @@ class BaseGraph:
                     # Simplified schema without coordinate columns
                     insert_reverse_sql = text(f"""
                         INSERT INTO {target_edges_qualified}
-                            (source_str, target_str, weight, geometry)
+                            (id, source_str, target_str, weight, geometry)
                         SELECT
+                            {max_id} + id as id,
                             target_str as source_str,
                             source_str as target_str,
                             weight,
@@ -2245,6 +2644,7 @@ class BaseGraph:
 
                 reverse_time = perf.end_timer("insert_reverse_edges_time")
                 logger.info(f"Inserted {reverse_count:,} reverse edges in {reverse_time:.3f}s")
+                logger.info(f"Reverse edge IDs: {max_id + 1:,} to {max_id + reverse_count:,}")
 
                 # Step 5: Create indexes for performance
                 perf.start_timer("create_indexes_time")
@@ -2470,7 +2870,8 @@ class FineGraph(BaseGraph):
 
     def create_fine_grid(self, route_buffer: Polygon, enc_names: List[str],
                          navigable_layers: List[Dict] = None,
-                         obstacle_layers: List[Dict] = None) -> Dict[str, str]:
+                         obstacle_layers: List[Dict] = None,
+                         return_geometries: bool = True) -> Dict[str, str]:
         """
         Creates a fine-resolution maritime grid using progressive iterative processing.
 
@@ -2501,17 +2902,45 @@ class FineGraph(BaseGraph):
             obstacle_layers (List[Dict], optional): Obstacle layers to subtract.
                 Each dict must contain 'layer' and 'bands' keys (resolution ignored).
                 Excludes 'lndare' which is processed per-band with seaare.
+            return_geometries (bool, optional): If True, returns Shapely geometries in addition
+                to GeoJSON strings. Useful for saving grids to GeoPackage with save_grid_to_gpkg().
+                Default: False.
 
         Returns:
-            Dict[str, str]: Grid components as GeoJSON strings:
-                - 'combined_grid': Final navigable area
-                - 'main_grid': Sea areas refined by land subtraction
-                - 'extra_grid': Additional navigational layers (if provided)
-                - 'subtract_grid': Obstacle areas (if provided)
-                All values are GeoJSON strings or None for empty/missing components.
+            Dict[str, Any]: Grid components. Content depends on return_geometries parameter:
+
+            If return_geometries=False (default):
+                - 'combined_grid': Final navigable area (GeoJSON string)
+                - 'main_grid': Sea areas refined by land subtraction (GeoJSON string)
+                - 'extra_grid': Additional navigational layers (GeoJSON string or None)
+                - 'subtract_grid': Obstacle areas (GeoJSON string or None)
+
+            If return_geometries=True:
+                Same as above, plus:
+                - 'combined_grid_geom': Final navigable area (Shapely geometry)
+                - 'main_grid_geom': Navigable water areas (Shapely geometry)
+                - 'extra_grid_geom': Additional layers (Shapely geometry or None)
+                - 'subtract_grid_geom': Obstacle areas (Shapely geometry or None)
+
+            Use with save_grid_to_gpkg() to persist grids for apply_static_weights_gpkg() optimization.
 
         Raises:
             Exception: If ENC data factory operations fail or geometric operations error.
+
+        Example:
+            # Create grid and save to GeoPackage
+            grid_result = base_graph.create_fine_grid(
+                route_buffer=buffer,
+                enc_names=enc_names,
+                return_geometries=True
+            )
+
+            # Save navigable water grid for LNDARE optimization
+            base_graph.save_grid_to_gpkg(
+                geometry=grid_result['main_grid_geom'],
+                layer_name='navigable_area',
+                output_path='fine_graph_01.gpkg'
+            )
         """
         self.performance.start_timer("create_fine_grid_total")
 
@@ -2523,6 +2952,7 @@ class FineGraph(BaseGraph):
         main_grid_geom = Polygon()
         extra_grid_geom = None
         subtract_grid_geom = None
+        lndare_geom = Polygon()
 
         logger.info(f"Starting iterative grid creation for {len(usage_bands)} usage bands")
 
@@ -2559,9 +2989,17 @@ class FineGraph(BaseGraph):
             lndare_gdf = self.factory.get_layer('lndare', filter_by_enc=band_encs)
             if not lndare_gdf.empty:
                 lndare_intersected = lndare_gdf.geometry.intersection(route_buffer)
-                lndare_geom = lndare_intersected[~lndare_intersected.is_empty].unary_union
-                if not lndare_geom.is_empty:
-                    main_grid_geom = main_grid_geom.difference(lndare_geom)
+
+                # Filter for polygonal types to avoid GeometryCollection
+                polygonal_geoms = lndare_intersected[
+                    lndare_intersected.geom_type.isin(['Polygon', 'MultiPolygon']) &
+                    (~lndare_intersected.is_empty)
+                ]
+
+                if not polygonal_geoms.empty:
+                    band_lndare_geom = polygonal_geoms.unary_union
+                    lndare_geom = lndare_geom.union(band_lndare_geom)
+                    main_grid_geom = main_grid_geom.difference(band_lndare_geom)
                     logger.debug(f"Subtracted land areas from main grid for band {band}")
 
             self.performance.end_timer(f"usage_band_{band}_processing")
@@ -2645,15 +3083,32 @@ class FineGraph(BaseGraph):
         if subtract_grid_geom is not None:
             combined_grid_geom = combined_grid_geom.difference(subtract_grid_geom)
 
+        # --- Refine land geometry ---
+        # By subtracting the final navigable water grid from the initial land geometry,
+        # we create a more precise land mask that accounts for navigable features
+        # which may have overlapped with raw land data (e.g., dredged channels).
+        logger.info("Refining land geometry by subtracting final navigable grid...")
+        land_fine_geom = lndare_geom.difference(combined_grid_geom)
+        logger.info("Land geometry refinement complete.")
+
         self.performance.end_timer("create_fine_grid_total")
 
         # Convert components to GeoJSON format
         result = {
             "combined_grid": GraphUtils.to_geojson_feature(combined_grid_geom),
             "main_grid": GraphUtils.to_geojson_feature(main_grid_geom),
+            "land_grid": GraphUtils.to_geojson_feature(land_fine_geom),
             "extra_grid": GraphUtils.to_geojson_feature(extra_grid_geom),
             "subtract_grid": GraphUtils.to_geojson_feature(subtract_grid_geom)
         }
+
+        # Optionally include Shapely geometries for saving to GeoPackage
+        if return_geometries:
+            result["combined_grid_geom"] = combined_grid_geom
+            result["main_grid_geom"] = main_grid_geom
+            result["land_grid_geom"] = land_fine_geom
+            result["extra_grid_geom"] = extra_grid_geom
+            result["subtract_grid_geom"] = subtract_grid_geom
 
         # Log completion status
         if combined_grid_geom.is_empty:
@@ -2699,14 +3154,16 @@ class H3Graph(BaseGraph):
     Extends BaseGraph to create graphs using the H3 spatial index.
     """
 
-    def __init__(self, data_factory: ENCDataFactory, route_schema_name: str, graph_schema_name: str = 'public'):
+    def __init__(self, data_factory: ENCDataFactory, route_schema_name: str = None, graph_schema_name: str = 'public'):
         """
         Initializes the H3Graph.
 
         Args:
             data_factory (ENCDataFactory): An initialized factory for accessing ENC data.
-            route_schema_name (str): Schema for route-specific data.
-            graph_schema_name (str): Schema for graph data.
+            route_schema_name (str, optional): Schema for route-specific data (PostGIS only).
+                                              Defaults to None for file-based workflows.
+            graph_schema_name (str, optional): Schema for graph data (PostGIS only).
+                                              Defaults to 'public' for PostGIS, ignored for file-based workflows.
         """
         super().__init__(data_factory, graph_schema_name)
         self.route_schema = route_schema_name
@@ -3469,7 +3926,7 @@ class Weights:
            - Combines with static weights: blocking = max(static, dynamic)
         5. **Calculate directional weights** using calculate_directional_weights() (OPTIONAL)
            - Traffic flow alignment (edge direction vs feature orientation)
-           - Creates dir_forward, dir_diff, wt_dir, ft_orient_rev columns
+           - Creates dir_edge_fwd, dir_diff, wt_dir, ft_orient_rev columns
            - Applies rewards/penalties based on alignment with intended traffic flow
         6. Use get_edge_columns() or print_column_summary() to inspect results
 
@@ -3519,7 +3976,7 @@ class Weights:
         # Shows: wt_static_blocking, wt_static_penalty, wt_static_bonus
         #        wt_dynamic_blocking, wt_dynamic_penalty, wt_dynamic_bonus
         #        blocking_factor, penalty_factor, bonus_factor, adjusted_weight
-        #        dir_forward, dir_diff, wt_dir (directional weights)
+        #        dir_edge_fwd, dir_diff, wt_dir (directional weights)
     """
 
     # Class constants for weight thresholds
@@ -4048,37 +4505,97 @@ class Weights:
         finally:
             conn.close()
 
-    def enrich_edges_with_features(self, graph: nx.Graph, enc_names: List[str],
+    def enrich_edges_with_features(self,
+                                    graph: nx.Graph = None,
+                                    gpkg_path: str = None,
+                                    enc_names: List[str] = None,
                                     route_buffer: Polygon = None,
-                                    feature_layers: List[str] = None) -> nx.Graph:
+                                    feature_layers: List[str] = None,
+                                    is_directed: bool = False,
+                                    include_sources: bool = False,
+                                    soundg_buffer_meters: float = 30.0,
+                                    inplace: bool = False) -> Union[nx.Graph, Dict[str, Any]]:
         """
         Enrich graph edges with S-57 feature data stored as ft_* columns.
+
+        **Dual Input Mode:**
+        - **Mode 1 (Graph)**: Process in-memory NetworkX graph → return updated nx.Graph
+        - **Mode 2 (File)**: Load from GeoPackage, enrich, save back → return summary dict
 
         This method performs spatial intersection between graph edges and S-57 layers,
         extracting relevant attributes (depth, clearance, soundings, etc.) and storing
         them as feature columns on edges for subsequent dynamic weight calculations.
 
+        **Implementation:** Pure GeoPandas/Shapely operations - no SQL, no SpatiaLite, no PostGIS
+
+        Features usage band prioritization (same as PostGIS version):
+        - Extracts usage band from ENC names (e.g., US5CA52M → band 5)
+        - Prioritizes: 6 (Berthing) > 5 (Harbour) > 4 (Approach) > 3 (Coastal) > 2 (General) > 1 (Overview)
+        - Within same usage band, applies aggregation (min/max/mean)
+
         Args:
-            graph (nx.Graph): The input graph to enrich.
+            graph (nx.Graph, optional): NetworkX graph for Mode 1 (in-memory processing).
+                Mutually exclusive with gpkg_path.
+            gpkg_path (str, optional): Path to graph GeoPackage for Mode 2 (file-based processing).
+                Mutually exclusive with graph.
             enc_names (List[str]): List of ENC names to source features from.
             route_buffer (Polygon, optional): Boundary to filter features. If None, uses graph extent.
             feature_layers (List[str], optional): List of S-57 layer names to extract features from.
                 If None, uses all layers from get_feature_layers_from_classifier().
                 Examples: ['depare', 'obstrn', 'wrecks', 'bridge']
+            is_directed (bool): If True, propagates feature values from forward edges to reverse
+                edges after enrichment. Default: False.
+            include_sources (bool): If True, stores dict structures tracking which layers/ENCs
+                contributed to each feature value. Default: False.
+            soundg_buffer_meters (float): Buffer distance in meters for SOUNDG point features.
+                Default: 30.0 meters.
+            inplace (bool, optional): For Mode 1 only - if True, modifies graph in-place (no copy).
+                Default: False.
 
         Returns:
-            nx.Graph: Graph with edges enriched with ft_* feature columns.
+            Union[nx.Graph, Dict[str, Any]]:
+                - Mode 1 (graph input): Returns updated nx.Graph with ft_* feature columns
+                - Mode 2 (gpkg_path input): Returns dict with:
+                    - 'mode': 'file'
+                    - 'gpkg_path': Path to GPKG file
+                    - 'edges_updated': Number of edges updated
+                    - 'layers_processed': Number of feature layers processed
+                    - 'enrichment_summary': Dict mapping column names to edges enriched
 
-        Example:
-            # Default enrichment (recommended - uses all layers from classifier)
-            G_enriched = weights.enrich_edges_with_features(G, enc_list)
+        Raises:
+            ValueError: If neither or both graph/gpkg_path provided
 
-            # Specify specific layers only
+        Examples:
+            # Mode 1: In-memory graph processing
             G_enriched = weights.enrich_edges_with_features(
-                G, enc_list,
-                feature_layers=['depare', 'obstrn', 'wrecks']
+                graph=G,
+                enc_names=['US5FL14M']
+            )
+
+            # Mode 2: File-based processing
+            summary = weights.enrich_edges_with_features(
+                gpkg_path='graph_base.gpkg',
+                enc_names=['US5FL14M']
+            )
+
+            # Mode 1 with inplace=True (no copy)
+            weights.enrich_edges_with_features(
+                graph=G,
+                enc_names=['US5FL14M'],
+                inplace=True
             )
         """
+        # Input validation: exactly one of graph or gpkg_path
+        if (graph is None and gpkg_path is None) or (graph is not None and gpkg_path is not None):
+            raise ValueError(
+                "Exactly one of 'graph' or 'gpkg_path' must be provided. "
+                "Use graph= for in-memory processing or gpkg_path= for file-based updates."
+            )
+
+        # Determine processing mode
+        mode = "graph" if graph is not None else "file"
+        logger.info(f"[ENRICH_EDGES_WITH_FEATURES] Mode: {mode.upper()}")
+
         # Get full feature layer configuration from classifier
         all_feature_layers = self.get_feature_layers_from_classifier()
 
@@ -4096,38 +4613,64 @@ class Weights:
                 logger.warning(f"Requested layers not in classifier: {missing_layers}")
             logger.debug(f"Using {len(feature_layers_config)} of {len(feature_layers)} requested layers")
 
-        G = graph.copy()
+        # === MODE-SPECIFIC INITIALIZATION ===
+        if mode == "graph":
+            # Mode 1: In-memory graph processing
+            G = graph if inplace else graph.copy()
 
-        # Initialize weight calculation columns with default values
-        # This ensures they appear right after base columns (weight, geom)
-        logger.info(f"Initializing weight calculation columns on {G.number_of_edges():,} edges")
-        for u, v in G.edges():
-            original_weight = G[u][v].get('weight', 1.0)
-            G[u][v]['base_weight'] = original_weight
-            G[u][v]['adjusted_weight'] = original_weight
-            G[u][v]['blocking_factor'] = 1.0
-            G[u][v]['penalty_factor'] = 1.0
-            G[u][v]['bonus_factor'] = 1.0
-            G[u][v]['ukc_meters'] = 0.0
+            # Initialize weight calculation columns with default values
+            logger.info(f"[MODE: GRAPH] Initializing weight calculation columns on {G.number_of_edges():,} edges")
+            for u, v in G.edges():
+                original_weight = G[u][v].get('weight', 1.0)
+                G[u][v]['base_weight'] = original_weight
+                G[u][v]['adjusted_weight'] = original_weight
+                G[u][v]['blocking_factor'] = 1.0
+                G[u][v]['penalty_factor'] = 1.0
+                G[u][v]['bonus_factor'] = 1.0
+                G[u][v]['ukc_meters'] = 0.0
 
-        # Create edges GeoDataFrame with unique identifiers
-        edges_list = []
-        for idx, (u, v) in enumerate(G.edges()):
-            edges_list.append({
-                'edge_id': idx,
-                'u': u,
-                'v': v,
-                'geometry': LineString([u, v])
-            })
-        edges_gdf = gpd.GeoDataFrame(edges_list, crs="EPSG:4326")
-
-        # Create route buffer from graph extent if not provided
-        if route_buffer is None:
-            nodes_gdf = gpd.GeoDataFrame(
-                geometry=[Point(n) for n in G.nodes()],
+            # Create edges GeoDataFrame with unique identifiers (optimized construction)
+            edges_data = [
+                (idx, u, v, LineString([u, v]))
+                for idx, (u, v) in enumerate(G.edges())
+            ]
+            edges_gdf = gpd.GeoDataFrame(
+                edges_data,
+                columns=['edge_id', 'u', 'v', 'geometry'],
+                geometry='geometry',
                 crs="EPSG:4326"
             )
-            route_buffer = nodes_gdf.union_all().convex_hull.buffer(0.01)  # Small buffer
+            edges_list = [(u, v) for _, u, v, _ in edges_data]  # For later edge lookup
+
+        else:  # mode == "file"
+            # Mode 2: File-based processing - load edges from GeoPackage
+            logger.info(f"[MODE: FILE] Loading edges from: {gpkg_path}")
+            edges_gdf = gpd.read_file(gpkg_path, layer='edges', engine='fiona')
+
+            # Add edge_id if not present
+            if 'edge_id' not in edges_gdf.columns:
+                edges_gdf['edge_id'] = edges_gdf.index
+
+            # Initialize ft_* columns if they don't exist
+            for layer_name, config in feature_layers_config.items():
+                target_column = config['column']
+                if target_column not in edges_gdf.columns:
+                    edges_gdf[target_column] = None
+
+            G = None  # No nx.Graph in file mode
+            edges_list = None
+
+        # Create route buffer from graph/edges extent if not provided
+        if route_buffer is None:
+            if mode == "graph":
+                nodes_gdf = gpd.GeoDataFrame(
+                    geometry=[Point(n) for n in G.nodes()],
+                    crs="EPSG:4326"
+                )
+                route_buffer = nodes_gdf.union_all().convex_hull.buffer(0.01)
+            else:  # mode == "file"
+                minx, miny, maxx, maxy = edges_gdf.total_bounds
+                route_buffer = box(minx, miny, maxx, maxy).buffer(0.01)
 
         logger.info(f"Enriching {len(edges_gdf):,} edges with features from {len(feature_layers_config)} layers")
 
@@ -4160,6 +4703,17 @@ class Weights:
                 logger.debug(f"No features intersect route buffer for layer '{layer_name}'")
                 continue
 
+            # Apply buffer to SOUNDG point features for better intersection detection
+            # SOUNDG features are POINT geometries that may not intersect LINESTRING edges
+            # Buffer creates a circular area around each sounding point
+            if layer_name.lower() == 'soundg' and soundg_buffer_meters > 0:
+                # GeoPandas buffer with geographic projection for meter-based buffering
+                # Project to Web Mercator (3857) for accurate meter buffering, then back to WGS84 (4326)
+                features_gdf_projected = features_gdf.to_crs('EPSG:3857')
+                features_gdf_projected['geometry'] = features_gdf_projected.geometry.buffer(soundg_buffer_meters)
+                features_gdf = features_gdf_projected.to_crs('EPSG:4326')
+                logger.debug(f"Applied {soundg_buffer_meters}m buffer to SOUNDG point features")
+
             # Find which attributes exist in the layer
             available_attrs = [attr for attr in s57_attributes if attr in features_gdf.columns]
             if not available_attrs:
@@ -4177,10 +4731,15 @@ class Weights:
                 attr_to_use = available_attrs[0]
 
             # Spatial join to find intersecting edges
+            # Include dsid_dsnm for usage band prioritization
+            columns_to_join = [attr_to_use, 'geometry']
+            if 'dsid_dsnm' in features_gdf.columns:
+                columns_to_join.insert(0, 'dsid_dsnm')
+
             try:
                 intersecting = gpd.sjoin(
                     edges_gdf,
-                    features_gdf[[attr_to_use, 'geometry']],
+                    features_gdf[columns_to_join],
                     how="inner",
                     predicate="intersects"
                 )
@@ -4192,60 +4751,259 @@ class Weights:
                 logger.debug(f"No edge intersections for layer '{layer_name}'")
                 continue
 
-            # Aggregate values for edges that intersect multiple features
-            if aggregation == 'min':
-                edge_values = intersecting.groupby('edge_id')[attr_to_use].min()
-            elif aggregation == 'max':
-                edge_values = intersecting.groupby('edge_id')[attr_to_use].max()
-            elif aggregation == 'mean':
-                edge_values = intersecting.groupby('edge_id')[attr_to_use].mean()
-            elif aggregation == 'first':
-                edge_values = intersecting.groupby('edge_id')[attr_to_use].first()
+            # Extract usage band from dsid_dsnm if available (e.g., US5CA52M → 5)
+            # Usage band priority: 6 (Berthing) > 5 (Harbour) > 4 (Approach) > 3 (Coastal) > 2 (General) > 1 (Overview)
+            if 'dsid_dsnm' in intersecting.columns:
+                intersecting['usage_band'] = intersecting['dsid_dsnm'].str[2:3].astype(int, errors='ignore')
+                # Fill NaN with 0 for ENCs without clear band designation
+                intersecting['usage_band'] = intersecting['usage_band'].fillna(0).astype(int)
             else:
-                logger.warning(f"Unknown aggregation '{aggregation}', using 'min'")
-                edge_values = intersecting.groupby('edge_id')[attr_to_use].min()
+                # No usage band info, use default
+                intersecting['usage_band'] = 0
 
-            # Apply values to graph edges
-            edges_updated = 0
-            for edge_id, value in edge_values.items():
-                edge_data = edges_list[edge_id]
-                u, v = edge_data['u'], edge_data['v']
+            # Aggregate with usage band prioritization
+            # First group by edge_id and dsid_dsnm, then aggregate within each ENC
+            if 'dsid_dsnm' in intersecting.columns:
+                # Aggregate within each ENC first
+                if aggregation == 'min':
+                    enc_agg = intersecting.groupby(['edge_id', 'dsid_dsnm', 'usage_band'])[attr_to_use].min().reset_index()
+                elif aggregation == 'max':
+                    enc_agg = intersecting.groupby(['edge_id', 'dsid_dsnm', 'usage_band'])[attr_to_use].max().reset_index()
+                elif aggregation == 'mean':
+                    enc_agg = intersecting.groupby(['edge_id', 'dsid_dsnm', 'usage_band'])[attr_to_use].mean().reset_index()
+                elif aggregation == 'first':
+                    enc_agg = intersecting.groupby(['edge_id', 'dsid_dsnm', 'usage_band'])[attr_to_use].first().reset_index()
+                else:
+                    logger.warning(f"Unknown aggregation '{aggregation}', using 'min'")
+                    enc_agg = intersecting.groupby(['edge_id', 'dsid_dsnm', 'usage_band'])[attr_to_use].min().reset_index()
 
-                # Store or update the feature value
-                if target_column in G[u][v]:
-                    # If column exists, apply aggregation logic
-                    existing_value = G[u][v][target_column]
-                    if aggregation == 'min':
-                        G[u][v][target_column] = min(existing_value, value)
-                    elif aggregation == 'max':
-                        G[u][v][target_column] = max(existing_value, value)
+                # Sort by usage band (descending) and value (based on aggregation)
+                if aggregation == 'min':
+                    enc_agg = enc_agg.sort_values(['edge_id', 'usage_band', attr_to_use], ascending=[True, False, True])
+                elif aggregation == 'max':
+                    enc_agg = enc_agg.sort_values(['edge_id', 'usage_band', attr_to_use], ascending=[True, False, False])
+                else:
+                    enc_agg = enc_agg.sort_values(['edge_id', 'usage_band', attr_to_use], ascending=[True, False, True])
+
+                # Keep only the best value per edge (highest usage band, then aggregation)
+                best_per_edge = enc_agg.groupby('edge_id').first()
+                edge_values = best_per_edge[attr_to_use]
+
+                # Store all sources if include_sources=True
+                if include_sources:
+                    edge_sources = enc_agg.groupby('edge_id').apply(
+                        lambda x: {
+                            f"{row['dsid_dsnm']}_{layer_name}": {
+                                'value': row[attr_to_use],
+                                'usage_band': row['usage_band']
+                            }
+                            for _, row in x.iterrows()
+                        }
+                    )
+                else:
+                    edge_sources = None
+            else:
+                # No dsid_dsnm, fall back to simple aggregation
+                if aggregation == 'min':
+                    edge_values = intersecting.groupby('edge_id')[attr_to_use].min()
+                elif aggregation == 'max':
+                    edge_values = intersecting.groupby('edge_id')[attr_to_use].max()
+                elif aggregation == 'mean':
+                    edge_values = intersecting.groupby('edge_id')[attr_to_use].mean()
+                elif aggregation == 'first':
+                    edge_values = intersecting.groupby('edge_id')[attr_to_use].first()
+                else:
+                    logger.warning(f"Unknown aggregation '{aggregation}', using 'min'")
+                    edge_values = intersecting.groupby('edge_id')[attr_to_use].min()
+                edge_sources = None
+
+            # === MODE-SPECIFIC UPDATE ===
+            if mode == "graph":
+                # Mode 1: Update nx.Graph edge attributes (with batch optimization)
+                sources_column = f"{target_column}_sources"
+                edges_updated = len(edge_values)
+
+                # Batch update for performance
+                for edge_id, value in edge_values.items():
+                    u, v = edges_list[edge_id]
+
+                    # Store or update the feature value
+                    if target_column in G[u][v]:
+                        existing_value = G[u][v][target_column]
+                        if include_sources and edge_sources is not None and edge_id in edge_sources:
+                            G[u][v][target_column] = value
+                        else:
+                            if aggregation == 'min':
+                                G[u][v][target_column] = min(existing_value, value)
+                            elif aggregation == 'max':
+                                G[u][v][target_column] = max(existing_value, value)
+                            else:
+                                G[u][v][target_column] = value
                     else:
                         G[u][v][target_column] = value
-                else:
-                    G[u][v][target_column] = value
 
-                edges_updated += 1
+                    # Store source tracking info if enabled
+                    if include_sources and edge_sources is not None and edge_id in edge_sources:
+                        if sources_column not in G[u][v]:
+                            G[u][v][sources_column] = {}
+                        G[u][v][sources_column].update(edge_sources[edge_id])
+
+            else:  # mode == "file"
+                # Mode 2: Update GeoDataFrame column (simple assignment)
+                edges_gdf.loc[edge_values.index, target_column] = edge_values
+                edges_updated = len(edge_values)
 
             logger.info(f"Enriched {edges_updated:,} edges with {target_column} from '{layer_name}'")
 
-        # Log enrichment summary
-        enriched_columns = set()
-        for u, v, data in G.edges(data=True):
-            enriched_columns.update([k for k in data.keys() if k.startswith('ft_')])
+        # === MODE-SPECIFIC FINALIZATION ===
+        if mode == "graph":
+            # Mode 1: Finalize graph and return
+            enriched_columns = set()
+            for u, v, data in G.edges(data=True):
+                enriched_columns.update([k for k in data.keys() if k.startswith('ft_')])
 
-        logger.info(f"=== Feature Enrichment Complete ===")
-        logger.info(f"Total edges: {G.number_of_edges():,}")
-        logger.info(f"Feature columns added: {len(enriched_columns)}")
-        logger.info(f"Columns: {sorted(enriched_columns)}")
+            logger.info(f"=== Feature Enrichment Complete ===")
+            logger.info(f"Total edges: {G.number_of_edges():,}")
+            logger.info(f"Feature columns added: {len(enriched_columns)}")
+            logger.info(f"Columns: {sorted(enriched_columns)}")
 
-        return G
+            # Propagate features to reverse edges if directed graph
+            if is_directed:
+                logger.info(f"\n=== Propagating Features to Reverse Edges (Directed Graph) ===")
+                propagation_stats = self._propagate_features_to_reverse_edges(G, list(enriched_columns))
+
+                # Log propagation results
+                total_propagated = sum(propagation_stats.values())
+                if total_propagated > 0:
+                    logger.info(f"Total edges updated in propagation: {total_propagated:,}")
+                    for col, count in sorted(propagation_stats.items()):
+                        if count > 0:
+                            logger.info(f"  {col}: propagated to {count:,} reverse edges")
+                else:
+                    logger.info("No reverse edges needed propagation (already complete)")
+
+            return G
+
+        else:  # mode == "file"
+            # Mode 2: Finalize file-based enrichment and save to GPKG
+
+            # Collect enrichment statistics
+            enrichment_summary = {}
+            feature_columns_list = []
+
+            for layer_name, layer_config in feature_layers_config.items():
+                target_column = layer_config['column']
+                feature_columns_list.append(target_column)
+
+                if target_column in edges_gdf.columns:
+                    # Count non-null values for this feature column
+                    enriched_count = edges_gdf[target_column].notna().sum()
+                    enrichment_summary[target_column] = int(enriched_count)
+
+            # Propagate features to reverse edges if directed graph
+            if is_directed:
+                logger.info(f"\n=== Propagating Features to Reverse Edges (File Mode - Directed Graph) ===")
+                # For file mode, propagate within GeoDataFrame
+                for col_name in feature_columns_list:
+                    if col_name not in edges_gdf.columns:
+                        continue
+
+                    updated_count = 0
+                    # Build reverse edge lookup based on edge_id convention
+                    for idx, row in edges_gdf.iterrows():
+                        edge_id = row['edge_id']
+                        # Construct potential reverse edge ID (assuming u_v vs v_u convention)
+                        # This requires knowing the node order convention - simplified for now
+                        if col_name in row and pd.notna(row[col_name]):
+                            # Mark that this edge has data
+                            pass
+
+                    if updated_count > 0:
+                        logger.info(f"  ✓ {col_name}: propagated to {updated_count:,} reverse edges")
+
+            # Save enriched GeoDataFrame back to GPKG
+            logger.info(f"\n=== Saving Enriched Edges to GeoPackage ===")
+            logger.info(f"Output file: {gpkg_path}")
+
+            try:
+                edges_gdf.to_file(gpkg_path, layer='edges', driver='GPKG', mode='w', engine='fiona')
+                logger.info(f"Successfully saved {len(edges_gdf):,} enriched edges to '{gpkg_path}'")
+            except Exception as e:
+                logger.error(f"Failed to save enriched edges to GPKG: {e}")
+                raise
+
+            logger.info(f"=== Feature Enrichment Complete ===")
+            logger.info(f"Total edges: {len(edges_gdf):,}")
+            logger.info(f"Feature columns added: {len(feature_columns_list)}")
+            logger.info(f"Columns: {sorted(feature_columns_list)}")
+
+            # Return summary dictionary for file mode
+            return {
+                'mode': 'file',
+                'gpkg_path': gpkg_path,
+                'edges_saved': len(edges_gdf),
+                'layers_processed': len(feature_layers_config),
+                'feature_columns': sorted(feature_columns_list),
+                'enrichment_summary': enrichment_summary
+            }
+
+    def _propagate_features_to_reverse_edges(self, graph: nx.Graph,
+                                             feature_columns: List[str]) -> Dict[str, int]:
+        """
+        Helper method: Propagates feature column values from forward edges to reverse pairs in directed graphs.
+
+        In directed graphs, each physical edge has TWO entries (A→B and B→A) with identical geometries.
+        When spatial joins run, they often only update ONE edge per geometry, leaving ~50% with NULL values.
+        This method copies feature values from edges with data to their reverse pairs that don't have data.
+
+        Args:
+            graph (nx.Graph): The graph to propagate features in (modified in-place)
+            feature_columns (List[str]): List of ft_* columns to propagate
+
+        Returns:
+            Dict[str, int]: Dictionary mapping column names to count of edges updated
+        """
+        propagation_stats = {}
+
+        for col_name in feature_columns:
+            updated_count = 0
+
+            # Build a lookup of edges with values for this column
+            edges_with_values = {}
+            for u, v, data in graph.edges(data=True):
+                if col_name in data and data[col_name] is not None:
+                    # Store forward edge value
+                    edges_with_values[(u, v)] = data[col_name]
+
+            # Propagate to reverse edges
+            for u, v, data in graph.edges(data=True):
+                # Check if this edge is missing the value
+                if col_name not in data or data[col_name] is None:
+                    # Look for reverse edge (v, u) with value
+                    if (v, u) in edges_with_values:
+                        graph[u][v][col_name] = edges_with_values[(v, u)]
+                        updated_count += 1
+
+                        # Also propagate _sources column if it exists
+                        sources_col = f"{col_name}_sources"
+                        if sources_col in graph[v][u]:
+                            graph[u][v][sources_col] = graph[v][u][sources_col].copy()
+
+            propagation_stats[col_name] = updated_count
+
+            if updated_count > 0:
+                logger.debug(f"  ✓ {col_name}: propagated to {updated_count:,} reverse edges")
+
+        return propagation_stats
 
     def enrich_edges_with_features_postgis(self, graph_name: str,
                                            enc_names: List[str],
                                            schema_name: str = 'graph',
                                            enc_schema: str = 'public',
                                            feature_layers: List[str] = None,
-                                           is_directed: bool = False) -> Dict[str, int]:
+                                           is_directed: bool = False,
+                                           include_sources: bool = False,
+                                           soundg_buffer_meters: float = 30.0) -> Dict[str, int]:
         """
         Enrich graph edges with S-57 feature data using server-side PostGIS operations.
 
@@ -4268,6 +5026,13 @@ class Weights:
                 to reverse edges after enrichment. This is needed for directed graphs where both
                 A→B and B→A edges share the same geometry, causing spatial joins to only update
                 one edge per pair. Default: False.
+            include_sources (bool): If True, creates JSONB *_sources columns to track which layers
+                contributed to each feature value. Useful for debugging but adds memory overhead.
+                Default: False.
+            soundg_buffer_meters (float): Buffer distance in meters to apply around SOUNDG point
+                features for spatial intersection. Since soundings are POINT geometries, they may
+                not intersect LINESTRING edges without buffering. The buffer ensures nearby edges
+                capture sounding depth data for ft_sounding_point. Default: 30.0 meters.
 
         Returns:
             Dict[str, int]: Summary of edges enriched per column
@@ -4292,7 +5057,25 @@ class Weights:
                  enc_schema='us_enc_all',
                  is_directed=True  # ← Copies features from forward to reverse edges
             )
-            print(summary)  # {'ft_depth': 850234, 'ft_sounding': 1234, ...}
+
+            # With source tracking for debugging (creates JSONB *_sources columns)
+            summary = weights.enrich_edges_with_features_postgis(
+                 graph_name='fine_graph_01',
+                 enc_names=enc_list,
+                 schema_name='graph',
+                 enc_schema='us_enc_all',
+                 include_sources=True  # ← Track which layers contributed to each feature
+            )
+
+            # Custom SOUNDG buffer for sparse sounding coverage
+            summary = weights.enrich_edges_with_features_postgis(
+                 graph_name='fine_graph_01',
+                 enc_names=enc_list,
+                 schema_name='graph',
+                 enc_schema='us_enc_all',
+                 soundg_buffer_meters=50.0  # ← Larger buffer for sparse soundings
+            )
+            print(summary)  # {'ft_depth': 850234, 'ft_sounding_point': 5432, ...}
         """
         # Validate PostGIS connection
         if not hasattr(self.factory, 'manager') or not hasattr(self.factory.manager, 'engine'):
@@ -4344,8 +5127,7 @@ class Weights:
                 ('blocking_factor', 'DOUBLE PRECISION'),
                 ('penalty_factor', 'DOUBLE PRECISION'),
                 ('bonus_factor', 'DOUBLE PRECISION'),
-                ('ukc_meters', 'DOUBLE PRECISION'),
-                ('ft_depth_sources', 'JSONB')  # Diagnostic: track which layers contribute to ft_depth
+                ('ukc_meters', 'DOUBLE PRECISION')
             ]
 
             for col_name, col_type in weight_calc_columns:
@@ -4389,7 +5171,7 @@ class Weights:
             conn.commit()
             logger.info(f"Initialized weight calculation columns with default values")
 
-            # Step 1: Add columns if they don't exist (including _sources tracking columns)
+            # Step 1: Add columns if they don't exist (including _sources tracking columns if include_sources=True)
             source_tracked_columns = {'ft_depth', 'ft_sounding', 'ft_sounding_point',
                                      'ft_ver_clearance', 'ft_hor_clearance'}
 
@@ -4420,8 +5202,8 @@ class Weights:
                     conn.commit()
                     logger.info(f"Added column '{target_column}' to {edges_table}")
 
-                # Add _sources column for tracked features
-                if target_column in source_tracked_columns:
+                # Add _sources column for tracked features (only if include_sources=True)
+                if include_sources and target_column in source_tracked_columns:
                     sources_column = f"{target_column}_sources"
                     result_sources = conn.execute(
                         check_column_sql,
@@ -4522,6 +5304,16 @@ class Weights:
                 layer_geom_col = geom_result[0]
                 logger.debug(f"Using geometry column '{layer_geom_col}' for {actual_layer}")
 
+                # Apply buffer to SOUNDG point features for better intersection detection
+                # SOUNDG features are POINT geometries that may not intersect LINESTRING edges
+                # Buffer creates a circular area around each sounding point
+                if actual_layer.lower() == 'soundg' and soundg_buffer_meters > 0:
+                    # Use ST_Buffer with geography cast for accurate meter-based buffering
+                    feature_geom_expr = f"ST_Buffer(f.{layer_geom_col}::geography, {soundg_buffer_meters})::geometry"
+                    logger.debug(f"Applying {soundg_buffer_meters}m buffer to SOUNDG point features")
+                else:
+                    feature_geom_expr = f"f.{layer_geom_col}"
+
                 # Perform spatial join and update edges
                 # Using ST_Intersects with spatial indexes for performance
                 # attr_expression handles both single and composite (LEAST) attributes
@@ -4542,9 +5334,10 @@ class Weights:
                 # Usage band priority: 6 (Berthing) > 5 (Harbour) > 4 (Approach) > 3 (Coastal) > 2 (General) > 1 (Overview)
                 # Within same usage band, use aggregation (MIN/MAX/etc.)
                 #
-                # Track sources for important columns (depth, clearances, soundings)
-                track_sources = target_column in ['ft_depth', 'ft_sounding', 'ft_sounding_point',
-                                                   'ft_ver_clearance', 'ft_hor_clearance']
+                # Track sources for important columns (depth, clearances, soundings) if include_sources=True
+                track_sources = (include_sources and
+                                target_column in ['ft_depth', 'ft_sounding', 'ft_sounding_point',
+                                                  'ft_ver_clearance', 'ft_hor_clearance'])
                 sources_column = f"{target_column}_sources"
 
                 if target_column.startswith('ft_'):
@@ -4560,7 +5353,7 @@ class Weights:
                                     {agg_func}({attr_expression}) as agg_value
                                 FROM "{schema_name}"."{edges_table}" e
                                 JOIN "{enc_schema}"."{actual_layer}" f
-                                    ON ST_Intersects(e.geometry, f.{layer_geom_col})
+                                    ON ST_Intersects(e.geometry, {feature_geom_expr})
                                 WHERE {attr_expression} IS NOT NULL
                                 {enc_filter}
                                 GROUP BY e.id, f.dsid_dsnm
@@ -4605,7 +5398,7 @@ class Weights:
                                     {agg_func}({attr_expression}) as agg_value
                                 FROM "{schema_name}"."{edges_table}" e
                                 JOIN "{enc_schema}"."{actual_layer}" f
-                                    ON ST_Intersects(e.geometry, f.{layer_geom_col})
+                                    ON ST_Intersects(e.geometry, {feature_geom_expr})
                                 WHERE {attr_expression} IS NOT NULL
                                 {enc_filter}
                                 GROUP BY e.id, f.dsid_dsnm
@@ -4632,7 +5425,7 @@ class Weights:
                                 {agg_func}({attr_expression}) as agg_value
                             FROM "{schema_name}"."{edges_table}" e
                             JOIN "{enc_schema}"."{actual_layer}" f
-                                ON ST_Intersects(e.geometry, f.{layer_geom_col})
+                                ON ST_Intersects(e.geometry, {feature_geom_expr})
                             WHERE {attr_expression} IS NOT NULL
                             {enc_filter}
                             GROUP BY e.id
@@ -4779,11 +5572,1196 @@ class Weights:
 
         return propagation_stats
 
-    def apply_static_weights(self, graph: nx.Graph, enc_names: List[str],
+    def enrich_edges_with_features_gpkg_v3(self,
+                                           graph_gpkg_path: str,
+                                           enc_data_path: str,
+                                           enc_names: List[str],
+                                           feature_layers: List[str] = None,
+                                           is_directed: bool = False,
+                                           include_sources: bool = False,
+                                           soundg_buffer_meters: float = 30.0,
+                                           progress_callback: callable = None,
+                                           ram_cache_mb: int = 8192,
+                                           skip_layers_without_rtree: bool = True) -> Dict[str, int]:
+        """
+        [V3 Optimized - Parallel Pre-Aggregated Multi-Temp-Table Strategy]
+        Enrich graph edges with S-57 data using a highly optimized parallel strategy for ft_depth.
+
+        **Key Optimizations:**
+
+        1. **Per-Layer Pre-Aggregation:** Each depth layer is pre-aggregated (GROUP BY fid)
+           to reduce data volume by ~10x (e.g., 48M rows → 2.9M rows for 1.6M edges).
+
+        2. **Parallel Materialization:** Depth layers are processed in parallel (up to 4 threads)
+           using separate temp tables. Each thread writes to its own table, avoiding lock contention.
+
+        3. **UNION ALL Aggregation:** All pre-aggregated temp tables are combined with UNION ALL,
+           then a single cross-layer aggregation finds the global optimal depth (highest usage band,
+           then MIN depth within that band).
+
+        4. **Single UPDATE:** The edges table is updated only once for ft_depth after all layers
+           are processed, minimizing write operations.
+
+        **Performance vs Original V3:**
+        - 3-3.5x faster depth layer processing (parallel + pre-aggregation)
+        - 93% memory reduction (1.7GB → 109MB for 1.6M edges)
+        - Guaranteed global precision (highest band across ALL depth layers)
+
+        Args:
+            graph_gpkg_path (str): Path to graph GeoPackage file
+            enc_data_path (str): Path to ENC data GeoPackage file
+            enc_names (List[str]): List of ENC identifiers to filter features
+            feature_layers (List[str], optional): Feature layers to process (None = all)
+            is_directed (bool): Enable directed graph propagation (default: False)
+            include_sources (bool): Track feature sources in JSON columns (default: False)
+            soundg_buffer_meters (float): Buffer distance for SOUNDG points (default: 30.0m)
+            progress_callback (callable, optional): Progress reporting callback
+            ram_cache_mb (int): SQLite cache size in MB (default: 8192)
+            skip_layers_without_rtree (bool): Skip layers missing spatial index (default: True)
+
+        Returns:
+            Dict[str, int]: Summary of edges enriched per column
+
+        Example:
+            >>> weights = Weights(factory)
+            >>> summary = weights.enrich_edges_with_features_gpkg_v3(
+            ...     graph_gpkg_path='graph.gpkg',
+            ...     enc_data_path='enc_data.gpkg',
+            ...     enc_names=['US5TX12M', 'US4TX12M'],
+            ...     is_directed=True
+            ... )
+            >>> print(f"Enriched {summary['ft_depth']} edges with depth data")
+        """
+        from pathlib import Path
+        import sqlite3
+        import time
+
+        # Validate inputs
+        graph_path = Path(graph_gpkg_path)
+        enc_path = Path(enc_data_path)
+
+        if not graph_path.exists():
+            raise FileNotFoundError(f"Graph file not found: {graph_gpkg_path}")
+        if not enc_path.exists():
+            raise FileNotFoundError(f"ENC data file not found: {enc_data_path}")
+
+        # Get feature layer configuration
+        all_feature_layers = self.get_feature_layers_from_classifier()
+        if feature_layers is None:
+            feature_layers_config = all_feature_layers
+        else:
+            feature_layers_config = {
+                layer: config for layer, config in all_feature_layers.items()
+                if layer in feature_layers
+            }
+
+        enrichment_summary = {}
+        start_time = time.perf_counter()
+
+        logger.info(f"=== GeoPackage Feature Enrichment (V3 - Materialize & Aggregate) ===")
+        logger.info(f"Graph: {graph_gpkg_path}")
+        logger.info(f"ENC Data: {enc_data_path}")
+        logger.info(f"Processing {len(feature_layers_config)} feature layers")
+
+        # Connect to graph database
+        conn_graph = sqlite3.connect(graph_gpkg_path)
+        conn_graph.enable_load_extension(True)
+
+        try:
+            # --- Performance Optimizations & SpatiaLite Loading ---
+            conn_graph.execute("PRAGMA journal_mode = WAL;")
+            conn_graph.execute("PRAGMA synchronous = NORMAL;")
+            conn_graph.execute(f"PRAGMA cache_size = -{ram_cache_mb * 1024};")
+            try:
+                conn_graph.load_extension("mod_spatialite")
+            except sqlite3.OperationalError:
+                conn_graph.load_extension("libspatialite")
+        except sqlite3.OperationalError as e:
+            conn_graph.close()
+            raise RuntimeError(f"Cannot load SpatiaLite extension: {e}.")
+
+        cursor_graph = conn_graph.cursor()
+
+        try:
+            # --- Attach ENC database BEFORE starting transaction ---
+            cursor_graph.execute(f"ATTACH DATABASE '{enc_data_path}' AS enc_db")
+            logger.info(f"Attached ENC database: {enc_data_path}")
+
+            # Start transaction AFTER attach
+            cursor_graph.execute("BEGIN DEFERRED TRANSACTION")
+
+            # --- Schema Setup ---
+            logger.info("Initializing weight and feature columns...")
+
+            # Add weight calculation columns
+            weight_calc_columns = [
+                'base_weight', 'adjusted_weight', 'blocking_factor',
+                'penalty_factor', 'bonus_factor', 'ukc_meters'
+            ]
+            for col_name in weight_calc_columns:
+                cursor_graph.execute("SELECT COUNT(*) FROM pragma_table_info('edges') WHERE name = ?", (col_name,))
+                if cursor_graph.fetchone()[0] == 0:
+                    cursor_graph.execute(f'ALTER TABLE edges ADD COLUMN "{col_name}" REAL')
+                    logger.info(f"Added column '{col_name}'")
+
+            # Initialize weight columns with default values
+            cursor_graph.execute("""
+                UPDATE edges
+                SET base_weight     = COALESCE(weight, 1.0),
+                    adjusted_weight = COALESCE(weight, 1.0),
+                    blocking_factor = 1.0,
+                    penalty_factor  = 1.0,
+                    bonus_factor    = 1.0,
+                    ukc_meters      = 0.0
+            """)
+
+            # Detect geometry column name
+            cursor_graph.execute("PRAGMA table_info(edges)")
+            columns = [row[1] for row in cursor_graph.fetchall()]
+            geom_col = 'geom' if 'geom' in columns else 'geometry'
+
+            # Build ENC filter for queries
+            enc_filter_placeholders = ','.join(['?' for _ in enc_names])
+            enc_filter = f"f.dsid_dsnm IN ({enc_filter_placeholders})"
+
+            # Define columns that track sources
+            source_tracked_columns = {'ft_depth', 'ft_sounding', 'ft_sounding_point',
+                                      'ft_ver_clearance', 'ft_hor_clearance'}
+
+            # Add feature columns for all layers
+            for layer_name, config in feature_layers_config.items():
+                target_column = config['column']
+                cursor_graph.execute("SELECT COUNT(*) FROM pragma_table_info('edges') WHERE name = ?", (target_column,))
+                if cursor_graph.fetchone()[0] == 0:
+                    cursor_graph.execute(f'ALTER TABLE edges ADD COLUMN "{target_column}" REAL')
+                    logger.info(f"Added column '{target_column}'")
+
+                # Add source tracking columns if enabled
+                if include_sources and target_column in source_tracked_columns:
+                    sources_column = f"{target_column}_sources"
+                    cursor_graph.execute("SELECT COUNT(*) FROM pragma_table_info('edges') WHERE name = ?",
+                                         (sources_column,))
+                    if cursor_graph.fetchone()[0] == 0:
+                        cursor_graph.execute(f'ALTER TABLE edges ADD COLUMN "{sources_column}" TEXT')
+                        logger.info(f"Added column '{sources_column}'")
+
+            logger.info("Schema setup complete.")
+
+            # --- Separate Depth Layers ---
+            depth_layers_config = {k: v for k, v in feature_layers_config.items() if v['column'] == 'ft_depth'}
+            other_layers_config = {k: v for k, v in feature_layers_config.items() if v['column'] != 'ft_depth'}
+            logger.info(f"Identified {len(depth_layers_config)} depth layers and {len(other_layers_config)} other layers.")
+
+            # --- Create Temporary Tables ---
+            # For non-depth layers
+            cursor_graph.execute("""
+                CREATE TEMPORARY TABLE IF NOT EXISTS edge_updates (
+                    fid INTEGER PRIMARY KEY, new_value REAL, new_source TEXT
+                )""")
+            logger.info("Created temporary table for non-depth layers.")
+
+            # Update statistics for query optimizer
+            logger.info("Updating table statistics for query optimizer...")
+            cursor_graph.execute("ANALYZE edges")
+
+            # --- Step 1: Parallel Pre-Aggregated Depth Materialization ---
+            active_temp_tables = []  # Initialize outside if block for scope
+
+            if depth_layers_config:
+                logger.info("--- Phase 1: Parallel Per-Layer Pre-Aggregation ---")
+                logger.info(f"Processing {len(depth_layers_config)} depth layers with pre-aggregation optimization")
+
+                # Prepare temp table names and create them BEFORE parallel execution
+                # This prevents lock contention from simultaneous CREATE TABLE operations
+                temp_table_names = []
+                for layer_name in depth_layers_config.keys():
+                    temp_table_name = f"temp_{layer_name.lower()}_candidates"
+
+                    # Create table in main connection BEFORE threads start
+                    cursor_graph.execute(f"""
+                        CREATE TABLE IF NOT EXISTS {temp_table_name} (
+                            fid INTEGER PRIMARY KEY,
+                            depth_value REAL,
+                            usage_band INTEGER
+                        )
+                    """)
+                    temp_table_names.append((layer_name, temp_table_name))
+                    logger.debug(f"Pre-created temp table: {temp_table_name}")
+
+                # CRITICAL: Commit the schema setup transaction before parallel writes
+                # This releases the exclusive lock so multiple threads can write
+                conn_graph.commit()
+                logger.debug("Committed schema setup with temp tables, ready for parallel processing")
+
+                # Define parallel materialization function
+                def materialize_layer_pre_aggregated(layer_name, config, temp_table_name):
+                    """
+                    Materialize and pre-aggregate one depth layer in parallel.
+                    Returns: (layer_name, row_count, elapsed_time)
+                    """
+                    import sqlite3
+                    import time
+                    import random
+
+                    # Random delay to stagger thread starts and reduce WAL checkpoint conflicts
+                    # Increased delay helps when some layers complete very quickly (e.g., swpare with 0 edges)
+                    time.sleep(random.uniform(0.3, 0.6))
+
+                    # Each thread gets its own connection
+                    thread_conn = sqlite3.connect(graph_gpkg_path, timeout=30.0)
+                    thread_conn.enable_load_extension(True)
+                    try:
+                        thread_conn.load_extension("mod_spatialite")
+                    except sqlite3.OperationalError:
+                        thread_conn.load_extension("libspatialite")
+
+                    # Apply same PRAGMAs
+                    thread_conn.execute("PRAGMA journal_mode = WAL;")
+                    thread_conn.execute("PRAGMA synchronous = NORMAL;")
+                    thread_conn.execute(f"PRAGMA cache_size = -{ram_cache_mb * 1024};")
+
+                    # Attach ENC database (read-only, no lock contention)
+                    thread_conn.execute(f"ATTACH DATABASE '{enc_data_path}' AS enc_db")
+
+                    thread_cursor = thread_conn.cursor()
+
+                    # NOTE: Temp table already created by main thread before parallel execution
+                    # This eliminates CREATE TABLE lock contention between threads
+
+                    # Extract configuration (same logic as before)
+                    if 'attributes' in config:
+                        s57_attributes = config['attributes']
+                    else:
+                        s57_attributes = [config['attribute']]
+
+                    actual_layer = config.get('source_layer', layer_name)
+                    enc_layer_name_quoted = f'"{actual_layer.upper()}"'
+
+                    # Introspect layer columns
+                    try:
+                        thread_cursor.execute(f"SELECT * FROM enc_db.{enc_layer_name_quoted} LIMIT 0")
+                        all_layer_cols = {col[0].lower(): col[0] for col in thread_cursor.description}
+                    except sqlite3.Error as e:
+                        thread_conn.close()
+                        raise RuntimeError(f"Cannot read layer {enc_layer_name_quoted}: {e}")
+
+                    # Find available attributes
+                    available_attrs = [all_layer_cols[attr.lower()] for attr in s57_attributes if
+                                       attr.lower() in all_layer_cols]
+                    if not available_attrs:
+                        thread_conn.close()
+                        raise RuntimeError(f"No attributes {s57_attributes} found in {enc_layer_name_quoted}")
+
+                    # Find geometry column
+                    layer_geom_col = next((all_layer_cols[g] for g in ['geom', 'geometry'] if g in all_layer_cols), None)
+                    if not layer_geom_col:
+                        thread_conn.close()
+                        raise RuntimeError(f"No geometry column found in {enc_layer_name_quoted}")
+                    layer_geom_col_quoted = f'"{layer_geom_col}"'
+
+                    # Check for R-tree spatial index
+                    rtree_name_upper_table = f"rtree_{actual_layer.upper()}_{layer_geom_col}"
+                    rtree_name_lower_table = f"rtree_{actual_layer.lower()}_{layer_geom_col}"
+
+                    thread_cursor.execute(
+                        "SELECT name FROM enc_db.sqlite_master WHERE type='table' AND (name = ? OR name = ?)",
+                        (rtree_name_upper_table, rtree_name_lower_table)
+                    )
+                    rtree_row = thread_cursor.fetchone()
+                    if rtree_row:
+                        rtree_name = rtree_row[0]
+                    else:
+                        if skip_layers_without_rtree:
+                            thread_conn.close()
+                            raise RuntimeError(f"Missing R-tree index for {enc_layer_name_quoted}")
+                        else:
+                            rtree_name = rtree_name_lower_table
+                    rtree_name_quoted = f'"{rtree_name}"'
+
+                    # Build attribute expression
+                    quoted_attrs = [f'f."{attr}"' for attr in available_attrs]
+                    if len(available_attrs) > 1:
+                        attr_expression = f"MIN({', '.join(quoted_attrs)})"
+                    else:
+                        attr_expression = quoted_attrs[0]
+
+                    # Build attribute NOT NULL filter
+                    attr_not_null_filter = " AND ".join([f'f."{attr}" IS NOT NULL' for attr in available_attrs])
+
+                    # Apply SOUNDG buffer if needed
+                    if actual_layer.lower() == 'soundg' and soundg_buffer_meters > 0:
+                        buffer_degrees = soundg_buffer_meters / 111320.0
+                        feature_geom_expr = f'ST_Buffer(f.{layer_geom_col_quoted}, {buffer_degrees})'
+                    else:
+                        feature_geom_expr = f'f.{layer_geom_col_quoted}'
+
+                    # Determine if heavy layer
+                    is_heavy_layer = actual_layer.lower() in ['depare', 'drgare', 'unsare', 'resare']
+                    if is_heavy_layer:
+                        spatial_predicate = ""
+                    else:
+                        spatial_predicate = f'AND ST_Intersects(e."{geom_col}", {feature_geom_expr})'
+
+                    # KEY OPTIMIZATION: Pre-aggregate with GROUP BY e.fid
+                    # This reduces rows from ~10 per edge to 1 per edge
+
+                    # PERFORMANCE: Create index on temp table BEFORE insert for heavy layers
+                    # This makes INSERT OR REPLACE much faster for large datasets
+                    if is_heavy_layer:
+                        thread_cursor.execute(f"""
+                            CREATE INDEX IF NOT EXISTS idx_{temp_table_name}_fid
+                            ON {temp_table_name}(fid)
+                        """)
+
+                    insert_sql = f"""
+                        INSERT OR REPLACE INTO {temp_table_name} (fid, depth_value, usage_band)
+                        SELECT
+                            e.fid,
+                            MIN({attr_expression}) AS depth_value,
+                            CAST(SUBSTR(f.dsid_dsnm, 3, 1) AS INTEGER) AS usage_band
+                        FROM edges e
+                        JOIN enc_db.{enc_layer_name_quoted} f
+                            ON f.ROWID IN (
+                                SELECT id FROM enc_db.{rtree_name_quoted}
+                                WHERE minx <= MbrMaxX(e."{geom_col}") AND maxx >= MbrMinX(e."{geom_col}")
+                                  AND miny <= MbrMaxY(e."{geom_col}") AND maxy >= MbrMinY(e."{geom_col}")
+                            )
+                            {spatial_predicate}
+                            AND {attr_not_null_filter}
+                            AND {enc_filter}
+                        GROUP BY e.fid, CAST(SUBSTR(f.dsid_dsnm, 3, 1) AS INTEGER)
+                    """
+
+                    start = time.perf_counter()
+
+                    # CRITICAL OPTIMIZATION: For heavy layers, process in batches
+                    # This prevents SQLite from trying to materialize huge join results in memory
+                    if is_heavy_layer:
+                        # Get total edge count
+                        thread_cursor.execute("SELECT COUNT(*) FROM edges")
+                        total_edges = thread_cursor.fetchone()[0]
+
+                        batch_size = 50000  # Process 50k edges at a time
+                        num_batches = (total_edges + batch_size - 1) // batch_size
+                        total_rows = 0
+
+                        for batch_num in range(num_batches):
+                            offset = batch_num * batch_size
+
+                            # Modify query to add LIMIT/OFFSET
+                            batch_insert_sql = insert_sql.replace(
+                                "FROM edges e",
+                                f"FROM (SELECT * FROM edges LIMIT {batch_size} OFFSET {offset}) e"
+                            )
+
+                            thread_cursor.execute(batch_insert_sql, enc_names)
+                            batch_rows = thread_cursor.rowcount
+                            total_rows += batch_rows
+                            thread_conn.commit()  # Commit each batch
+
+                            # Log progress for long-running operations
+                            if batch_num % 5 == 0:  # Every 5 batches
+                                elapsed_so_far = time.perf_counter() - start
+                                edges_processed = (batch_num + 1) * batch_size
+                                progress_pct = min(100, (edges_processed / total_edges) * 100)
+                                logger.info(
+                                    f"    {layer_name}: {progress_pct:.0f}% complete "
+                                    f"({edges_processed:,}/{total_edges:,} edges, "
+                                    f"{elapsed_so_far:.0f}s elapsed)"
+                                )
+
+                        rows = total_rows
+                    else:
+                        # Non-heavy layers: process all at once
+                        thread_cursor.execute(insert_sql, enc_names)
+                        rows = thread_cursor.rowcount
+                        thread_conn.commit()
+
+                    elapsed = time.perf_counter() - start
+
+                    # Small delay before closing connection to reduce WAL checkpoint conflicts
+                    # This is especially important for fast-completing layers (e.g., swpare with 0 edges)
+                    time.sleep(0.1)
+
+                    thread_conn.close()
+                    return (layer_name, rows, elapsed)
+
+                # Retry wrapper for database lock issues
+                def materialize_with_retry(layer_name, config, temp_table_name, max_retries=3):
+                    """
+                    Retry wrapper for materialization with exponential backoff.
+                    Handles intermittent "database is locked" errors.
+                    """
+                    import random
+                    for attempt in range(max_retries):
+                        try:
+                            return materialize_layer_pre_aggregated(layer_name, config, temp_table_name)
+                        except sqlite3.OperationalError as e:
+                            if "database is locked" in str(e).lower() and attempt < max_retries - 1:
+                                # Exponential backoff: 0.5s, 1.5s, 3.5s (with jitter)
+                                wait_time = (2 ** attempt) * 0.5 + random.uniform(0, 0.5)
+                                logger.warning(
+                                    f"  ⚠ {layer_name}: Database locked (attempt {attempt + 1}/{max_retries}), "
+                                    f"retrying in {wait_time:.1f}s..."
+                                )
+                                time.sleep(wait_time)
+                            else:
+                                raise  # Re-raise if not a lock issue or final attempt
+
+                # Execute materialization (parallel if 2+ layers, sequential otherwise)
+                if len(depth_layers_config) >= 2:
+                    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+                    max_workers = min(4, len(depth_layers_config))
+                    logger.info(f"Using {max_workers} parallel workers for depth layer materialization")
+
+                    total_edges_processed = 0
+                    successful_layers = []
+
+                    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                        futures = {}
+                        for layer_name, config in depth_layers_config.items():
+                            temp_table_name = f"temp_{layer_name.lower()}_candidates"
+                            future = executor.submit(
+                                materialize_with_retry,  # Use retry wrapper
+                                layer_name, config, temp_table_name
+                            )
+                            futures[future] = layer_name
+
+                        # Collect results as they complete
+                        for future in as_completed(futures):
+                            layer_name = futures[future]
+                            try:
+                                layer_name_result, rows, elapsed = future.result()
+                                total_edges_processed += rows
+                                successful_layers.append(layer_name)
+                                throughput = rows / elapsed if elapsed > 0 else 0
+                                logger.info(
+                                    f"  ✓ {layer_name}: {rows:,} edges in {elapsed:.1f}s "
+                                    f"({throughput:.0f} edges/sec)"
+                                )
+                            except Exception as e:
+                                logger.error(f"  ✗ {layer_name}: Failed after retries - {e}")
+                                # Remove failed layer from processing
+                                temp_table_names = [(ln, tn) for ln, tn in temp_table_names if ln != layer_name]
+
+                    logger.info(f"Parallel materialization complete: {total_edges_processed:,} total edges across {len(successful_layers)} layers")
+
+                else:
+                    # Sequential fallback for single layer
+                    logger.info("Single depth layer - using sequential processing")
+                    total_edges_processed = 0
+
+                    for layer_name, config in depth_layers_config.items():
+                        temp_table_name = f"temp_{layer_name.lower()}_candidates"
+                        try:
+                            layer_name_result, rows, elapsed = materialize_with_retry(
+                                layer_name, config, temp_table_name
+                            )
+                            total_edges_processed += rows
+                            throughput = rows / elapsed if elapsed > 0 else 0
+                            logger.info(
+                                f"  + {layer_name}: {rows:,} edges in {elapsed:.1f}s "
+                                f"({throughput:.0f} edges/sec)"
+                            )
+                        except Exception as e:
+                            logger.error(f"Failed to materialize '{layer_name}' after retries: {e}")
+                            # Remove failed layer from processing
+                            temp_table_names = [(ln, tn) for ln, tn in temp_table_names if ln != layer_name]
+                            continue
+
+                # Filter temp_table_names to only successful layers
+                active_temp_tables = [tn for ln, tn in temp_table_names if ln in depth_layers_config.keys()]
+
+                if not active_temp_tables:
+                    logger.warning("No depth layers successfully materialized")
+                    enrichment_summary['ft_depth'] = 0
+                else:
+                    # --- Step 2: Cross-Layer Aggregation with UNION ALL ---
+                    logger.info("--- Phase 2: Cross-Layer Aggregation ---")
+
+                    # Start a new transaction for aggregation and updates
+                    cursor_graph.execute("BEGIN DEFERRED TRANSACTION")
+                    logger.debug("Started transaction for aggregation phase")
+
+                    start_agg_time = time.perf_counter()
+
+                    # Build UNION ALL query to combine all temp tables
+                    union_clauses = [
+                        f"SELECT fid, depth_value, usage_band FROM {table_name}"
+                        for table_name in active_temp_tables
+                    ]
+                    union_sql = " UNION ALL ".join(union_clauses)
+
+                    logger.info(f"Combining {len(active_temp_tables)} temp tables with UNION ALL")
+
+                    # OPTIMIZATION: Add indexes on temp tables before aggregation
+                    start_index_time = time.perf_counter()
+                    for table_name in active_temp_tables:
+                        try:
+                            cursor_graph.execute(f"CREATE INDEX IF NOT EXISTS idx_{table_name}_fid ON {table_name}(fid)")
+                            cursor_graph.execute(f"CREATE INDEX IF NOT EXISTS idx_{table_name}_band ON {table_name}(usage_band)")
+                        except Exception as e:
+                            logger.warning(f"Could not create indexes on {table_name}: {e}")
+                    index_elapsed = time.perf_counter() - start_index_time
+                    logger.debug(f"Created indexes on {len(active_temp_tables)} temp tables in {index_elapsed:.1f}s")
+
+                    # OPTIMIZATION: Materialize aggregation results first, then use efficient JOIN-based UPDATE
+
+                    # Step 2a: Create and populate final aggregation table
+                    start_materialize_time = time.perf_counter()
+
+                    cursor_graph.execute("""
+                        CREATE TEMPORARY TABLE temp_final_depths (
+                            fid INTEGER PRIMARY KEY,
+                            final_depth REAL
+                        )
+                    """)
+
+                    aggregate_sql = f"""
+                        INSERT INTO temp_final_depths (fid, final_depth)
+                        WITH all_candidates AS (
+                            {union_sql}
+                        ),
+                        best_bands AS (
+                            SELECT fid, MAX(usage_band) AS max_band
+                            FROM all_candidates
+                            GROUP BY fid
+                        )
+                        SELECT
+                            c.fid,
+                            MIN(c.depth_value) AS final_depth
+                        FROM all_candidates c
+                        JOIN best_bands b ON c.fid = b.fid AND c.usage_band = b.max_band
+                        GROUP BY c.fid
+                    """
+
+                    cursor_graph.execute(aggregate_sql)
+                    aggregated_rows = cursor_graph.rowcount
+                    materialize_elapsed = time.perf_counter() - start_materialize_time
+                    logger.debug(f"Materialized {aggregated_rows:,} final depth values in {materialize_elapsed:.1f}s")
+
+                    # Step 2b: Efficient UPDATE using JOIN (much faster than correlated subquery)
+                    start_update_time = time.perf_counter()
+
+                    # SQLite doesn't support UPDATE FROM, so we use a different approach
+                    cursor_graph.execute("""
+                        UPDATE edges
+                        SET ft_depth = (SELECT final_depth FROM temp_final_depths WHERE fid = edges.fid)
+                        WHERE fid IN (SELECT fid FROM temp_final_depths)
+                    """)
+
+                    rows_updated = cursor_graph.rowcount
+                    update_elapsed = time.perf_counter() - start_update_time
+
+                    # Clean up temp table
+                    cursor_graph.execute("DROP TABLE IF EXISTS temp_final_depths")
+
+                    enrichment_summary['ft_depth'] = rows_updated
+                    agg_elapsed = time.perf_counter() - start_agg_time
+
+                    logger.info(f"Phase 2 timing breakdown:")
+                    logger.info(f"  - Index creation: {index_elapsed:.1f}s")
+                    logger.info(f"  - UNION ALL + aggregation (materialize): {materialize_elapsed:.1f}s")
+                    logger.info(f"  - UPDATE edges: {update_elapsed:.1f}s")
+                    logger.info(f"  - Total Phase 2: {agg_elapsed:.1f}s")
+                    logger.info(f"Enriched {rows_updated:,} edges with ft_depth")
+
+                    # Get min-max statistics for ft_depth
+                    cursor_graph.execute("""
+                        SELECT
+                            MIN(ft_depth) AS min_depth,
+                            MAX(ft_depth) AS max_depth,
+                            AVG(ft_depth) AS avg_depth,
+                            COUNT(ft_depth) AS depth_count
+                        FROM edges
+                        WHERE ft_depth IS NOT NULL
+                    """)
+                    depth_stats = cursor_graph.fetchone()
+                    if depth_stats and depth_stats[0] is not None:
+                        min_depth, max_depth, avg_depth, depth_count = depth_stats
+                        logger.info(
+                            f"ft_depth statistics: "
+                            f"min={min_depth:.2f}m, max={max_depth:.2f}m, "
+                            f"avg={avg_depth:.2f}m, count={depth_count:,}"
+                        )
+
+                    # Calculate throughput
+                    phase2_throughput = rows_updated / agg_elapsed if agg_elapsed > 0 else 0
+                    logger.info(f"Phase 2 throughput: {phase2_throughput:.0f} edges/sec")
+
+                    # Cleanup temp tables
+                    for table_name in active_temp_tables:
+                        try:
+                            cursor_graph.execute(f"DROP TABLE IF EXISTS {table_name}")
+                        except sqlite3.Error as e:
+                            logger.warning(f"Could not drop temp table {table_name}: {e}")
+
+                    # Commit the depth aggregation transaction
+                    conn_graph.commit()
+                    logger.info("Committed depth enrichment and cleaned up temporary tables")
+
+            # If no depth layers were processed, we still need to start a transaction
+            # for the non-depth layers
+            if not depth_layers_config or not active_temp_tables:
+                cursor_graph.execute("BEGIN DEFERRED TRANSACTION")
+                logger.debug("Started transaction for non-depth layer processing")
+
+            # --- Step 3: Process other (non-depth) layers ---
+            logger.info("--- Phase 3: Processing Other Feature Layers ---")
+            total_other_layers = len(other_layers_config)
+
+            for layer_idx, (layer_name, config) in enumerate(other_layers_config.items(), start=1):
+                cursor_graph.execute("DELETE FROM edge_updates;")  # Clear temp table
+
+                target_column = config['column']
+                sources_column = f"{target_column}_sources"
+
+                if progress_callback:
+                    progress_callback(len(depth_layers_config) + layer_idx,
+                                      len(feature_layers_config),
+                                      layer_name, 'enriching', target_column)
+
+                # Extract layer configuration
+                if 'attributes' in config:
+                    s57_attributes = config['attributes']
+                else:
+                    s57_attributes = [config['attribute']]
+
+                aggregation = config.get('aggregation', 'min')
+                actual_layer = config.get('source_layer', layer_name)
+                enc_layer_name_quoted = f'"{actual_layer.upper()}"'
+
+                logger.info(f"Processing '{layer_name}' -> {target_column} (agg: {aggregation})")
+
+                agg_func_map = {'min': 'MIN', 'max': 'MAX', 'mean': 'AVG', 'first': 'MIN'}
+                agg_func = agg_func_map.get(aggregation, 'MIN')
+
+                # Introspect layer columns
+                try:
+                    cursor_graph.execute(f"SELECT * FROM enc_db.{enc_layer_name_quoted} LIMIT 0")
+                    all_layer_cols = {col[0].lower(): col[0] for col in cursor_graph.description}
+                except sqlite3.Error as e:
+                    logger.warning(f"Skipping layer {enc_layer_name_quoted}: Cannot read columns ({e})")
+                    enrichment_summary[target_column] = 0
+                    if progress_callback:
+                        progress_callback(len(depth_layers_config) + layer_idx,
+                                          len(feature_layers_config),
+                                          layer_name, 'skipped', target_column)
+                    continue
+
+                # Find available attributes
+                available_attrs = [all_layer_cols[attr.lower()] for attr in s57_attributes if
+                                   attr.lower() in all_layer_cols]
+                if not available_attrs:
+                    logger.warning(f"Skipping layer {enc_layer_name_quoted}: No attributes {s57_attributes} found.")
+                    enrichment_summary[target_column] = 0
+                    if progress_callback:
+                        progress_callback(len(depth_layers_config) + layer_idx,
+                                          len(feature_layers_config),
+                                          layer_name, 'skipped', target_column)
+                    continue
+
+                # Find geometry column
+                layer_geom_col = next((all_layer_cols[g] for g in ['geom', 'geometry'] if g in all_layer_cols), None)
+                if not layer_geom_col:
+                    logger.warning(f"Skipping layer {enc_layer_name_quoted}: No geometry column found.")
+                    enrichment_summary[target_column] = 0
+                    if progress_callback:
+                        progress_callback(len(depth_layers_config) + layer_idx,
+                                          len(feature_layers_config),
+                                          layer_name, 'skipped', target_column)
+                    continue
+                layer_geom_col_quoted = f'"{layer_geom_col}"'
+
+                # Check for R-tree spatial index
+                rtree_name_upper_table = f"rtree_{actual_layer.upper()}_{layer_geom_col}"
+                rtree_name_lower_table = f"rtree_{actual_layer.lower()}_{layer_geom_col}"
+
+                cursor_graph.execute(
+                    "SELECT name FROM enc_db.sqlite_master WHERE type='table' AND (name = ? OR name = ?)",
+                    (rtree_name_upper_table, rtree_name_lower_table)
+                )
+                rtree_row = cursor_graph.fetchone()
+                if rtree_row:
+                    rtree_name = rtree_row[0]
+                    logger.debug(f"Found R-tree index: {rtree_name}")
+                else:
+                    logger.error(f"Missing R-tree index for {enc_layer_name_quoted}. Tried '{rtree_name_upper_table}' and '{rtree_name_lower_table}'.")
+                    if skip_layers_without_rtree:
+                        logger.error("Skipping this layer. To fix, rebuild the ENC GeoPackage with spatial indexes.")
+                        enrichment_summary[target_column] = 0
+                        if progress_callback:
+                            progress_callback(len(depth_layers_config) + layer_idx,
+                                              len(feature_layers_config),
+                                              layer_name, 'skipped', target_column)
+                        continue
+                    else:
+                        logger.warning("Proceeding without index - this may take a very long time!")
+                        rtree_name = rtree_name_lower_table
+                rtree_name_quoted = f'"{rtree_name}"'
+
+                # Build attribute expression
+                quoted_attrs = [f'f."{attr}"' for attr in available_attrs]
+                if len(available_attrs) > 1:
+                    attr_expression = f"MIN({', '.join(quoted_attrs)})"
+                else:
+                    attr_expression = quoted_attrs[0]
+
+                # Build attribute NOT NULL filter
+                attr_not_null_filter = " AND ".join([f'f."{attr}" IS NOT NULL' for attr in available_attrs])
+
+                # Apply SOUNDG buffer if needed
+                if actual_layer.lower() == 'soundg' and soundg_buffer_meters > 0:
+                    buffer_degrees = soundg_buffer_meters / 111320.0
+                    feature_geom_expr = f'ST_Buffer(f.{layer_geom_col_quoted}, {buffer_degrees})'
+                else:
+                    feature_geom_expr = f'f.{layer_geom_col_quoted}'
+
+                # Determine if heavy layer
+                is_heavy_layer = actual_layer.lower() in ['depare', 'drgare', 'unsare', 'resare']
+                if is_heavy_layer:
+                    spatial_predicate = ""  # MBR-only check
+                    logger.info(f"[OPTIMIZATION] Using MBR-only spatial check (no ST_Intersects)")
+                else:
+                    spatial_predicate = f'AND ST_Intersects(e."{geom_col}", {feature_geom_expr})'
+
+                # Source tracking
+                track_sources = (include_sources and target_column in source_tracked_columns)
+                source_col_sql = ", new_source" if track_sources else ""
+
+                if track_sources:
+                    safe_layer_name = layer_name.replace("'", "''")
+                    source_select_sql = f""",
+                        json_object(
+                            dsid_dsnm || '_' || '{safe_layer_name}',
+                            json_object('value', attr_value, 'usage_band', usage_band)
+                        ) as new_source"""
+                else:
+                    source_select_sql = ""
+
+                # Build INSERT query based on aggregation type
+                if aggregation == 'min':
+                    insert_sql = f"""
+                        INSERT INTO edge_updates (fid, new_value {source_col_sql})
+                        WITH spatial_joins AS (
+                            SELECT
+                                e.fid,
+                                f.dsid_dsnm,
+                                {attr_expression} AS attr_value,
+                                CAST(SUBSTR(f.dsid_dsnm, 3, 1) AS INTEGER) AS usage_band
+                            FROM edges e
+                            JOIN enc_db.{enc_layer_name_quoted} f
+                                ON f.ROWID IN (
+                                    SELECT id FROM enc_db.{rtree_name_quoted}
+                                    WHERE minx <= MbrMaxX(e."{geom_col}")
+                                      AND maxx >= MbrMinX(e."{geom_col}")
+                                      AND miny <= MbrMaxY(e."{geom_col}")
+                                      AND maxy >= MbrMinY(e."{geom_col}")
+                                )
+                                {spatial_predicate}
+                                AND {attr_not_null_filter}
+                                AND {enc_filter}
+                        ),
+                        best_bands AS (
+                            SELECT fid, MAX(usage_band) as best_band
+                            FROM spatial_joins
+                            GROUP BY fid
+                        )
+                        SELECT
+                            sj.fid,
+                            MIN(sj.attr_value) as new_value
+                            {source_select_sql}
+                        FROM spatial_joins sj
+                        JOIN best_bands bb ON sj.fid = bb.fid AND sj.usage_band = bb.best_band
+                        GROUP BY sj.fid{', sj.dsid_dsnm, sj.usage_band' if track_sources else ''}
+                    """
+                elif aggregation == 'max':
+                    insert_sql = f"""
+                        INSERT INTO edge_updates (fid, new_value {source_col_sql})
+                        WITH spatial_joins AS (
+                            SELECT
+                                e.fid,
+                                f.dsid_dsnm,
+                                {attr_expression} AS attr_value,
+                                CAST(SUBSTR(f.dsid_dsnm, 3, 1) AS INTEGER) AS usage_band
+                            FROM edges e
+                            JOIN enc_db.{enc_layer_name_quoted} f
+                                ON f.ROWID IN (
+                                    SELECT id FROM enc_db.{rtree_name_quoted}
+                                    WHERE minx <= MbrMaxX(e."{geom_col}")
+                                      AND maxx >= MbrMinX(e."{geom_col}")
+                                      AND miny <= MbrMaxY(e."{geom_col}")
+                                      AND maxy >= MbrMinY(e."{geom_col}")
+                                )
+                                {spatial_predicate}
+                                AND {attr_not_null_filter}
+                                AND {enc_filter}
+                        ),
+                        best_bands AS (
+                            SELECT fid, MAX(usage_band) as best_band
+                            FROM spatial_joins
+                            GROUP BY fid
+                        )
+                        SELECT
+                            sj.fid,
+                            MAX(sj.attr_value) as new_value
+                            {source_select_sql}
+                        FROM spatial_joins sj
+                        JOIN best_bands bb ON sj.fid = bb.fid AND sj.usage_band = bb.best_band
+                        GROUP BY sj.fid{', sj.dsid_dsnm, sj.usage_band' if track_sources else ''}
+                    """
+                else:  # 'first' aggregation
+                    insert_sql = f"""
+                        INSERT INTO edge_updates (fid, new_value {source_col_sql})
+                        WITH spatial_joins AS (
+                            SELECT
+                                e.fid,
+                                f.dsid_dsnm,
+                                {attr_expression} AS attr_value,
+                                CAST(SUBSTR(f.dsid_dsnm, 3, 1) AS INTEGER) AS usage_band
+                            FROM edges e
+                            JOIN enc_db.{enc_layer_name_quoted} f
+                                ON f.ROWID IN (
+                                    SELECT id FROM enc_db.{rtree_name_quoted}
+                                    WHERE minx <= MbrMaxX(e."{geom_col}")
+                                      AND maxx >= MbrMinX(e."{geom_col}")
+                                      AND miny <= MbrMaxY(e."{geom_col}")
+                                      AND maxy >= MbrMinY(e."{geom_col}")
+                                )
+                                {spatial_predicate}
+                                AND {attr_not_null_filter}
+                                AND {enc_filter}
+                        ),
+                        best_bands AS (
+                            SELECT fid, MAX(usage_band) as best_band
+                            FROM spatial_joins
+                            GROUP BY fid
+                        )
+                        SELECT
+                            sj.fid,
+                            MIN(sj.attr_value) as new_value
+                            {source_select_sql}
+                        FROM spatial_joins sj
+                        JOIN best_bands bb ON sj.fid = bb.fid AND sj.usage_band = bb.best_band
+                        GROUP BY sj.fid{', sj.dsid_dsnm, sj.usage_band' if track_sources else ''}
+                    """
+
+                try:
+                    start_time_layer = time.perf_counter()
+                    logger.info(f"Starting spatial join for {target_column}...")
+
+                    # Execute INSERT into temp table
+                    cursor_graph.execute(insert_sql, enc_names)
+                    rows_inserted = cursor_graph.rowcount
+                    insert_time = time.perf_counter() - start_time_layer
+
+                    logger.info(f"Inserted {rows_inserted:,} values into temp table in {insert_time:.1f}s")
+
+                    # UPDATE edges table from temp table
+                    if track_sources:
+                        update_sql = f"""
+                            UPDATE edges
+                            SET "{target_column}" = eu.new_value,
+                                "{sources_column}" = COALESCE(
+                                    json_patch(COALESCE("{sources_column}", '{{}}'), json(eu.new_source)),
+                                    json(eu.new_source)
+                                )
+                            FROM edge_updates eu
+                            WHERE edges.fid = eu.fid
+                        """
+                    else:
+                        update_sql = f"""
+                            UPDATE edges
+                            SET "{target_column}" = eu.new_value
+                            FROM edge_updates eu
+                            WHERE edges.fid = eu.fid
+                        """
+
+                    update_start = time.perf_counter()
+                    cursor_graph.execute(update_sql)
+                    rows_updated = cursor_graph.rowcount
+                    update_time = time.perf_counter() - update_start
+
+                    elapsed = time.perf_counter() - start_time_layer
+                    throughput = rows_updated / elapsed if elapsed > 0 else 0
+
+                    logger.info(f"UPDATE completed in {update_time:.1f}s ({rows_updated/update_time:.0f} edges/sec)")
+                    logger.info(f"Enriched {rows_updated:,} edges with {target_column} in {elapsed:.1f}s ({throughput:.0f} edges/sec)")
+
+                    enrichment_summary[target_column] = enrichment_summary.get(target_column, 0) + rows_updated
+
+                    if progress_callback:
+                        progress_callback(len(depth_layers_config) + layer_idx,
+                                          len(feature_layers_config),
+                                          layer_name, 'completed', target_column, rows_updated, elapsed)
+
+                except sqlite3.Error as e:
+                    logger.error(f"Failed to enrich {target_column} from '{layer_name}': {e}")
+                    enrichment_summary[target_column] = 0
+                    if progress_callback:
+                        progress_callback(len(depth_layers_config) + layer_idx,
+                                          len(feature_layers_config),
+                                          layer_name, 'failed', target_column)
+                    continue
+
+            # --- Cleanup and Final Commit ---
+            # Drop temp tables (edge_updates is auto-dropped as TEMPORARY)
+            cursor_graph.execute("DROP TABLE IF EXISTS all_depth_candidates;")
+
+            # Commit transaction BEFORE detaching database
+            conn_graph.commit()
+            logger.info("Committed all enrichment operations.")
+
+            # Now detach the ENC database (must be done AFTER commit, not during transaction)
+            cursor_graph.execute("DETACH DATABASE enc_db;")
+            logger.debug("Detached ENC database")
+
+            # --- Propagation for Directed Graphs ---
+            if is_directed:
+                logger.info("Propagating features to reverse edges...")
+                propagation_stats = self._propagate_features_to_reverse_edges_gpkg(
+                    graph_gpkg_path=graph_gpkg_path,
+                    feature_columns=[k for k, v in enrichment_summary.items() if isinstance(v, int) and v > 0]
+                )
+                total_propagated = sum(propagation_stats.values())
+                if total_propagated > 0:
+                    logger.info(f"Propagated to {total_propagated:,} reverse edges")
+
+        except Exception as e:
+            logger.error(f"Enrichment failed, rolling back transaction: {e}")
+            conn_graph.rollback()
+            raise
+        finally:
+            # Restore default PRAGMAs
+            try:
+                conn_graph.execute("PRAGMA journal_mode = DELETE;")
+                conn_graph.execute("PRAGMA synchronous = FULL;")
+            except sqlite3.Error as prag_err:
+                logger.warning(f"Could not reset PRAGMAs: {prag_err}")
+            conn_graph.close()
+
+        total_time = time.perf_counter() - start_time
+        total_enrichments = sum(v for v in enrichment_summary.values() if isinstance(v, int))
+        avg_throughput = total_enrichments / total_time if total_time > 0 else 0
+
+        logger.info(f"=== GPKG Feature Enrichment Summary (V3) ===")
+        logger.info(f"Total edge updates: {total_enrichments:,}")
+        logger.info(f"Total time: {total_time:.1f}s")
+        logger.info(f"Average throughput: {avg_throughput:.0f} edges/sec")
+
+        return enrichment_summary
+
+    def _propagate_features_to_reverse_edges_gpkg(self,
+                                                   graph_gpkg_path: str,
+                                                   feature_columns: List[str] = None) -> Dict[str, int]:
+        """
+        [V2 Optimized] Propagate feature values from forward to reverse edges in directed graphs.
+
+        This method uses an optimized O(n) approach based on direct `fid` arithmetic,
+        assuming the directed graph was created by duplicating N edges to 2N edges.
+
+        **ID Mapping Assumption:**
+        - Original edges: `fid` 1 to N
+        - Reverse edges: `fid` (N+1) to 2N
+        - Mapping: `reverse_fid = original_fid + N`
+
+        **Optimized Propagation:**
+        1. Get `original_count` (N) by dividing total edge count by 2.
+        2. Use a single `UPDATE` statement to copy all `ft_*` columns from original
+           edges to their corresponding reverse edges using `fid` arithmetic.
+        3. This avoids slow, string-based self-joins on `(source, target)` columns.
+
+        Args:
+            graph_gpkg_path (str): Path to the GeoPackage file (.gpkg only)
+            feature_columns (List[str], optional): List of ft_* columns to propagate.
+                If None, auto-detects all ft_* columns in the table.
+
+        Returns:
+            Dict[str, int]: Dictionary with a single key 'edges_propagated'
+                            and the count of reverse edges updated.
+        """
+        import sqlite3
+
+        conn = sqlite3.connect(graph_gpkg_path)
+        conn.enable_load_extension(True)
+
+        # Load SpatiaLite for GeoPackage geometry validation triggers
+        try:
+            conn.load_extension("mod_spatialite")
+        except sqlite3.OperationalError:
+            try:
+                conn.load_extension("libspatialite")
+            except sqlite3.OperationalError:
+                logger.warning(
+                    "Could not load SpatiaLite. Operations may fail if GeoPackage has geometry triggers."
+                )
+
+        cursor = conn.cursor()
+
+        try:
+            # Step 1: Get total count of original edges (half of total)
+            cursor.execute("SELECT COUNT(*) FROM edges")
+            total_edges = cursor.fetchone()[0]
+
+            if total_edges % 2 != 0:
+                logger.warning(f"Total edge count ({total_edges}) is not even. "
+                               "FID-based propagation may not work as expected. "
+                               "Falling back to slower source/target join method.")
+                return self._propagate_features_to_reverse_edges_gpkg_fallback(graph_gpkg_path, feature_columns)
+
+            original_count = total_edges // 2
+            logger.info(f"Original edge count (N): {original_count:,}")
+
+            # Auto-detect ft_* columns if not specified
+            if feature_columns is None:
+                cursor.execute("""
+                    SELECT name FROM pragma_table_info('edges')
+                    WHERE name LIKE 'ft_%'
+                    ORDER BY name
+                """)
+                feature_columns = [row[0] for row in cursor.fetchall()]
+
+            if not feature_columns:
+                logger.warning("No ft_* columns found in edges table")
+                return {'edges_propagated': 0}
+
+            # Step 2: Build and execute a single UPDATE statement for all columns
+            set_clauses = ",\n    ".join([f'"{col}" = orig."{col}"' for col in feature_columns])
+            where_conditions = " OR ".join([f'orig."{col}" IS NOT NULL' for col in feature_columns])
+
+            # SQLite's UPDATE FROM syntax is different from PostgreSQL
+            # We use a correlated subquery for each column.
+            # This is still much faster than the old method because it's one pass.
+            set_clauses_correlated = ",\n    ".join([
+                f'"{col}" = (SELECT "{col}" FROM edges AS orig WHERE orig.fid = e1.fid - {original_count})'
+                for col in feature_columns
+            ])
+
+            propagate_sql = f"""
+                UPDATE edges AS e1
+                SET {set_clauses_correlated}
+                WHERE e1.fid > {original_count} -- Only process reverse edges
+                  -- Add validation to ensure the source/target are correctly swapped
+                  AND e1.source = (SELECT target FROM edges AS orig WHERE orig.fid = e1.fid - {original_count})
+                  AND e1.target = (SELECT source FROM edges AS orig WHERE orig.fid = e1.fid - {original_count})
+                  -- Ensure the original edge has a value to propagate
+                  AND (
+                      SELECT COUNT(*)
+                      FROM edges AS orig
+                      WHERE orig.fid = e1.fid - {original_count} -- This condition is now redundant but harmless
+                        AND ({where_conditions})
+                  ) > 0
+            """
+
+            logger.info(f"Executing single-pass UPDATE for {len(feature_columns)} feature columns...")
+            cursor.execute(propagate_sql)
+            conn.commit()
+            rows_updated = cursor.rowcount
+
+            logger.info(f"Propagation complete: {rows_updated:,} reverse edges updated.")
+
+            return {'edges_propagated': rows_updated}
+
+        finally:
+            conn.close()
+
+    def _propagate_features_to_reverse_edges_gpkg_fallback(self,
+                                                           graph_gpkg_path: str,
+                                                           feature_columns: List[str] = None) -> Dict[str, int]:
+        """Fallback propagation method using source/target join for non-standard fids."""
+        import sqlite3
+        propagation_stats = {}
+        conn = sqlite3.connect(graph_gpkg_path)
+        conn.enable_load_extension(True)
+        try:
+            conn.load_extension("mod_spatialite")
+        except sqlite3.OperationalError:
+            conn.load_extension("libspatialite")
+        cursor = conn.cursor()
+        try:
+            if feature_columns is None:
+                cursor.execute("SELECT name FROM pragma_table_info('edges') WHERE name LIKE 'ft_%' ORDER BY name")
+                feature_columns = [row[0] for row in cursor.fetchall()]
+            if not feature_columns:
+                return {}
+
+            for col_name in feature_columns:
+                propagate_sql = f"""
+                    UPDATE edges AS e1
+                    SET {col_name} = (
+                        SELECT e2.{col_name} FROM edges e2
+                        WHERE e1.source = e2.target AND e1.target = e2.source AND e2.{col_name} IS NOT NULL LIMIT 1
+                    )
+                    WHERE e1.{col_name} IS NULL AND EXISTS (
+                        SELECT 1 FROM edges e2
+                        WHERE e1.source = e2.target AND e1.target = e2.source AND e2.{col_name} IS NOT NULL
+                    )
+                """
+                cursor.execute(propagate_sql)
+                conn.commit()
+                propagation_stats[col_name] = cursor.rowcount
+        finally:
+            conn.close()
+
+        return propagation_stats
+
+    def _identify_land_intersecting_edges_geopandas(
+        self,
+        edges_gdf: gpd.GeoDataFrame,
+        land_grid_gdf: gpd.GeoDataFrame
+    ) -> List[int]:
+        """
+        Read-only GeoPandas method to identify edge IDs intersecting land.
+
+        Uses pure Shapely geometry operations (no SQLite) for fast, reliable
+        intersection detection on pre-computed land grids.
+
+        Args:
+            edges_gdf: GeoDataFrame of graph edges with 'edge_id' column
+            land_grid_gdf: GeoDataFrame of land grid polygons
+
+        Returns:
+            List[int]: List of edge_id values that intersect land geometries
+        """
+        try:
+            logger.debug(f"[LNDARE GEOPANDAS] Identifying intersecting edges...")
+            start_time = time.perf_counter()
+
+            # Create union of all land geometries for efficient intersection testing
+            land_union = land_grid_gdf.geometry.union_all()
+            logger.debug(f"[LNDARE GEOPANDAS] Land union geometry type: {land_union.geom_type}")
+
+            # Find edges intersecting land (pure in-memory Shapely operation)
+            intersecting_mask = edges_gdf.geometry.intersects(land_union)
+            intersecting_edges = edges_gdf[intersecting_mask]
+
+            elapsed = time.perf_counter() - start_time
+            logger.info(
+                f"[LNDARE GEOPANDAS] Identified {len(intersecting_edges):,} intersecting edges "
+                f"({len(intersecting_edges)/len(edges_gdf)*100:.1f}%) in {elapsed:.1f}s"
+            )
+
+            # Return edge IDs as list for update loop
+            return intersecting_edges['edge_id'].tolist()
+
+        except Exception as e:
+            logger.error(f"[LNDARE GEOPANDAS] Failed to identify intersecting edges: {e}")
+            raise
+
+    def apply_static_weights(self,
+                             graph: nx.Graph = None,
+                             gpkg_path: str = None,
+                             enc_names: List[str] = None,
                              static_layers: List[str] = None,
-                             usage_bands: List[int] = None) -> nx.Graph:
+                             usage_bands: List[int] = None,
+                             land_area_layer: Union[str, Polygon, MultiPolygon] = None) -> Optional[nx.Graph]:
         """
         Applies static weights to graph edges based on lateral distance to maritime features.
+
+        **Dual Input Mode:**
+        - **Mode 1 (Graph)**: Process in-memory NetworkX graph → return updated nx.Graph
+        - **Mode 2 (File)**: Load from GeoPackage, update weights in place → return None
 
         **NEW Three-Tier System with Distance-Based Degradation:**
 
@@ -4816,25 +6794,60 @@ class Weights:
             3. Hardcoded fallback in classifier
 
         Args:
-            graph (nx.Graph): The input graph
+            graph (nx.Graph, optional): NetworkX graph for Mode 1 (in-memory processing).
+                Mutually exclusive with gpkg_path.
+            gpkg_path (str, optional): Path to graph GeoPackage for Mode 2 (file-based processing).
+                Mutually exclusive with graph.
             enc_names (List[str]): List of ENCs to source features from
             static_layers (List[str], optional): List of layer names to apply weights from.
                 If None, uses layers from config or defaults
             usage_bands (List[int], optional): Usage bands to filter (e.g., [1,2,3,4,5,6]).
                 If None, uses all bands
+            land_area_layer (Union[str, Polygon, MultiPolygon], optional):
+                LNDARE optimization source (20-40x faster):
+                - str: Layer name to load from factory.db_path (Mode 1) or gpkg_path (Mode 2)
+                - Polygon/MultiPolygon: Pre-loaded Shapely geometry (use directly, no file I/O)
+                Default: None (uses standard ENC-based LNDARE).
 
         Returns:
-            nx.Graph: Graph with three weight columns:
-                - wt_static_blocking (MAX, default=1.0)
-                - wt_static_penalty (MULTIPLY, default=1.0)
-                - wt_static_bonus (MULTIPLY, default=1.0)
+            Union[nx.Graph, Dict[str, Any]]:
+                - Mode 1 (graph input): Returns updated nx.Graph with weight columns
+                - Mode 2 (gpkg_path input): Returns stats dictionary with update summary
 
-        Example:
+        Examples:
+            # Mode 1: In-memory graph processing
             weights = Weights(factory)
-            G = weights.apply_static_weights(G, enc_names=['US5FL14M'])
-            # Uses config static_layers with distance-based degradation
+            G = weights.apply_static_weights(
+                graph=G,
+                enc_names=['US5FL14M'],
+                land_area_layer='land_grid'  # Load from factory.db_path
+            )
+
+            # Mode 1: With pre-loaded land geometry
+            land_geom = gpd.read_file('graph.gpkg', layer='land_grid', engine='fiona').geometry.union_all()
+            G = weights.apply_static_weights(
+                graph=G,
+                enc_names=['US5FL14M'],
+                land_area_layer=land_geom  # Use directly, no file I/O
+            )
+
+            # Mode 2: File-based processing (lightweight updates)
+            weights.apply_static_weights(
+                gpkg_path='graph.gpkg',
+                enc_names=['US5FL14M'],
+                land_area_layer='land_grid'  # Load from graph.gpkg
+            )
         """
-        from maritime_module.utils.s57_classification import NavClass
+        # Input validation: exactly one of graph or gpkg_path must be provided
+        if (graph is None and gpkg_path is None) or (graph is not None and gpkg_path is not None):
+            raise ValueError(
+                "Exactly one of 'graph' or 'gpkg_path' must be provided. "
+                "Use graph= for in-memory processing or gpkg_path= for file-based updates."
+            )
+
+        # Determine processing mode
+        mode = "graph" if graph is not None else "file"
+        logger.info(f"[APPLY_STATIC_WEIGHTS] Mode: {mode.upper()}")
 
         if static_layers is None:
             # Use config defaults (which have hardcoded fallback)
@@ -4856,24 +6869,58 @@ class Weights:
         else:
             filtered_enc_names = enc_names if enc_names else []
 
-        G = graph.copy()
+        # === MODE-SPECIFIC INITIALIZATION ===
+        if mode == "graph":
+            # Mode 1: In-memory graph processing
+            G = graph.copy()
 
-        # Initialize three-tier static weight columns
-        for u, v in G.edges():
-            G[u][v]['wt_static_blocking'] = 1.0   # MAX aggregation
-            G[u][v]['wt_static_penalty'] = 1.0    # MULTIPLY aggregation
-            G[u][v]['wt_static_bonus'] = 1.0      # MULTIPLY aggregation
+            # Initialize three-tier static weight columns
+            for u, v in G.edges():
+                G[u][v]['wt_static_blocking'] = 1.0   # MAX aggregation
+                G[u][v]['wt_static_penalty'] = 1.0    # MULTIPLY aggregation
+                G[u][v]['wt_static_bonus'] = 1.0      # MULTIPLY aggregation
 
-        # Create edges GeoDataFrame with edge identifiers
-        edges_list = []
-        for idx, (u, v) in enumerate(G.edges()):
-            edges_list.append({
-                'edge_id': idx,
-                'u': u,
-                'v': v,
-                'geometry': LineString([u, v])
-            })
-        edges_gdf = gpd.GeoDataFrame(edges_list, crs="EPSG:4326")
+            # Create edges GeoDataFrame with edge identifiers
+            edges_list = []
+            for idx, (u, v) in enumerate(G.edges()):
+                edges_list.append({
+                    'edge_id': idx,
+                    'u': u,
+                    'v': v,
+                    'geometry': LineString([u, v])
+                })
+            edges_gdf = gpd.GeoDataFrame(edges_list, crs="EPSG:4326")
+            logger.info(f"[MODE: GRAPH] Created edges GeoDataFrame from NetworkX graph")
+
+        else:  # mode == "file"
+            # Mode 2: File-based processing - load edges from GeoPackage
+            logger.info(f"[MODE: FILE] Loading edges from: {gpkg_path}")
+            edges_gdf = gpd.read_file(gpkg_path, layer='edges', engine='fiona')
+
+            # Initialize weight columns if they don't exist
+            if 'wt_static_blocking' not in edges_gdf.columns:
+                edges_gdf['wt_static_blocking'] = 1.0
+            if 'wt_static_penalty' not in edges_gdf.columns:
+                edges_gdf['wt_static_penalty'] = 1.0
+            if 'wt_static_bonus' not in edges_gdf.columns:
+                edges_gdf['wt_static_bonus'] = 1.0
+
+            # Build edges_list for consistent processing
+            edges_list = []
+            for idx, row in edges_gdf.iterrows():
+                edges_list.append({
+                    'edge_id': row.get('edge_id', idx),
+                    'u': row.get('u') or row.get('source'),
+                    'v': row.get('v') or row.get('target'),
+                    'geometry': row.geometry,
+                    'fid': row.get('fid', idx)  # Store original FID for updates
+                })
+
+            # Replace edge_id with index for consistency
+            edges_gdf['edge_id'] = edges_gdf.index
+            logger.info(f"[MODE: FILE] Loaded {len(edges_gdf):,} edges from GeoPackage")
+
+            G = None  # No NetworkX graph in file mode
 
         logger.info(f"=== Applying Static Weights (Three-Tier + Distance Degradation) ===")
         logger.info(f"Processing {len(static_layers)} layers on {len(edges_gdf):,} edges")
@@ -4885,6 +6932,85 @@ class Weights:
         }
 
         for layer_name in static_layers:
+            # LNDARE OPTIMIZATION: Use pre-computed land grid if available
+            if layer_name.upper() == 'LNDARE' and land_area_layer:
+                try:
+                    start_time = time.perf_counter()
+
+                    # Determine land geometry source and load appropriately
+                    if isinstance(land_area_layer, (Polygon, MultiPolygon)):
+                        # Direct Shapely geometry provided - use as-is (no file I/O)
+                        logger.info(f"[LNDARE OPTIMIZATION] Using pre-loaded Shapely geometry: {land_area_layer.geom_type}")
+                        land_union = land_area_layer
+                        land_gdf = None  # Not needed for geometry-only processing
+
+                    elif isinstance(land_area_layer, str):
+                        # Layer name provided - load from appropriate source
+                        if mode == "graph":
+                            # Load from factory.db_path
+                            source_path = self.factory.db_path
+                            logger.info(f"[LNDARE OPTIMIZATION] Loading '{land_area_layer}' from factory: {source_path}")
+                        else:  # mode == "file"
+                            # Load from gpkg_path
+                            source_path = gpkg_path
+                            logger.info(f"[LNDARE OPTIMIZATION] Loading '{land_area_layer}' from graph GPKG: {source_path}")
+
+                        land_gdf = gpd.read_file(
+                            source_path,
+                            layer=land_area_layer,
+                            engine='fiona'
+                        )
+                        logger.debug(f"[LNDARE OPTIMIZATION] Loaded {len(land_gdf)} land grid polygons")
+                        land_union = land_gdf.geometry.union_all()
+
+                    else:
+                        raise TypeError(
+                            f"land_area_layer must be str or Shapely geometry, got {type(land_area_layer)}"
+                        )
+
+                    # Identify edges intersecting land (pure GeoPandas/Shapely, no SQLite)
+                    if land_gdf is not None:
+                        # Use helper method with GeoDataFrame
+                        edge_ids_to_block = self._identify_land_intersecting_edges_geopandas(
+                            edges_gdf, land_gdf
+                        )
+                    else:
+                        # Direct geometry intersection
+                        intersecting_mask = edges_gdf.geometry.intersects(land_union)
+                        intersecting_edges = edges_gdf[intersecting_mask]
+                        edge_ids_to_block = intersecting_edges['edge_id'].tolist()
+
+                    # Update weights based on mode
+                    if edge_ids_to_block:
+                        if mode == "graph":
+                            # Update NetworkX graph in-memory
+                            for edge_id in edge_ids_to_block:
+                                edge_data = edges_list[edge_id]
+                                u, v = edge_data['u'], edge_data['v']
+                                G[u][v]['wt_static_blocking'] = max(
+                                    G[u][v]['wt_static_blocking'],
+                                    self.BLOCKING_THRESHOLD  # 100
+                                )
+                        else:  # mode == "file"
+                            # Update GeoDataFrame directly
+                            edges_gdf.loc[edge_ids_to_block, 'wt_static_blocking'] = edges_gdf.loc[
+                                edge_ids_to_block, 'wt_static_blocking'
+                            ].apply(lambda x: max(x, self.BLOCKING_THRESHOLD))
+
+                    elapsed = time.perf_counter() - start_time
+                    logger.info(
+                        f"[LNDARE OPTIMIZATION] Blocked {len(edge_ids_to_block):,} edges in {elapsed:.1f}s"
+                    )
+                    stats['blocking_updates'] += len(edge_ids_to_block)
+
+                    # Skip standard LNDARE processing
+                    continue
+
+                except Exception as e:
+                    logger.warning(f"[LNDARE OPTIMIZATION] Failed: {e}, using standard ENC-based processing")
+                    # Fall through to standard layer processing
+
+            # Standard layer processing
             # Get classification from S57Classifier
             classification = self.classifier.get_classification(layer_name.upper())
             if not classification:
@@ -4902,7 +7028,7 @@ class Weights:
 
             logger.info(f"Processing '{layer_name}': {nav_class.name}, factor={base_factor}, buffer={buffer_meters}m")
 
-            # Get features from layer
+            # Get features from layer (using Fiona engine via factory)
             try:
                 features_gdf = self.factory.get_layer(layer_name, filter_by_enc=filtered_enc_names)
             except Exception as e:
@@ -4965,30 +7091,49 @@ class Weights:
                     else:
                         factor = max(base_factor, self.BLOCKING_THRESHOLD)
 
-                    G[u][v]['wt_static_blocking'] = max(G[u][v]['wt_static_blocking'], factor)
+                    if mode == "graph":
+                        G[u][v]['wt_static_blocking'] = max(G[u][v]['wt_static_blocking'], factor)
+                    else:  # mode == "file"
+                        edges_gdf.loc[edge_id, 'wt_static_blocking'] = max(
+                            edges_gdf.loc[edge_id, 'wt_static_blocking'], factor
+                        )
                     layer_updates['blocking'] += 1
 
                 elif nav_class == NavClass.CAUTION:
                     if tier == 'degrade' or tier == 'amplify':
                         # CAUTION degrades to DANGEROUS when within buffer
                         factor = self.BLOCKING_THRESHOLD if tier == 'amplify' else base_factor * 10.0
-                        G[u][v]['wt_static_blocking'] = max(G[u][v]['wt_static_blocking'], factor)
+                        if mode == "graph":
+                            G[u][v]['wt_static_blocking'] = max(G[u][v]['wt_static_blocking'], factor)
+                        else:  # mode == "file"
+                            edges_gdf.loc[edge_id, 'wt_static_blocking'] = max(
+                                edges_gdf.loc[edge_id, 'wt_static_blocking'], factor
+                            )
                         layer_updates['blocking'] += 1
                     else:
                         # Outside buffer - normal penalty
-                        G[u][v]['wt_static_penalty'] *= base_factor
+                        if mode == "graph":
+                            G[u][v]['wt_static_penalty'] *= base_factor
+                        else:  # mode == "file"
+                            edges_gdf.loc[edge_id, 'wt_static_penalty'] *= base_factor
                         layer_updates['penalty'] += 1
 
                 elif nav_class == NavClass.SAFE:
                     if tier == 'degrade' or tier == 'amplify':
                         # SAFE degrades to CAUTION when within buffer
                         penalty = base_factor * distance_factor
-                        G[u][v]['wt_static_penalty'] *= penalty
+                        if mode == "graph":
+                            G[u][v]['wt_static_penalty'] *= penalty
+                        else:  # mode == "file"
+                            edges_gdf.loc[edge_id, 'wt_static_penalty'] *= penalty
                         layer_updates['penalty'] += 1
                     else:
                         # Outside buffer - normal bonus (factor < 1.0)
                         bonus = 1.0 / base_factor if base_factor > 1.0 else base_factor
-                        G[u][v]['wt_static_bonus'] *= max(bonus, self.MIN_BONUS_FACTOR)
+                        if mode == "graph":
+                            G[u][v]['wt_static_bonus'] *= max(bonus, self.MIN_BONUS_FACTOR)
+                        else:  # mode == "file"
+                            edges_gdf.loc[edge_id, 'wt_static_bonus'] *= max(bonus, self.MIN_BONUS_FACTOR)
                         layer_updates['bonus'] += 1
 
             # Log layer results
@@ -5006,7 +7151,86 @@ class Weights:
         logger.info(f"Penalty updates: {stats['penalty_updates']:,}")
         logger.info(f"Bonus updates: {stats['bonus_updates']:,}")
 
-        return G
+        # === MODE-SPECIFIC OUTPUT ===
+        if mode == "graph":
+            # Mode 1: Return updated NetworkX graph
+            logger.info("[MODE: GRAPH] Returning updated NetworkX graph")
+            return G
+
+        else:  # mode == "file"
+            # Mode 2: Update weights in GeoPackage using SQLite
+            logger.info(f"[MODE: FILE] Updating weight columns in: {gpkg_path}")
+
+            # Connect to GeoPackage and update weight columns
+            try:
+                conn = sqlite3.connect(gpkg_path)
+                conn.enable_load_extension(True)
+                cursor = conn.cursor()
+
+                # Load SpatiaLite extension (needed for geometry triggers)
+                try:
+                    conn.load_extension("mod_spatialite")
+                except sqlite3.OperationalError:
+                    logger.warning("[MODE: FILE] Could not load SpatiaLite extension")
+
+                # Check if weight columns exist, create if needed
+                cursor.execute("PRAGMA table_info(edges)")
+                existing_columns = {row[1] for row in cursor.fetchall()}
+
+                columns_to_add = []
+                if 'wt_static_blocking' not in existing_columns:
+                    columns_to_add.append('wt_static_blocking')
+                if 'wt_static_penalty' not in existing_columns:
+                    columns_to_add.append('wt_static_penalty')
+                if 'wt_static_bonus' not in existing_columns:
+                    columns_to_add.append('wt_static_bonus')
+
+                # Add missing columns
+                for col in columns_to_add:
+                    logger.info(f"[MODE: FILE] Adding column '{col}' to edges table")
+                    cursor.execute(f"ALTER TABLE edges ADD COLUMN {col} REAL DEFAULT 1.0")
+
+                conn.commit()
+
+                # Update each edge with new weight values
+                for idx, row in edges_gdf.iterrows():
+                    fid = row.get('fid', idx)
+                    blocking = row['wt_static_blocking']
+                    penalty = row['wt_static_penalty']
+                    bonus = row['wt_static_bonus']
+
+                    cursor.execute("""
+                        UPDATE edges
+                        SET wt_static_blocking = ?,
+                            wt_static_penalty = ?,
+                            wt_static_bonus = ?
+                        WHERE fid = ?
+                    """, (blocking, penalty, bonus, fid))
+
+                conn.commit()
+                logger.info(f"[MODE: FILE] Successfully updated {len(edges_gdf):,} edges with new weights")
+
+            except Exception as e:
+                logger.error(f"[MODE: FILE] Failed to update GeoPackage: {e}")
+                if 'conn' in locals():
+                    conn.rollback()
+                raise
+            finally:
+                if 'conn' in locals():
+                    conn.close()
+
+            # Return summary statistics for file mode
+            return {
+                'mode': 'file',
+                'gpkg_path': gpkg_path,
+                'edges_updated': len(edges_gdf),
+                'layers_processed': len(static_layers),
+                'layers_applied': len([l for l in static_layers if l.upper() in [sl.upper() for sl in static_layers]]),
+                'blocking_updates': stats['blocking_updates'],
+                'penalty_updates': stats['penalty_updates'],
+                'bonus_updates': stats['bonus_updates'],
+                'columns_added': columns_to_add if columns_to_add else []
+            }
 
     def apply_static_weights_postgis(self, graph_name: str,
                                      enc_names: List[str],
@@ -5907,7 +8131,7 @@ class Weights:
 
         Directional Weight System:
             - Extracts ft_orient and ft_trafic from enriched edge data
-            - Calculates dir_forward (edge bearing from source to target)
+            - Calculates dir_edge_fwd (edge bearing from source to target)
             - Calculates dir_diff (angular difference between feature orientation and edge)
             - Applies wt_dir based on configurable angle_bands from YAML config
 
@@ -6079,7 +8303,7 @@ class Weights:
                             ST_StartPoint(geometry),
                             ST_EndPoint(geometry)
                         )
-                    ) AS dir_forward
+                    ) AS dir_edge_fwd
                 FROM {edges_table}
             ),
             angular_diff AS (
@@ -6090,12 +8314,12 @@ class Weights:
                     target_str,
                     ft_orient,
                     ft_trafic,
-                    dir_forward,
+                    dir_edge_fwd,
                     CASE
                         WHEN ft_orient IS NULL THEN NULL
-                        WHEN ABS(ft_orient - dir_forward) <= 180
-                            THEN ABS(ft_orient - dir_forward)
-                        ELSE 360 - ABS(ft_orient - dir_forward)
+                        WHEN ABS(ft_orient - dir_edge_fwd) <= 180
+                            THEN ABS(ft_orient - dir_edge_fwd)
+                        ELSE 360 - ABS(ft_orient - dir_edge_fwd)
                     END AS dir_diff_initial
                 FROM edge_bearings
             ),
@@ -6107,7 +8331,7 @@ class Weights:
                     target_str,
                     ft_orient,
                     ft_trafic,
-                    dir_forward,
+                    dir_edge_fwd,
                     dir_diff_initial,
                     CASE
                         -- Two-way traffic: check reverse orientation
@@ -6129,9 +8353,9 @@ class Weights:
                             LEAST(
                                 dir_diff_initial,
                                 CASE
-                                    WHEN ABS(MOD(CAST(ft_orient + 180 AS NUMERIC), 360) - dir_forward) <= 180
-                                        THEN ABS(MOD(CAST(ft_orient + 180 AS NUMERIC), 360) - dir_forward)
-                                    ELSE 360 - ABS(MOD(CAST(ft_orient + 180 AS NUMERIC), 360) - dir_forward)
+                                    WHEN ABS(MOD(CAST(ft_orient + 180 AS NUMERIC), 360) - dir_edge_fwd) <= 180
+                                        THEN ABS(MOD(CAST(ft_orient + 180 AS NUMERIC), 360) - dir_edge_fwd)
+                                    ELSE 360 - ABS(MOD(CAST(ft_orient + 180 AS NUMERIC), 360) - dir_edge_fwd)
                                 END
                             )
                         ELSE dir_diff_initial
@@ -6141,7 +8365,7 @@ class Weights:
             -- Update edges table with directional weights
             UPDATE {edges_table} e
             SET
-                dir_forward = tc.dir_forward,
+                dir_edge_fwd = tc.dir_edge_fwd,
                 dir_diff = tc.dir_diff,
                 ft_orient_rev = tc.ft_orient_rev,
                 wt_dir = CASE
@@ -6158,7 +8382,7 @@ class Weights:
             # Ensure directional columns exist
             logger.info("Ensuring directional weight columns exist...")
             column_creation_sqls = [
-                f'ALTER TABLE {edges_table} ADD COLUMN IF NOT EXISTS dir_forward DOUBLE PRECISION',
+                f'ALTER TABLE {edges_table} ADD COLUMN IF NOT EXISTS dir_edge_fwd DOUBLE PRECISION',
                 f'ALTER TABLE {edges_table} ADD COLUMN IF NOT EXISTS dir_diff DOUBLE PRECISION',
                 f'ALTER TABLE {edges_table} ADD COLUMN IF NOT EXISTS ft_orient_rev DOUBLE PRECISION',
                 f'ALTER TABLE {edges_table} ADD COLUMN IF NOT EXISTS wt_dir DOUBLE PRECISION DEFAULT 1.0',
@@ -6230,7 +8454,7 @@ class Weights:
         Only resets directional-specific columns, preserving all other weight calculations.
 
         Columns Reset:
-            - dir_forward: Edge bearing (0-360°)
+            - dir_edge_fwd: Edge bearing (0-360°)
             - dir_diff: Angular difference between feature and edge
             - ft_orient_rev: Reverse orientation for two-way traffic
             - wt_dir: Directional weight factor
@@ -6305,7 +8529,7 @@ class Weights:
             reset_sql = text(f"""
                 UPDATE {edges_table}
                 SET
-                    dir_forward = NULL,
+                    dir_edge_fwd = NULL,
                     dir_diff = NULL,
                     ft_orient_rev = NULL,
                     wt_dir = NULL
@@ -6333,7 +8557,7 @@ class Weights:
             """)
             edges_reset = conn.execute(count_sql).scalar()
 
-            columns_reset = ['dir_forward', 'dir_diff', 'ft_orient_rev', 'wt_dir']
+            columns_reset = ['dir_edge_fwd', 'dir_diff', 'ft_orient_rev', 'wt_dir']
             if reset_adjusted_weight:
                 columns_reset.append('adjusted_weight (recalculated)')
 
@@ -6361,7 +8585,7 @@ class Weights:
         Only resets directional-specific attributes, preserving all other weight calculations.
 
         Attributes Reset:
-            - dir_forward: Edge bearing (0-360°)
+            - dir_edge_fwd: Edge bearing (0-360°)
             - dir_diff: Angular difference between feature and edge
             - ft_orient_rev: Reverse orientation for two-way traffic
             - wt_dir: Directional weight factor
@@ -6410,7 +8634,7 @@ class Weights:
         logger.info(f"Reset adjusted_weight: {reset_adjusted_weight}")
 
         edges_reset = 0
-        directional_attrs = ['dir_forward', 'dir_diff', 'ft_orient_rev', 'wt_dir', 'directional_factor']
+        directional_attrs = ['dir_edge_fwd', 'dir_diff', 'ft_orient_rev', 'wt_dir', 'directional_factor']
 
         for u, v, data in G.edges(data=True):
             # Remove directional attributes
@@ -6438,6 +8662,756 @@ class Weights:
         logger.info(f"Attributes reset: {', '.join(columns_reset)}")
 
         return G
+
+    def _apply_lndare_optimization_geopandas(
+        self,
+        graph_gpkg_path: str,
+        land_grid_layer: str
+    ) -> List[int]:
+        """
+        Read-only GeoPandas LNDARE optimization that identifies edges intersecting land.
+
+        This method performs ONLY read operations and in-memory geometry processing.
+        Database write is performed by the main SQLite connection to avoid connection conflicts.
+
+        This approach is more reliable than SpatiaLite for handling pre-computed
+        land grid geometries that may have encoding issues.
+
+        Args:
+            graph_gpkg_path: Path to graph GeoPackage (read-only access)
+            land_grid_layer: Name of land grid layer
+
+        Returns:
+            List[int]: FIDs of edges intersecting land (to be blocked by main connection)
+
+        Raises:
+            Exception: If GeoPandas operations fail
+        """
+
+
+        logger.info(f"[LNDARE GEOPANDAS] Loading edges and land_grid geometries...")
+        start_time = time.perf_counter()
+
+        try:
+            # Load geometries from GeoPackage (READ-ONLY)
+            edges_gdf = gpd.read_file(graph_gpkg_path, layer='edges', engine='fiona')
+            land_gdf = gpd.read_file(graph_gpkg_path, layer=land_grid_layer, engine='fiona')
+
+            logger.debug(f"  Loaded {len(edges_gdf):,} edges and {len(land_gdf)} land grid rows")
+
+            # Create union of all land geometries
+            land_union = land_gdf.geometry.union_all()
+            logger.debug(f"  Land union geometry type: {land_union.geom_type}")
+
+            # Find edges intersecting land (pure in-memory operation)
+            intersecting_mask = edges_gdf.geometry.intersects(land_union)
+            intersecting_edges = edges_gdf[intersecting_mask]
+
+            logger.info(f"  Found {len(intersecting_edges):,} edges intersecting land ({len(intersecting_edges)/len(edges_gdf)*100:.1f}%)")
+
+            # Extract FIDs for database update by main connection
+            # Note: fid is the index in GeoPandas dataframe
+            fids = intersecting_edges.index.tolist()
+
+            elapsed = time.perf_counter() - start_time
+            logger.info(f"[LNDARE GEOPANDAS] Identified {len(fids):,} edges to block in {elapsed:.1f}s")
+
+            return fids
+
+        except Exception as e:
+            logger.error(f"GeoPandas LNDARE optimization failed: {e}")
+            raise
+
+    def apply_static_weights_gpkg(self,
+                                   graph_gpkg_path: str,
+                                   enc_data_path: str,
+                                   enc_names: List[str],
+                                   static_layers: List[str] = None,
+                                   usage_bands: List[int] = None,
+                                   land_area_layer: str = None) -> Dict[str, Any]:
+        """
+        Apply static feature weights to graph edges using GeoPackage SQL operations.
+
+        This method is MUCH faster than apply_static_weights() for file-based backends because:
+        - All spatial operations happen database-side using native GeoPackage spatial functions
+        - Uses R-tree spatial indexes for ST_DWithin queries
+        - No data transfer to Python (only SQL commands)
+        - Batch updates per layer with transaction management
+
+        Performance: 10-15x faster than memory-based approach.
+
+        **Binary Buffer Degradation (Optimized for Performance):**
+        Uses ST_DWithin() for fast spatial index-based queries:
+
+        1. **Outside buffer**: Base NavClass applies
+           - DANGEROUS → wt_static_blocking
+           - CAUTION → wt_static_penalty
+           - SAFE → wt_static_bonus
+
+        2. **Inside buffer (ST_DWithin)**: Degrade one tier
+           - DANGEROUS → wt_static_blocking (amplified)
+           - CAUTION → wt_static_blocking (CAUTION → DANGEROUS)
+           - SAFE → wt_static_penalty × 2.0 (SAFE → CAUTION)
+
+        **GeoPackage Naming Conventions:**
+
+        This method operates on two GeoPackage databases with different naming conventions:
+
+        1. **ENC Data (enc_data.gpkg)**: Source S-57 Electronic Navigational Charts
+           - Attached as 'enc_db' schema
+           - Tables: UPPERCASE (e.g., DEPARE, UWTROC, FAIRWY, LNDARE)
+           - Columns: UPPERCASE (e.g., DRVAL1, VALSOU, CATUWI)
+           - Reason: Follows S-57 standard uppercase object codes
+
+        2. **Graph Data (graph.gpkg)**: Maritime routing graph (this database)
+           - Main connection
+           - Tables: lowercase (e.g., edges, nodes)
+           - Columns: lowercase (e.g., wt_static_blocking, wt_static_penalty)
+           - Reason: PostGIS-compatible naming for cross-platform export
+
+        The method automatically converts layer names to UPPERCASE when querying ENC data.
+
+        Args:
+            graph_gpkg_path (str): Path to the GeoPackage file containing the graph (.gpkg only)
+            enc_data_path (str): Path to the GeoPackage file containing ENC data (.gpkg only)
+            enc_names (List[str]): List of ENC names to filter features
+            static_layers (List[str], optional): List of layer names to apply weights from.
+                If None, uses layers from config or defaults.
+            usage_bands (List[int], optional): Usage bands to filter (e.g., [1,2,3,4,5,6]).
+                If None, uses all bands.
+            land_area_layer (str, optional): Name of the pre-computed land grid layer
+                in the graph GeoPackage for LNDARE optimization. If provided, LNDARE processing
+                uses GeoPandas geometric intersection (reliable) instead of ENC-based approach.
+                Should contain land/obstacle polygons (e.g., from land_grid_geom in
+                create_fine_grid()). If None or optimization fails, falls back to standard
+                ENC-based LNDARE processing. Default: None.
+
+                NOTE: Uses GeoPandas (Python) for intersection checking instead of SpatiaLite (SQL)
+                to ensure reliable results with pre-computed grid geometries. Performance: ~10-15s
+                for 400k edges (acceptable for one-time graph creation).
+
+        Returns:
+            Dict[str, Any]: Summary with:
+                - 'layers_processed': Number of layers processed
+                - 'layers_applied': Number of layers that modified edges
+                - 'layer_details': Dict of {layer_name: {'blocking': int, 'penalty': int, 'bonus': int}}
+
+        Raises:
+            FileNotFoundError: If graph or ENC data file not found
+
+        Example:
+            weights = Weights(factory)
+
+            # Without pre-computed land grid (uses standard ENC-based processing)
+            summary = weights.apply_static_weights_gpkg(
+                graph_gpkg_path='graph_base.gpkg',
+                enc_data_path='enc_data.gpkg',
+                enc_names=['US5FL14M', 'US5FL13M']
+            )
+
+            # With pre-computed land grid (20-40x faster for LNDARE)
+            # First save land grid from fine_graph creation:
+            # fg_grid = fine_graph.create_fine_grid(...)
+            # fine_graph.save_grid_to_gpkg(
+            #     geometry=fg_grid['land_grid_geom'],
+            #     layer_name='land_grid',
+            #     output_path=output_dir / 'graph_base.gpkg'
+            # )
+            summary = weights.apply_static_weights_gpkg(
+                graph_gpkg_path='graph_base.gpkg',
+                enc_data_path='enc_data.gpkg',
+                enc_names=['US5FL14M', 'US5FL13M'],
+                land_area_layer='land_grid'  # Enable fast LNDARE with land grid
+            )
+            print(f"Modified {summary['layers_applied']} layers")
+
+            # If results show all/zero edges blocked, run diagnostic:
+            # python diagnose_land_grid.py graph_base.gpkg land_grid
+        """
+        from pathlib import Path
+        import sqlite3
+        import time
+
+        # Validate inputs and resolve to absolute paths
+        graph_path = Path(graph_gpkg_path).resolve()
+        enc_path = Path(enc_data_path).resolve()
+
+        if not graph_path.exists():
+            raise FileNotFoundError(f"Graph file not found: {graph_gpkg_path}")
+        if not enc_path.exists():
+            raise FileNotFoundError(f"ENC data file not found: {enc_data_path}")
+
+        # Use absolute paths for database connections
+        graph_gpkg_path = str(graph_path)
+        enc_data_path = str(enc_path)
+
+        # Default layers if not specified
+        if static_layers is None:
+            static_layers = self.default_static_layers
+            logger.debug(f"Using default static layers from config: {static_layers}")
+
+        # Default usage bands if not specified
+        if usage_bands is None:
+            usage_bands = [1, 2, 3, 4, 5, 6]
+
+        # Pre-filter enc_names by usage bands
+        if enc_names and usage_bands:
+            usage_bands_set = set(str(b) for b in usage_bands)
+            filtered_enc_names = [
+                enc for enc in enc_names
+                if len(enc) > 2 and enc[2] in usage_bands_set
+            ]
+            logger.info(f"Filtered {len(enc_names)} ENCs to {len(filtered_enc_names)} based on usage bands {usage_bands}")
+        else:
+            filtered_enc_names = enc_names if enc_names else []
+
+        summary = {
+            'layers_processed': 0,
+            'layers_applied': 0,
+            'layer_details': {}
+        }
+
+        logger.info(f"=== GeoPackage Static Weights Application (Three-Tier System) ===")
+        logger.info(f"Graph: {graph_gpkg_path}")
+        logger.info(f"ENC Data: {enc_data_path}")
+        logger.info(f"Processing {len(static_layers)} layers")
+
+        # Build ENC filter clause
+        if filtered_enc_names:
+            enc_filter = "AND f.dsid_dsnm IN (" + ",".join([f"'{enc}'" for enc in filtered_enc_names]) + ")"
+        else:
+            enc_filter = ""
+
+        # Connect to graph database
+        conn_graph = sqlite3.connect(graph_gpkg_path)
+        conn_graph.enable_load_extension(True)
+
+        # Load SpatiaLite extension for GeoPackage geometry validation triggers
+        # WHY: GeoPackage files have geometry validation triggers (per GPKG spec) that
+        #      call SpatiaLite functions during UPDATE/INSERT operations
+        # NOTE: Our spatial queries use GeoPackage built-in functions, not SpatiaLite
+        try:
+            conn_graph.load_extension("mod_spatialite")
+        except sqlite3.OperationalError:
+            try:
+                conn_graph.load_extension("libspatialite")
+            except sqlite3.OperationalError:
+                raise RuntimeError(
+                    "Cannot load SpatiaLite extension. GeoPackage files require SpatiaLite "
+                    "for geometry validation triggers.\n"
+                    "Install: sudo apt-get install libspatialite-dev (Linux) or brew install libspatialite (Mac)"
+                )
+
+        cursor_graph = conn_graph.cursor()
+
+        # --- Dynamically detect the geometry column name for the graph ---
+        cursor_graph.execute("PRAGMA table_info(edges)")
+        graph_columns = [row[1] for row in cursor_graph.fetchall()]
+        graph_geom_col = 'geom' if 'geom' in graph_columns else 'geometry'
+        if graph_geom_col not in graph_columns:
+            conn_graph.close()
+            raise ValueError("No geometry column ('geom' or 'geometry') found in the edges table.")
+        logger.info(f"Using graph geometry column: '{graph_geom_col}'")
+
+        try:
+            # Step 1: Ensure three-tier columns exist
+            logger.info("Ensuring three-tier weight columns exist...")
+
+            for col in ['wt_static_blocking', 'wt_static_penalty', 'wt_static_bonus']:
+                cursor_graph.execute(
+                    "SELECT COUNT(*) FROM pragma_table_info('edges') WHERE name = ?",
+                    (col,)
+                )
+
+                if cursor_graph.fetchone()[0] == 0:
+                    cursor_graph.execute(f"ALTER TABLE edges ADD COLUMN {col} REAL DEFAULT 1.0")
+                    logger.info(f"Added '{col}' column to edges")
+
+            # Step 2: Reset three-tier columns to neutral values
+            cursor_graph.execute("""
+                UPDATE edges
+                SET wt_static_blocking = 1.0,
+                    wt_static_penalty = 1.0,
+                    wt_static_bonus = 1.0
+            """)
+            conn_graph.commit()
+            logger.info("Reset three-tier columns to neutral (1.0)")
+
+            # Step 3: Check for pre-computed land area grid (for LNDARE optimization)
+            has_land_area = False
+            land_geom_col = None
+
+            if land_area_layer:
+                cursor_graph.execute("""
+                    SELECT name FROM sqlite_master
+                    WHERE type='table' AND name=? COLLATE NOCASE
+                """, (land_area_layer,))
+                has_land_area = cursor_graph.fetchone() is not None
+
+                if has_land_area:
+                    # Detect geometry column name for land layer
+                    try:
+                        cursor_graph.execute(f"SELECT * FROM {land_area_layer} LIMIT 0")
+                        land_cols = {col[0].lower(): col[0] for col in cursor_graph.description}
+                        land_geom_col = next((land_cols[g] for g in ['geom', 'geometry'] if g in land_cols), None)
+
+                        if land_geom_col:
+                            logger.info(f"Found pre-computed '{land_area_layer}' layer - will use for fast LNDARE optimization")
+                        else:
+                            logger.warning(f"Layer '{land_area_layer}' has no geometry column - will use standard LNDARE processing")
+                            has_land_area = False
+                    except sqlite3.Error as e:
+                        logger.warning(f"Failed to inspect layer '{land_area_layer}': {e} - will use standard LNDARE processing")
+                        has_land_area = False
+                else:
+                    logger.info(f"No '{land_area_layer}' layer found - LNDARE will use standard ENC-based processing")
+            else:
+                logger.debug(f"No land_area_layer parameter provided - LNDARE will use standard ENC-based processing")
+
+            # Step 4: Attach ENC database
+            try:
+                cursor_graph.execute(f"ATTACH DATABASE '{enc_data_path}' AS enc_db")
+                logger.info(f"Attached ENC database: {enc_data_path}")
+            except sqlite3.Error as e:
+                logger.error(f"Failed to attach ENC database '{enc_data_path}': {e}")
+                raise
+
+            # Step 5: Verify R-tree spatial indexes exist for performance
+            # GeoPackage stores R-tree indexes in rtree_<table>_<geom_col> tables
+            logger.info("Verifying R-tree spatial indexes...")
+
+            # Check graph edges R-tree
+            cursor_graph.execute(f"""
+                SELECT name FROM sqlite_master
+                WHERE type='table' AND name LIKE 'rtree_edges_%'
+            """)
+            graph_rtree_tables = cursor_graph.fetchall()
+            if graph_rtree_tables:
+                logger.info(f"  Graph edges: R-tree index found ({len(graph_rtree_tables)} table(s))")
+            else:
+                logger.warning(f"  Graph edges: No R-tree index found. Spatial queries may be slow.")
+                logger.warning(f"  Consider recreating the GeoPackage with spatial indexes enabled.")
+
+            # Check ENC layer R-trees (sample check on common layers)
+            sample_enc_layers = ['DEPARE', 'LNDARE', 'UWTROC', 'OBSTRN']
+            enc_rtree_count = 0
+            for sample_layer in sample_enc_layers:
+                cursor_graph.execute(f"""
+                    SELECT name FROM enc_db.sqlite_master
+                    WHERE type='table' AND name LIKE 'rtree_{sample_layer}_%' COLLATE NOCASE
+                """)
+                if cursor_graph.fetchone():
+                    enc_rtree_count += 1
+
+            if enc_rtree_count > 0:
+                logger.info(f"  ENC data: R-tree indexes found ({enc_rtree_count}/{len(sample_enc_layers)} sampled layers)")
+            else:
+                logger.warning(f"  ENC data: No R-tree indexes found in sampled layers. Spatial queries may be slow.")
+                logger.warning(f"  ENC data should be created with 'SPATIAL_INDEX=YES' option.")
+
+            # Step 6: Cache for ENC layer geometry column names (avoid repeated PRAGMA queries)
+            enc_geom_col_cache = {}
+
+            # Step 7: Process each layer with three-tier system
+            for layer_name in static_layers:
+                summary['layers_processed'] += 1
+
+                enc_layer_name = layer_name.upper()
+
+                # OPTIMIZATION: Use pre-computed land area for LNDARE
+                if enc_layer_name == 'LNDARE' and has_land_area and land_geom_col:
+                    try:
+                        # Use GeoPandas for read-only LNDARE optimization
+                        # Returns list of FIDs to be blocked - no database writes
+                        # Main connection handles all database updates (single write point)
+                        fids_to_block = self._apply_lndare_optimization_geopandas(
+                            str(graph_path),
+                            land_area_layer
+                        )
+
+                        # Update edges using main connection (no connection conflicts)
+                        if fids_to_block:
+                            logger.info(f"[LNDARE UPDATE] Starting database update for {len(fids_to_block):,} edges...")
+                            update_start = time.perf_counter()
+
+                            # Set timeout to prevent hanging (20 seconds max for safety)
+                            logger.debug(f"[LNDARE UPDATE] Setting query timeout to 20 seconds...")
+                            conn_graph.execute("PRAGMA busy_timeout = 20000")
+
+                            # Optimize sync mode for batch update (faster commit)
+                            logger.info(f"[LNDARE UPDATE] Setting PRAGMA synchronous = NORMAL for faster commit...")
+                            cursor_graph.execute("PRAGMA synchronous = NORMAL")
+
+                            # Use single WHERE IN clause instead of executemany
+                            # This avoids triggering geometry validation 1,250 times
+                            # Single UPDATE = single trigger invocation = 10x faster
+                            logger.info(f"[LNDARE UPDATE] Building SQL with {len(fids_to_block)} FID placeholders...")
+                            fid_placeholders = ','.join('?' * len(fids_to_block))
+                            update_sql = f"""
+                                UPDATE edges
+                                SET wt_static_blocking = MAX(wt_static_blocking, 100)
+                                WHERE fid IN ({fid_placeholders})
+                            """
+
+                            logger.info(f"[LNDARE UPDATE] Executing SQL update (timeout 20s)...")
+                            execute_start = time.perf_counter()
+                            try:
+                                cursor_graph.execute(update_sql, fids_to_block)
+                                execute_elapsed = time.perf_counter() - execute_start
+                                logger.info(f"[LNDARE UPDATE] SQL execution completed: {execute_elapsed:.1f}s")
+                            except sqlite3.OperationalError as e:
+                                if "database is locked" in str(e).lower() or "timeout" in str(e).lower():
+                                    logger.error(f"[LNDARE UPDATE] Database is locked or query timeout: {e}")
+                                    logger.warning(f"[LNDARE UPDATE] Skipping LNDARE optimization due to lock/timeout")
+                                    summary['layers_processed'] -= 1  # Don't count this layer
+                                    continue
+                                else:
+                                    raise
+
+                            logger.info(f"[LNDARE UPDATE] Committing transaction...")
+                            commit_start = time.perf_counter()
+                            conn_graph.commit()
+                            commit_elapsed = time.perf_counter() - commit_start
+                            logger.info(f"[LNDARE UPDATE] Commit: {commit_elapsed:.1f}s")
+
+                            # Restore sync mode for data integrity
+                            cursor_graph.execute("PRAGMA synchronous = FULL")
+
+                            # CRITICAL: Checkpoint WAL after GeoPackage update
+                            # Ensures other connections can see the changes immediately
+                            logger.debug(f"[LNDARE UPDATE] Checkpointing WAL...")
+                            cursor_graph.execute("PRAGMA wal_checkpoint(RESTART)")
+                            logger.debug(f"[LNDARE UPDATE] WAL checkpoint complete")
+
+                            update_elapsed = time.perf_counter() - update_start
+                            logger.info(f"[LNDARE GEOPANDAS] Blocked {len(fids_to_block):,} edges in {update_elapsed:.1f}s total")
+                        else:
+                            logger.info(f"[LNDARE GEOPANDAS] No edges intersecting land")
+
+                        summary['layers_applied'] += 1
+                        summary['layer_details'][layer_name] = {
+                            'blocking': len(fids_to_block),
+                            'penalty': 0,
+                            'bonus': 0
+                        }
+                        logger.info(f"[LNDARE COMPLETE] LNDARE optimization finished successfully")
+                        logger.info(f"[NEXT LAYER] Processing next layer in iteration...")
+                        continue  # Skip standard LNDARE processing
+
+                    except Exception as e:
+                        logger.error(f"GeoPandas LNDARE optimization failed: {e}")
+                        logger.warning(f"Falling back to standard ENC-based LNDARE processing")
+                        # Fall through to standard processing
+
+                # Standard ENC-based LNDARE processing (or any other layer)
+                logger.info(f"[LAYER PROCESSING] Processing layer '{layer_name}' with standard ENC-based approach...")
+                # Get classification from S57Classifier
+                classification = self.classifier.get_classification(enc_layer_name)
+                if not classification:
+                    logger.warning(f"No classification found for layer '{layer_name}', skipping")
+                    summary['layer_details'][layer_name] = {'blocking': 0, 'penalty': 0, 'bonus': 0}
+                    continue
+
+                nav_class = classification['nav_class']
+                base_factor = classification['risk_multiplier']
+                buffer_meters = classification['buffer_meters']
+
+                # Skip neutral factors
+                if base_factor == 1.0:
+                    logger.debug(f"Skipping layer '{layer_name}' with neutral factor 1.0")
+                    summary['layer_details'][layer_name] = {'blocking': 0, 'penalty': 0, 'bonus': 0}
+                    continue
+
+                # Build properly quoted ENC layer name for SQL queries
+                enc_layer_name_quoted = f'"{enc_layer_name}"'
+
+                # Detect geometry column for this ENC layer (with caching)
+                if enc_layer_name in enc_geom_col_cache:
+                    # Use cached geometry column name
+                    enc_geom_col = enc_geom_col_cache[enc_layer_name]
+                    enc_geom_col_quoted = f'"{enc_geom_col}"'
+                else:
+                    # Query and cache geometry column name
+                    try:
+                        cursor_graph.execute(f"SELECT * FROM enc_db.{enc_layer_name_quoted} LIMIT 0")
+                        enc_layer_cols = {col[0].lower(): col[0] for col in cursor_graph.description}
+                        enc_geom_col = next((enc_layer_cols[g] for g in ['geom', 'geometry'] if g in enc_layer_cols), None)
+                        if not enc_geom_col:
+                            logger.warning(f"Skipping layer '{layer_name}': No geometry column found")
+                            summary['layer_details'][layer_name] = {'blocking': 0, 'penalty': 0, 'bonus': 0}
+                            continue
+                        enc_geom_col_quoted = f'"{enc_geom_col}"'
+                        # Cache the result
+                        enc_geom_col_cache[enc_layer_name] = enc_geom_col
+                        logger.debug(f"Cached geometry column '{enc_geom_col}' for layer '{layer_name}'")
+                    except sqlite3.Error as e:
+                        logger.error(f"Failed to inspect layer '{layer_name}': {type(e).__name__}: {e}")
+                        logger.debug(f"Failed to query table: enc_db.{enc_layer_name_quoted}")
+                        summary['layer_details'][layer_name] = {'blocking': 0, 'penalty': 0, 'bonus': 0}
+                        continue
+
+                # Convert buffer meters to degrees (approximate)
+                buffer_degrees = buffer_meters / 111320.0 if buffer_meters > 0 else 0
+
+
+                if nav_class == NavClass.DANGEROUS:
+                    # DANGEROUS always blocks
+                    # Inside buffer: amplified blocking, Outside: base blocking
+                    target_column = 'wt_static_blocking'
+                    inside_factor = self.BLOCKING_THRESHOLD
+                    outside_factor = max(base_factor, self.BLOCKING_THRESHOLD)
+                    aggregation = 'MAX'
+
+                elif nav_class == NavClass.CAUTION:
+                    # CAUTION: Inside buffer→DANGEROUS, Outside→penalty
+                    target_column = 'wt_static_blocking'  # Degrade to blocking when close
+                    inside_factor = base_factor * 10.0
+                    # For edges outside buffer, update penalty column instead
+                    penalty_column = 'wt_static_penalty'
+                    penalty_factor = base_factor
+                    aggregation = 'MULTIPLY'
+
+                elif nav_class == NavClass.SAFE:
+                    # SAFE: Inside buffer→CAUTION, Outside→bonus
+                    # Inside buffer: penalty, Outside: bonus
+                    penalty_column = 'wt_static_penalty'
+                    inside_penalty = base_factor * 2.0
+                    bonus_column = 'wt_static_bonus'
+                    outside_bonus = 1.0 / base_factor if base_factor > 1.0 else base_factor
+                    outside_bonus = max(outside_bonus, self.MIN_BONUS_FACTOR)
+                    aggregation = 'MULTIPLY'
+
+                else:
+                    logger.warning(f"Unknown NavClass for layer '{layer_name}': {nav_class}")
+                    summary['layer_details'][layer_name] = {'blocking': 0, 'penalty': 0, 'bonus': 0}
+                    continue
+
+                # Build SQL update query
+                layer_stats = {'blocking': 0, 'penalty': 0, 'bonus': 0}
+
+                if nav_class == NavClass.DANGEROUS:
+                    # Simple case: always blocking, amplified inside buffer
+                    if buffer_degrees > 0:
+                        update_sql = f"""
+                            WITH nearby_edges AS (
+                                SELECT DISTINCT e.fid
+                                FROM edges e
+                                JOIN enc_db.{enc_layer_name_quoted} f
+                                     ON ST_Distance(e."{graph_geom_col}", f.{enc_geom_col_quoted}) <= {buffer_degrees}
+                                WHERE 1=1 {enc_filter}
+                            )
+                            UPDATE edges
+                            SET {target_column} = MAX({target_column}, {inside_factor})
+                            WHERE fid IN (SELECT fid FROM nearby_edges)
+                        """
+                    else:
+                        # No buffer, direct intersection
+                        update_sql = f"""
+                            WITH intersecting_edges AS (
+                                SELECT DISTINCT e.fid
+                                FROM edges e
+                                JOIN enc_db.{enc_layer_name_quoted} f
+                                    ON ST_Intersects(e."{graph_geom_col}", f.{enc_geom_col_quoted})
+                                WHERE 1=1 {enc_filter}
+                            )
+                            UPDATE edges
+                            SET {target_column} = MAX({target_column}, {outside_factor})
+                            WHERE fid IN (SELECT fid FROM intersecting_edges)
+                        """
+
+                    try:
+                        cursor_graph.execute(update_sql)
+                        conn_graph.commit()
+                        layer_stats['blocking'] = cursor_graph.rowcount
+                    except sqlite3.Error as e:
+                        logger.error(f"Failed to apply weights for '{layer_name}': {type(e).__name__}: {e}")
+                        logger.debug(f"SQL that failed:\n{update_sql}")
+                        conn_graph.rollback()
+
+                elif nav_class == NavClass.CAUTION:
+                    # Two updates: inside buffer→blocking, outside buffer→penalty
+                    if buffer_degrees > 0:
+                        # Inside buffer: degrade to blocking
+                        inside_sql = f"""
+                            WITH nearby_edges AS (
+                                SELECT DISTINCT e.fid
+                                FROM edges e
+                                JOIN enc_db.{enc_layer_name_quoted} f
+                                     ON ST_Distance(e."{graph_geom_col}", f.{enc_geom_col_quoted}) <= {buffer_degrees}
+                                WHERE 1=1 {enc_filter}
+                            )
+                            UPDATE edges
+                            SET {target_column} = MAX({target_column}, {inside_factor})
+                            WHERE fid IN (SELECT fid FROM nearby_edges)
+                        """
+
+                        # Outside buffer: normal penalty
+                        outside_sql = f"""
+                            WITH intersecting_edges AS (
+                                SELECT DISTINCT e.fid
+                                FROM edges e
+                                JOIN enc_db.{enc_layer_name_quoted} f
+                                     ON ST_Intersects(e."{graph_geom_col}", f.{enc_geom_col_quoted})
+                                WHERE 1=1 {enc_filter}
+                                  AND e.fid NOT IN (
+                                      SELECT DISTINCT e2.fid
+                                      FROM edges e2
+                                      JOIN enc_db.{enc_layer_name_quoted} f2
+                                           ON ST_Distance(e2."{graph_geom_col}", f2.{enc_geom_col_quoted}) <= {buffer_degrees}
+                                      WHERE 1=1 {enc_filter}
+                                  )
+                            )
+                            UPDATE edges
+                            SET {penalty_column} = {penalty_column} * {penalty_factor}
+                            WHERE fid IN (SELECT fid FROM intersecting_edges)
+                        """
+
+                        try:
+                            cursor_graph.execute(inside_sql)
+                            conn_graph.commit()
+                            layer_stats['blocking'] = cursor_graph.rowcount
+
+                            cursor_graph.execute(outside_sql)
+                            conn_graph.commit()
+                            layer_stats['penalty'] = cursor_graph.rowcount
+                        except sqlite3.Error as e:
+                            logger.error(f"Failed to apply weights for '{layer_name}': {type(e).__name__}: {e}")
+                            logger.debug(f"Inside SQL:\n{inside_sql}\nOutside SQL:\n{outside_sql}")
+                            conn_graph.rollback()
+                    else:
+                        # No buffer, just penalty
+                        penalty_sql = f"""
+                            WITH intersecting_edges AS (
+                                SELECT DISTINCT e.fid
+                                FROM edges e
+                                JOIN enc_db.{enc_layer_name_quoted} f
+                                     ON ST_Intersects(e."{graph_geom_col}", f.{enc_geom_col_quoted})
+                                WHERE 1=1 {enc_filter}
+                            )
+                            UPDATE edges
+                            SET {penalty_column} = {penalty_column} * {penalty_factor}
+                            WHERE fid IN (SELECT fid FROM intersecting_edges)
+                        """
+
+                        try:
+                            cursor_graph.execute(penalty_sql)
+                            conn_graph.commit()
+                            layer_stats['penalty'] = cursor_graph.rowcount
+                        except sqlite3.Error as e:
+                            logger.error(f"Failed to apply weights for '{layer_name}': {type(e).__name__}: {e}")
+                            logger.debug(f"SQL that failed:\n{penalty_sql}")
+                            conn_graph.rollback()
+
+                elif nav_class == NavClass.SAFE:
+                    # Two updates: inside buffer→penalty, outside buffer→bonus
+                    if buffer_degrees > 0:
+                        # Inside buffer: penalty
+                        inside_sql = f"""
+                            WITH nearby_edges AS (
+                                SELECT DISTINCT e.fid
+                                FROM edges e
+                                JOIN enc_db.{enc_layer_name_quoted} f
+                                     ON ST_Distance(e."{graph_geom_col}", f.{enc_geom_col_quoted}) <= {buffer_degrees}
+                                WHERE 1=1 {enc_filter}
+                            )
+                            UPDATE edges
+                            SET {penalty_column} = {penalty_column} * {inside_penalty}
+                            WHERE fid IN (SELECT fid FROM nearby_edges)
+                        """
+
+                        # Outside buffer: bonus
+                        outside_sql = f"""
+                            WITH intersecting_edges AS (
+                                SELECT DISTINCT e.fid
+                                FROM edges e
+                                JOIN enc_db.{enc_layer_name_quoted} f
+                                     ON ST_Intersects(e."{graph_geom_col}", f.{enc_geom_col_quoted})
+                                WHERE 1=1 {enc_filter}
+                                  AND e.fid NOT IN (
+                                      SELECT DISTINCT e2.fid
+                                      FROM edges e2
+                                      JOIN enc_db.{enc_layer_name_quoted} f2
+                                           ON ST_Distance(e2."{graph_geom_col}", f2.{enc_geom_col_quoted}) <= {buffer_degrees}
+                                      WHERE 1=1 {enc_filter}
+                                  )
+                            )
+                            UPDATE edges
+                            SET {bonus_column} = {bonus_column} * {outside_bonus}
+                            WHERE fid IN (SELECT fid FROM intersecting_edges)
+                        """
+
+                        try:
+                            cursor_graph.execute(inside_sql)
+                            conn_graph.commit()
+                            layer_stats['penalty'] = cursor_graph.rowcount
+
+                            cursor_graph.execute(outside_sql)
+                            conn_graph.commit()
+                            layer_stats['bonus'] = cursor_graph.rowcount
+                        except sqlite3.Error as e:
+                            logger.error(f"Failed to apply weights for '{layer_name}': {type(e).__name__}: {e}")
+                            logger.debug(f"Inside SQL:\n{inside_sql}\nOutside SQL:\n{outside_sql}")
+                            conn_graph.rollback()
+                    else:
+                        # No buffer, just bonus
+                        bonus_sql = f"""
+                            WITH intersecting_edges AS (
+                                SELECT DISTINCT e.fid
+                                FROM edges e
+                                JOIN enc_db.{enc_layer_name_quoted} f
+                                    ON ST_Intersects(e."{graph_geom_col}", f.{enc_geom_col_quoted})
+                                WHERE 1=1 {enc_filter}
+                            )
+                            UPDATE edges
+                            SET {bonus_column} = {bonus_column} * {outside_bonus}
+                            WHERE fid IN (SELECT fid FROM intersecting_edges)
+                        """
+
+                        try:
+                            cursor_graph.execute(bonus_sql)
+                            conn_graph.commit()
+                            layer_stats['bonus'] = cursor_graph.rowcount
+                        except sqlite3.Error as e:
+                            logger.error(f"Failed to apply weights for '{layer_name}': {type(e).__name__}: {e}")
+                            logger.debug(f"SQL that failed:\n{bonus_sql}")
+                            conn_graph.rollback()
+
+                # Log layer results
+                total_updates = sum(layer_stats.values())
+                if total_updates > 0:
+                    logger.info(f"  {layer_name}: {total_updates} edges "
+                              f"(blocking:{layer_stats['blocking']}, "
+                              f"penalty:{layer_stats['penalty']}, bonus:{layer_stats['bonus']})")
+                    summary['layers_applied'] += 1
+
+                summary['layer_details'][layer_name] = layer_stats
+
+            # Step 5: Detach ENC database (if it's still attached)
+            try:
+                cursor_graph.execute("DETACH DATABASE enc_db")
+            except sqlite3.OperationalError as e:
+                if "not found" in str(e).lower():
+                    logger.debug("ENC database was not attached (LNDARE only processed)")
+                else:
+                    raise
+
+        finally:
+            conn_graph.close()
+
+        # Log final summary
+        logger.info(f"=== GPKG Static Weights Complete ===")
+        logger.info(f"Layers processed: {summary['layers_processed']}")
+        logger.info(f"Layers applied: {summary['layers_applied']}")
+
+        total_blocking = sum(d['blocking'] for d in summary['layer_details'].values())
+        total_penalty = sum(d['penalty'] for d in summary['layer_details'].values())
+        total_bonus = sum(d['bonus'] for d in summary['layer_details'].values())
+
+        logger.info(f"Blocking updates: {total_blocking:,}")
+        logger.info(f"Penalty updates: {total_penalty:,}")
+        logger.info(f"Bonus updates: {total_bonus:,}")
+
+        return summary
 
     def calculate_dynamic_safety_margin(self, base_safety_margin: float,
                                         weather_factor: float = 1.0,
@@ -6978,6 +9952,651 @@ class Weights:
 
         return G
 
+    def calculate_dynamic_weights_gpkg(self,
+                                       graph_gpkg_path: str,
+                                       vessel_parameters: Dict[str, Any],
+                                       environmental_conditions: Optional[Dict[str, Any]] = None,
+                                       max_penalty: float = None) -> Dict[str, Any]:
+        """
+        Calculate dynamic edge weights using GeoPackage with three-tier system (matches PostGIS logic).
+
+        This method provides complete logic parity with calculate_dynamic_weights_postgis() but for
+        file-based GeoPackage databases. Executes entirely in the database with performance 15-20x
+        faster than Python version.
+
+        Three-Tier Weight System:
+            Tier 1 (Blocking): Absolute constraints (factor=999)
+                - Land areas, underwater rocks, coastlines
+                - UKC ≤ 0 (grounding)
+                - Dangerous wrecks
+
+            Tier 2 (Penalties): Conditional hazards (multiplicative, capped)
+                - Shallow water (restricted UKC) - 4-band system
+                - Low clearance
+                - Hazard penalties (ft_sounding from wrecks/obstructions/rocks)
+                - Static layer penalties (wt_static_penalty)
+
+            Tier 3 (Bonuses): Preferences (multiplicative, <1.0)
+                - Fairways, TSS lanes
+                - Dredged areas, recommended tracks
+                - Deep water bonus (UKC > draft)
+
+        Weight Calculation:
+            base_weight = weight (copy of original distance)
+            adjusted_weight = base_weight × blocking_factor × penalty_factor × bonus_factor × wt_dir
+
+        IMPORTANT: The 'weight' column is NEVER modified (preserves original distance).
+        The 'adjusted_weight' column contains vessel-specific routing weights.
+        For pathfinding queries, use: ORDER BY adjusted_weight or WHERE adjusted_weight < threshold
+
+        Args:
+            graph_gpkg_path (str): Path to the GeoPackage file containing the graph (.gpkg)
+            vessel_parameters (Dict[str, Any]): Vessel specifications:
+                - draft (float): Vessel draft in meters
+                - height (float): Vessel height above waterline in meters
+                - safety_margin (float): Base safety margin in meters
+                - vessel_type (str): 'cargo', 'passenger', etc.
+                - clearance_safety_margin (float): Optional, default 3.0m
+            environmental_conditions (Dict[str, Any], optional): Environmental factors:
+                - weather_factor (float): Weather multiplier (1.0=good, 2.0=poor)
+                - visibility_factor (float): Visibility multiplier (1.0=good, 2.0=poor)
+                - time_of_day (str): 'day' or 'night'
+            max_penalty (float, optional): Maximum cumulative penalty (default: DEFAULT_MAX_PENALTY)
+
+        Returns:
+            Dict with:
+                - edges_updated: Number of edges updated
+                - edges_blocked: Number of edges with blocking factor
+                - edges_penalized: Number of edges with penalties
+                - edges_bonus: Number of edges with bonuses
+                - edges_directional: Number of edges with directional weights
+                - safety_margin: Calculated dynamic safety margin
+                - vessel_draft: Vessel draft
+                - vessel_height: Vessel height
+                - max_penalty: Maximum penalty used
+
+        Raises:
+            FileNotFoundError: If graph file not found
+            RuntimeError: If SpatiaLite extension cannot be loaded
+
+        Example:
+            weights = Weights(factory)
+
+            vessel_params = {
+                'draft': 7.5,
+                'height': 30.0,
+                'safety_margin': 2.0,
+                'vessel_type': 'cargo'
+            }
+            env_conditions = {
+                'weather_factor': 1.5,
+                'visibility_factor': 1.2,
+                'time_of_day': 'night'
+            }
+            summary = weights.calculate_dynamic_weights_gpkg(
+                graph_gpkg_path='graph_enriched.gpkg',
+                vessel_parameters=vessel_params,
+                environmental_conditions=env_conditions
+            )
+            print(f"Updated {summary['edges_updated']} edges")
+            print(f"Blocked {summary['edges_blocked']} edges")
+        """
+        from pathlib import Path
+        import sqlite3
+
+        # Validate input
+        graph_path = Path(graph_gpkg_path)
+        if not graph_path.exists():
+            raise FileNotFoundError(f"Graph file not found: {graph_gpkg_path}")
+
+        # Use class constant if not specified
+        if max_penalty is None:
+            max_penalty = self.DEFAULT_MAX_PENALTY
+
+        # Validate max_penalty
+        if max_penalty <= 1.0:
+            raise ValueError(f"Max penalty must be greater than 1.0, got {max_penalty}")
+
+        # Extract and validate vessel parameters
+        vessel_type = vessel_parameters.get('vessel_type', 'cargo')
+        draft = vessel_parameters.get('draft', 5.0)
+        vessel_height = vessel_parameters.get('height', 25.0)
+        base_safety_margin = vessel_parameters.get('safety_margin', 2.0)
+        clearance_safety = vessel_parameters.get('clearance_safety_margin', 3.0)
+
+        if draft <= 0:
+            raise ValueError(f"Draft must be positive, got {draft}")
+        if vessel_height <= 0:
+            raise ValueError(f"Vessel height must be positive, got {vessel_height}")
+        if base_safety_margin < 0:
+            raise ValueError(f"Safety margin must be non-negative, got {base_safety_margin}")
+        if clearance_safety < 0:
+            raise ValueError(f"Clearance safety margin must be non-negative, got {clearance_safety}")
+
+        # Extract and validate environmental conditions
+        if environmental_conditions is None:
+            environmental_conditions = {}
+
+        weather_factor = environmental_conditions.get('weather_factor', 1.0)
+        visibility_factor = environmental_conditions.get('visibility_factor', 1.0)
+        time_of_day = environmental_conditions.get('time_of_day', 'day')
+
+        if weather_factor < 0:
+            raise ValueError(f"Weather factor must be non-negative, got {weather_factor}")
+        if visibility_factor < 0:
+            raise ValueError(f"Visibility factor must be non-negative, got {visibility_factor}")
+        if time_of_day not in ('day', 'night'):
+            raise ValueError(f"Time of day must be 'day' or 'night', got '{time_of_day}'")
+
+        # Calculate dynamic safety margin
+        safety_margin = self.calculate_dynamic_safety_margin(
+            base_safety_margin, weather_factor, visibility_factor, time_of_day
+        )
+
+        logger.info(f"=== Dynamic Weight Calculation (GeoPackage - Three-Tier System) ===")
+        logger.info(f"Vessel: type={vessel_type}, draft={draft}m, height={vessel_height}m")
+        logger.info(f"Safety margin: {base_safety_margin}m → {safety_margin:.2f}m (adjusted)")
+        logger.info(f"Environment: weather={weather_factor}, visibility={visibility_factor}, time={time_of_day}")
+        logger.info(f"Max penalty cap: {max_penalty}")
+
+        # Connect to graph database
+        conn = sqlite3.connect(graph_gpkg_path)
+        conn.enable_load_extension(True)
+
+        # Load SpatiaLite for GeoPackage geometry validation triggers
+        try:
+            conn.load_extension("mod_spatialite")
+        except sqlite3.OperationalError:
+            try:
+                conn.load_extension("libspatialite")
+            except sqlite3.OperationalError:
+                raise RuntimeError(
+                    "Cannot load SpatiaLite extension. GeoPackage files require SpatiaLite "
+                    "for geometry validation triggers.\n"
+                    "Install: sudo apt-get install libspatialite-dev (Linux) or brew install libspatialite (Mac)"
+                )
+
+        cursor = conn.cursor()
+
+        try:
+            # Ensure weight columns exist
+            logger.info("Ensuring weight calculation columns exist...")
+            for col in ['blocking_factor', 'penalty_factor', 'bonus_factor', 'base_weight', 'adjusted_weight', 'ukc_meters']:
+                cursor.execute(
+                    "SELECT COUNT(*) FROM pragma_table_info('edges') WHERE name = ?",
+                    (col,)
+                )
+                if cursor.fetchone()[0] == 0:
+                    cursor.execute(f"ALTER TABLE edges ADD COLUMN {col} REAL")
+                    logger.info(f"Added '{col}' column to edges")
+
+            # ===== RESET TO DEFAULTS =====
+            logger.info("Tier 0: Resetting factors to defaults...")
+            reset_sql = """
+                UPDATE edges
+                SET blocking_factor = 1.0,
+                    penalty_factor = 1.0,
+                    bonus_factor = 1.0,
+                    ukc_meters = NULL,
+                    base_weight = weight
+            """
+            cursor.execute(reset_sql)
+            conn.commit()
+
+            # ===== TIER 1: BLOCKING FACTORS =====
+            logger.info("Tier 1: Calculating blocking factors...")
+
+            # STATIC BLOCKING: From apply_static_weights_gpkg() - wt_static_blocking column
+            static_blocking_sql = """
+                UPDATE edges
+                SET blocking_factor = MAX(blocking_factor, COALESCE(wt_static_blocking, 1.0))
+                WHERE wt_static_blocking IS NOT NULL AND wt_static_blocking > 1.0
+            """
+            cursor.execute(static_blocking_sql)
+            conn.commit()
+
+            # UKC grounding risk (UKC <= 0)
+            ukc_blocking_sql = f"""
+                UPDATE edges
+                SET blocking_factor = MAX(blocking_factor, {self.BLOCKING_THRESHOLD}),
+                    ukc_meters = COALESCE(ft_depth, {draft + 1}) - {draft}
+                WHERE ft_depth IS NOT NULL
+                  AND (ft_depth - {draft}) <= 0
+            """
+            cursor.execute(ukc_blocking_sql)
+            conn.commit()
+
+            # ===== TIER 2: PENALTY FACTORS =====
+            logger.info("Tier 2: Calculating penalty factors...")
+
+            # Depth penalties (4-band UKC system)
+            # Band 3: 0 < UKC <= safety_margin → ×10.0
+            depth_penalty_band3_sql = f"""
+                UPDATE edges
+                SET penalty_factor = penalty_factor * 10.0,
+                    ukc_meters = ft_depth - {draft}
+                WHERE ft_depth IS NOT NULL
+                  AND (ft_depth - {draft}) > 0
+                  AND (ft_depth - {draft}) <= {safety_margin}
+            """
+            cursor.execute(depth_penalty_band3_sql)
+            conn.commit()
+
+            # Band 2: safety_margin < UKC <= 0.5 * draft → ×2.0
+            depth_penalty_band2_sql = f"""
+                UPDATE edges
+                SET penalty_factor = penalty_factor * 2.0,
+                    ukc_meters = ft_depth - {draft}
+                WHERE ft_depth IS NOT NULL
+                  AND (ft_depth - {draft}) > {safety_margin}
+                  AND (ft_depth - {draft}) <= {0.5 * draft}
+            """
+            cursor.execute(depth_penalty_band2_sql)
+            conn.commit()
+
+            # Transitional band: 0.5 * draft < UKC <= draft → ×1.5
+            depth_penalty_transitional_sql = f"""
+                UPDATE edges
+                SET penalty_factor = penalty_factor * 1.5,
+                    ukc_meters = ft_depth - {draft}
+                WHERE ft_depth IS NOT NULL
+                  AND (ft_depth - {draft}) > {0.5 * draft}
+                  AND (ft_depth - {draft}) <= {draft}
+            """
+            cursor.execute(depth_penalty_transitional_sql)
+            conn.commit()
+
+            # Vertical clearance penalties
+            clearance_penalty_sql = f"""
+                UPDATE edges
+                SET penalty_factor = penalty_factor * 20.0
+                WHERE ft_ver_clearance IS NOT NULL
+                  AND ft_ver_clearance >= {vessel_height}
+                  AND ft_ver_clearance < {vessel_height + clearance_safety}
+            """
+            cursor.execute(clearance_penalty_sql)
+            conn.commit()
+
+            # Sounding penalties (wrecks/obstructions/underwater rocks)
+            # High risk: sounding just above draft
+            sounding_penalty_high_sql = f"""
+                UPDATE edges
+                SET penalty_factor = penalty_factor * 5.0
+                WHERE ft_sounding IS NOT NULL
+                  AND (ft_sounding - {draft}) > 0
+                  AND (ft_sounding - {draft}) <= {safety_margin}
+            """
+            cursor.execute(sounding_penalty_high_sql)
+            conn.commit()
+
+            # Moderate risk: sounding with some clearance
+            sounding_penalty_moderate_sql = f"""
+                UPDATE edges
+                SET penalty_factor = penalty_factor * 3.0
+                WHERE ft_sounding IS NOT NULL
+                  AND (ft_sounding - {draft}) > {safety_margin}
+                  AND (ft_sounding - {draft}) <= {draft}
+            """
+            cursor.execute(sounding_penalty_moderate_sql)
+            conn.commit()
+
+            # STATIC PENALTIES: From apply_static_weights_gpkg() - wt_static_penalty column
+            static_penalty_sql = """
+                UPDATE edges
+                SET penalty_factor = penalty_factor * COALESCE(wt_static_penalty, 1.0)
+                WHERE wt_static_penalty IS NOT NULL AND wt_static_penalty > 1.0
+            """
+            cursor.execute(static_penalty_sql)
+            conn.commit()
+
+            # Cap penalty accumulation
+            cap_penalty_sql = f"""
+                UPDATE edges
+                SET penalty_factor = MIN(penalty_factor, {max_penalty})
+                WHERE penalty_factor > {max_penalty}
+            """
+            cursor.execute(cap_penalty_sql)
+            conn.commit()
+
+            # ===== TIER 3: BONUS FACTORS =====
+            logger.info("Tier 3: Calculating bonus factors...")
+
+            # Deep water bonus (UKC > draft)
+            deep_water_bonus_sql = f"""
+                UPDATE edges
+                SET bonus_factor = bonus_factor * 0.95,
+                    ukc_meters = ft_depth - {draft}
+                WHERE ft_depth IS NOT NULL
+                  AND (ft_depth - {draft}) > {draft}
+            """
+            cursor.execute(deep_water_bonus_sql)
+            conn.commit()
+
+            # STATIC BONUSES: From apply_static_weights_gpkg() - wt_static_bonus column
+            static_bonus_sql = """
+                UPDATE edges
+                SET bonus_factor = bonus_factor * COALESCE(wt_static_bonus, 1.0)
+                WHERE wt_static_bonus IS NOT NULL AND wt_static_bonus < 1.0
+            """
+            cursor.execute(static_bonus_sql)
+            conn.commit()
+
+            # Ensure minimum bonus factor
+            min_bonus_sql = f"""
+                UPDATE edges
+                SET bonus_factor = MAX(bonus_factor, {self.MIN_BONUS_FACTOR})
+                WHERE bonus_factor < {self.MIN_BONUS_FACTOR}
+            """
+            cursor.execute(min_bonus_sql)
+            conn.commit()
+
+            # ===== FINAL WEIGHT CALCULATION =====
+            logger.info("Calculating adjusted weights...")
+
+            # Check if wt_dir column exists (from calculate_directional_weights_gpkg)
+            cursor.execute("SELECT COUNT(*) FROM pragma_table_info('edges') WHERE name = 'wt_dir'")
+            has_wt_dir = cursor.fetchone()[0] > 0
+
+            # Incorporate directional weight factor (wt_dir) if column exists
+            if has_wt_dir:
+                logger.info("Using directional weights (wt_dir column found)")
+                adjusted_weight_sql = """
+                    UPDATE edges
+                    SET adjusted_weight = base_weight * blocking_factor * penalty_factor * bonus_factor * COALESCE(wt_dir, 1.0)
+                """
+            else:
+                logger.warning("Directional weights not found (wt_dir column missing). Using neutral factor 1.0.")
+                logger.warning("Run calculate_directional_weights_gpkg() first to enable directional weights.")
+                adjusted_weight_sql = """
+                    UPDATE edges
+                    SET adjusted_weight = base_weight * blocking_factor * penalty_factor * bonus_factor
+                """
+
+            cursor.execute(adjusted_weight_sql)
+            conn.commit()
+
+            logger.info("NOTE: 'weight' column preserved as original distance. Use 'adjusted_weight' for pathfinding.")
+
+            # ===== GATHER STATISTICS =====
+            logger.info("Gathering weight calculation statistics...")
+
+            if has_wt_dir:
+                stats_sql = f"""
+                    SELECT
+                        COUNT(*) as total_edges,
+                        SUM(CASE WHEN blocking_factor >= {self.BLOCKING_THRESHOLD} THEN 1 ELSE 0 END) as blocked_edges,
+                        SUM(CASE WHEN penalty_factor > 1.0 THEN 1 ELSE 0 END) as penalized_edges,
+                        SUM(CASE WHEN bonus_factor < 1.0 THEN 1 ELSE 0 END) as bonus_edges,
+                        SUM(CASE WHEN wt_dir IS NOT NULL AND wt_dir != 1.0 THEN 1 ELSE 0 END) as directional_edges
+                    FROM edges
+                """
+            else:
+                stats_sql = f"""
+                    SELECT
+                        COUNT(*) as total_edges,
+                        SUM(CASE WHEN blocking_factor >= {self.BLOCKING_THRESHOLD} THEN 1 ELSE 0 END) as blocked_edges,
+                        SUM(CASE WHEN penalty_factor > 1.0 THEN 1 ELSE 0 END) as penalized_edges,
+                        SUM(CASE WHEN bonus_factor < 1.0 THEN 1 ELSE 0 END) as bonus_edges,
+                        0 as directional_edges
+                    FROM edges
+                """
+
+            cursor.execute(stats_sql)
+            result = cursor.fetchone()
+
+            summary = {
+                'edges_updated': result[0],
+                'edges_blocked': result[1],
+                'edges_penalized': result[2],
+                'edges_bonus': result[3],
+                'edges_directional': result[4],
+                'safety_margin': safety_margin,
+                'vessel_draft': draft,
+                'vessel_height': vessel_height,
+                'max_penalty': max_penalty
+            }
+
+            logger.info(f"=== Dynamic Weight Calculation Complete (GeoPackage) ===")
+            logger.info(f"Total edges: {summary['edges_updated']:,}")
+            logger.info(f"Blocked edges: {summary['edges_blocked']:,} ({summary['edges_blocked']/summary['edges_updated']*100:.1f}%)")
+            logger.info(f"Penalized edges: {summary['edges_penalized']:,} ({summary['edges_penalized']/summary['edges_updated']*100:.1f}%)")
+            logger.info(f"Bonus edges: {summary['edges_bonus']:,} ({summary['edges_bonus']/summary['edges_updated']*100:.1f}%)")
+            if has_wt_dir:
+                logger.info(f"Directional adjusted edges: {summary['edges_directional']:,} ({summary['edges_directional']/summary['edges_updated']*100:.1f}%)")
+            else:
+                logger.info(f"Directional adjusted edges: 0 (wt_dir column not found - run calculate_directional_weights_gpkg first)")
+
+            return summary
+
+        finally:
+            conn.close()
+
+    def calculate_directional_weights_gpkg(self,
+                                          graph_gpkg_path: str,
+                                          alignment_bonus: float = 0.8,
+                                          misalignment_penalty: float = 1.5,
+                                          opposite_penalty: float = 3.0) -> Dict[str, int]:
+        """
+        Calculate directional weights based on edge bearing vs traffic flow orientation.
+
+        This method is MUCH faster than calculate_directional_weights() for file-based backends because:
+        - Uses SQL trigonometry (DEGREES, ST_Azimuth) for bearing calculations
+        - Batch updates with single SQL statement
+        - No data transfer to Python
+
+        Performance: 10-15x faster than memory-based approach.
+
+        Requires ft_orient column (traffic flow orientation in degrees) from prior feature enrichment.
+
+        **GeoPackage Naming Conventions:**
+
+        This method operates on the graph GeoPackage database:
+        - Tables: lowercase (e.g., edges)
+        - Columns: lowercase (e.g., ft_orient, ft_trafic, dir_edge_fwd, wt_dir)
+        - All feature columns use 'ft_*' prefix, directional columns use 'dir_*' prefix
+
+        Args:
+            graph_gpkg_path (str): Path to the GeoPackage file containing the graph (.gpkg only)
+            alignment_bonus (float): Weight multiplier for aligned edges (default: 0.8 = faster)
+            misalignment_penalty (float): Weight multiplier for misaligned edges (default: 1.5 = slower)
+            opposite_penalty (float): Weight multiplier for opposite direction (default: 3.0 = much slower)
+
+        Returns:
+            Dict[str, int]: Summary with edges_updated count
+
+        Raises:
+            FileNotFoundError: If graph file not found
+
+        Example:
+            weights = Weights(factory)
+
+            # Must run feature enrichment first to get ft_orient
+            weights.enrich_edges_with_features_gpkg(
+                graph_gpkg_path='graph_directed.gpkg',
+                enc_data_path='enc_data.gpkg',
+                enc_names=enc_list
+            )
+
+            # Then calculate directional weights
+            summary = weights.calculate_directional_weights_gpkg(
+                graph_gpkg_path='graph_directed.gpkg'
+            )
+
+            print(f"Updated {summary['edges_updated']:,} edges with directional weights")
+        """
+        from pathlib import Path
+        import sqlite3
+
+        # Validate input
+        graph_path = Path(graph_gpkg_path)
+        if not graph_path.exists():
+            raise FileNotFoundError(f"Graph file not found: {graph_gpkg_path}")
+
+        logger.info(f"=== GeoPackage Directional Weights Calculation ===")
+        logger.info(f"Graph: {graph_gpkg_path}")
+        logger.info(f"Alignment: bonus={alignment_bonus}, misalign={misalignment_penalty}, opposite={opposite_penalty}")
+
+        # Connect to graph database
+        conn = sqlite3.connect(graph_gpkg_path)
+        conn.enable_load_extension(True)
+
+        # Load SpatiaLite for GeoPackage geometry validation triggers
+        try:
+            conn.load_extension("mod_spatialite")
+        except sqlite3.OperationalError:
+            try:
+                conn.load_extension("libspatialite")
+            except sqlite3.OperationalError:
+                raise RuntimeError(
+                    "Cannot load SpatiaLite extension. GeoPackage files require SpatiaLite "
+                    "for geometry validation triggers.\n"
+                    "Install: sudo apt-get install libspatialite-dev (Linux) or brew install libspatialite (Mac)"
+                )
+
+        cursor = conn.cursor()
+
+        # --- FIX: Dynamically detect the geometry column name ---
+        # GeoPackage files can use 'geom' or 'geometry'
+        cursor.execute("PRAGMA table_info(edges)")
+        columns = [row[1] for row in cursor.fetchall()]
+        geom_col = 'geom' if 'geom' in columns else 'geometry'
+        if geom_col not in columns:
+            conn.close()
+            raise OperationalError("No geometry column ('geom' or 'geometry') found in the edges table.")
+        logger.info(f"Using geometry column: '{geom_col}'")
+
+        try:
+            # Ensure directional weight columns exist
+            logger.info("Ensuring directional weight columns exist...")
+
+            for col in ['dir_edge_fwd', 'dir_diff', 'wt_dir']:
+                cursor.execute(
+                    "SELECT COUNT(*) FROM pragma_table_info('edges') WHERE name = ?",
+                    (col,)
+                )
+
+                if cursor.fetchone()[0] == 0:
+                    cursor.execute(f"ALTER TABLE edges ADD COLUMN {col} REAL")
+                    logger.info(f"Added '{col}' column to edges")
+
+            # Check if ft_orient exists (from traffic flow enrichment)
+            cursor.execute(
+                "SELECT COUNT(*) FROM pragma_table_info('edges') WHERE name = 'ft_orient'"
+            )
+
+            if cursor.fetchone()[0] == 0:
+                logger.warning("Column 'ft_orient' not found. Run enrich_edges_with_features_gpkg() first.")
+                logger.warning("Setting all directional weights to neutral (1.0)")
+
+                cursor.execute("UPDATE edges SET wt_dir = 1.0")
+                conn.commit()
+                conn.close()
+                return {'edges_updated': 0}
+
+            # Calculate edge bearing and directional weights using SQL trigonometry
+            # ST_Azimuth returns radians, convert to degrees
+            # Angular difference calculation handles 0-360 wrap-around
+            directional_sql = f"""
+                UPDATE edges
+                SET
+                    -- Calculate edge forward bearing (0-360 degrees)
+                    dir_edge_fwd = (
+                        DEGREES(ST_Azimuth(
+                            ST_StartPoint({geom_col}),
+                            ST_EndPoint({geom_col})
+                        )) + 360
+                    ) % 360.0,
+
+                    -- Calculate angular difference with traffic flow
+                    -- Use minimum of clockwise and counter-clockwise difference
+                    dir_diff = MIN(
+                        ABS((
+                            DEGREES(ST_Azimuth(
+                                ST_StartPoint({geom_col}),
+                                ST_EndPoint({geom_col})
+                            )) + 360
+                        ) % 360.0 - COALESCE(ft_orient, 0)),
+                        360.0 - ABS((
+                            DEGREES(ST_Azimuth(
+                                ST_StartPoint({geom_col}),
+                                ST_EndPoint({geom_col})
+                            )) + 360
+                        ) % 360.0 - COALESCE(ft_orient, 0))
+                    ),
+
+                    -- Apply directional weight based on alignment
+                    wt_dir = CASE
+                        WHEN ft_orient IS NULL THEN 1.0  -- No traffic flow data, neutral
+                        -- Aligned (within 30 degrees)
+                        WHEN MIN(
+                            ABS((
+                                DEGREES(ST_Azimuth(
+                                    ST_StartPoint({geom_col}),
+                                    ST_EndPoint({geom_col})
+                                )) + 360
+                            ) % 360.0 - ft_orient),
+                            360.0 - ABS((
+                                DEGREES(ST_Azimuth(
+                                    ST_StartPoint({geom_col}),
+                                    ST_EndPoint({geom_col})
+                                )) + 360
+                            ) % 360.0 - ft_orient)
+                        ) < 30 THEN {alignment_bonus}
+                        -- Opposite (150-210 degrees, i.e., within 30 degrees of 180)
+                        WHEN MIN(
+                            ABS((
+                                DEGREES(ST_Azimuth(
+                                    ST_StartPoint({geom_col}),
+                                    ST_EndPoint({geom_col})
+                                )) + 360
+                            ) % 360.0 - ft_orient),
+                            360.0 - ABS((
+                                DEGREES(ST_Azimuth(
+                                    ST_StartPoint({geom_col}),
+                                    ST_EndPoint({geom_col})
+                                )) + 360
+                            ) % 360.0 - ft_orient)
+                        ) BETWEEN 150 AND 210 THEN {opposite_penalty}
+                        -- Misaligned (30-150 or 210-330)
+                        ELSE {misalignment_penalty}
+                    END
+                WHERE 1=1
+            """
+
+            cursor.execute(directional_sql)
+            conn.commit()
+            edges_updated = cursor.rowcount
+
+            logger.info(f"Updated {edges_updated:,} edges with directional weights")
+
+            # Get statistics on directional weights
+            cursor.execute(f"""
+                SELECT
+                    COUNT(*) as total,
+                    COUNT(CASE WHEN wt_dir = {alignment_bonus} THEN 1 END) as aligned,
+                    COUNT(CASE WHEN wt_dir = {misalignment_penalty} THEN 1 END) as misaligned,
+                    COUNT(CASE WHEN wt_dir = {opposite_penalty} THEN 1 END) as opposite,
+                    COUNT(CASE WHEN wt_dir = 1.0 AND ft_orient IS NULL THEN 1 END) as no_data
+                FROM edges
+            """)
+
+            stats = cursor.fetchone()
+            if stats:
+                total, aligned, misaligned, opposite, no_data = stats
+                logger.info(f"Directional Weight Statistics:")
+                logger.info(f"  Total edges: {total:,}")
+                logger.info(f"  Aligned (bonus): {aligned:,}")
+                logger.info(f"  Misaligned (penalty): {misaligned:,}")
+                logger.info(f"  Opposite (high penalty): {opposite:,}")
+                logger.info(f"  No traffic flow data: {no_data:,}")
+
+        finally:
+            conn.close()
+
+        logger.info(f"=== GPKG Directional Weights Complete ===")
+
+        return {'edges_updated': edges_updated}
+
     def calculate_directional_weights(self, graph: nx.Graph,
                                       apply_to_layers: Optional[List[str]] = None,
                                       angle_bands: Optional[List[Dict[str, Any]]] = None,
@@ -6994,7 +10613,7 @@ class Weights:
 
         Directional Weight System:
             - Extracts ft_orient and ft_trafic from S-57 features (ORIENT, TRAFIC attributes)
-            - Calculates dir_forward (edge orientation from A->B in degrees)
+            - Calculates dir_edge_fwd (edge orientation from A->B in degrees)
             - Calculates dir_diff (angular difference between feature orient and edge direction)
             - Applies wt_dir based on configurable angle_bands from YAML config
 
@@ -7036,7 +10655,7 @@ class Weights:
                 - ft_orient: Feature orientation in degrees (0-360)
                 - ft_trafic: Traffic flow code (1-4)
                 - ft_orient_rev: Reversed orientation for two-way traffic
-                - dir_forward: Edge direction from u->v in degrees
+                - dir_edge_fwd: Edge direction from u->v in degrees
                 - dir_diff: Angular difference between feature and edge
                 - wt_dir: Directional weight factor (configurable)
 
@@ -7046,7 +10665,7 @@ class Weights:
             graph = weights.enrich_edges_with_features(graph, enc_names)
             # Then calculate directional weights (uses config defaults)
             graph = weights.calculate_directional_weights(graph)
-            # Edges now have ft_orient, dir_forward, dir_diff, wt_dir attributes
+            # Edges now have ft_orient, dir_edge_fwd, dir_diff, wt_dir attributes
 
             # Custom angle bands (override config)
             custom_bands = [
@@ -7116,8 +10735,8 @@ class Weights:
             stats['edges_total'] += 1
 
             # Calculate edge forward direction (bearing from u to v)
-            dir_forward = self._calculate_bearing(u, v)
-            G[u][v]['dir_forward'] = dir_forward
+            dir_edge_fwd = self._calculate_bearing(u, v)
+            G[u][v]['dir_edge_fwd'] = dir_edge_fwd
 
             # Extract feature orientation if available
             ft_orient = data.get('ft_orient')
@@ -7132,14 +10751,14 @@ class Weights:
             stats['edges_with_orient'] += 1
 
             # Calculate angular difference (handling 360° wrap-around)
-            dir_diff = self._calculate_angular_difference(ft_orient, dir_forward)
+            dir_diff = self._calculate_angular_difference(ft_orient, dir_edge_fwd)
 
             # Check if this is two-way traffic and opposite direction
             ft_orient_rev = None
             if two_way_enabled and ft_trafic == 4 and dir_diff > reverse_check_threshold:
                 # Two-way traffic: check if edge aligns with reverse orientation
                 ft_orient_rev = (ft_orient + 180) % 360
-                dir_diff_rev = self._calculate_angular_difference(ft_orient_rev, dir_forward)
+                dir_diff_rev = self._calculate_angular_difference(ft_orient_rev, dir_edge_fwd)
 
                 # Use reverse orientation if it provides better alignment
                 if dir_diff_rev < dir_diff:
@@ -7393,7 +11012,8 @@ class Weights:
                 'target': pd.Series(dtype='object'),
                 'geometry': gpd.GeoSeries(dtype='geometry')
             }, crs="EPSG:4326")
-            empty_nodes.to_file(output_path, layer='nodes', driver='GPKG')
+            empty_nodes.to_file(output_path, layer='nodes', driver='GPKG', engine='fiona')
+            # Use pyogrio for append mode (fiona doesn't support GPKG append well)
             empty_edges.to_file(output_path, layer='edges', driver='GPKG', mode='a')
             save_performance.end_timer("save_weighted_graph_gpkg_total")
             return
@@ -7411,7 +11031,7 @@ class Weights:
         nodes_processing_time = save_performance.end_timer("nodes_processing")
 
         save_performance.start_timer("nodes_save")
-        nodes_gdf.to_file(output_path, layer='nodes', driver='GPKG')
+        nodes_gdf.to_file(output_path, layer='nodes', driver='GPKG', engine='fiona')
         nodes_save_time = save_performance.end_timer("nodes_save")
         logger.info(f"Saved {len(nodes_gdf):,} nodes in {nodes_save_time:.3f}s")
 
@@ -7421,6 +11041,7 @@ class Weights:
         edges_processing_time = save_performance.end_timer("edges_processing")
 
         save_performance.start_timer("edges_save")
+        # Use pyogrio for append mode (fiona doesn't support GPKG append well)
         edges_gdf.to_file(output_path, layer='edges', driver='GPKG', mode='a')
         edges_save_time = save_performance.end_timer("edges_save")
 
@@ -7760,6 +11381,318 @@ def main_graph_creation() -> None:
         logger.info("Graph creation process completed successfully.")
     else:
         logger.error("Graph creation failed.")
+
+
+class FineTuning:
+    """
+    Fine-tuning utilities for graph edge weight adjustments.
+
+    This class provides methods for recalculating and updating edge weights
+    based on various factors such as directional differences, traffic patterns,
+    and other maritime navigation considerations.
+    """
+
+    def __init__(self, data_factory: ENCDataFactory, graph_schema: str = 'graph', config_path: Union[str, Path] = None):
+        """
+        Initialize the FineTuning class.
+
+        Args:
+            data_factory (ENCDataFactory): An initialized factory for accessing ENC data.
+            graph_schema (str): Schema name for graph tables (PostGIS) or database path (file-based)
+            config_path (Union[str, Path], optional): Path to graph_config.yml. If None, uses default location.
+        """
+        self.factory = data_factory
+        self.graph_schema = graph_schema
+        self.performance = PerformanceMetrics()
+
+        # Load configuration
+        if config_path is None:
+            # Default to data directory
+            config_path = Path(__file__).parent.parent / 'data' / 'graph_config.yml'
+
+        self.config_manager = GraphConfigManager(config_path)
+        self.config = self.config_manager.data
+
+        # Extract directional weight configuration
+        self.dir_config = self.config.get('weight_settings', {}).get('directional_weights', {})
+
+        logger.info(f"FineTuning initialized with schema: {graph_schema}")
+        logger.info(f"Directional weights enabled: {self.dir_config.get('enabled', False)}")
+
+    def reapply_directional_weights(self, table_prefix: str = "graph",
+                                   batch_size: int = 10000,
+                                   commit_interval: int = 50000) -> Dict[str, Any]:
+        """
+        Recalculate and update wt_dir (directional weight) based on dir_diff.
+
+        This method reads the directional difference (dir_diff) column from the edges table
+        and applies weight factors based on the configured angle bands from graph_config.yml.
+
+        Process:
+            1. Load directional weight configuration from graph_config.yml
+            2. Read edges in batches with dir_diff and dir_trafic values
+            3. For each edge, determine the appropriate weight based on:
+               - Angular difference (dir_diff) between edge bearing and feature orientation
+               - Two-way traffic handling (TRAFIC=4) for reverse direction checking
+            4. Update wt_dir column in the database
+
+        Configuration used from graph_config.yml:
+            - weight_settings.directional_weights.enabled: Enable/disable processing
+            - weight_settings.directional_weights.angle_bands: Weight factors by angle range
+            - weight_settings.directional_weights.two_way_traffic: Reverse direction handling
+            - weight_settings.directional_weights.apply_to_layers: Layer filter (optional)
+
+        Args:
+            table_prefix (str): Prefix for graph tables (default: "graph")
+                               Uses {prefix}_edges table
+            batch_size (int): Number of edges to process per batch (default: 10000)
+            commit_interval (int): Number of edges to commit at once (default: 50000)
+
+        Returns:
+            Dict[str, Any]: Processing statistics:
+                - 'total_edges': Total number of edges in table
+                - 'edges_with_dir_diff': Number of edges with directional data
+                - 'edges_updated': Number of edges where wt_dir was updated
+                - 'processing_time': Total processing time in seconds
+                - 'update_rate': Edges updated per second
+
+        Raises:
+            ValueError: If directional weights are disabled in configuration
+            ValueError: If required columns (dir_diff, wt_dir) are missing
+
+        Example:
+            from maritime_module.core.s57_data import ENCDataFactory
+            factory = ENCDataFactory.create_postgis("postgresql://user:pass@localhost/db")
+            fine_tuning = FineTuning(factory, graph_schema='graph')
+
+            stats = fine_tuning.reapply_directional_weights(
+                 table_prefix='fine_graph_01',
+                 batch_size=10000
+            )
+            print(f"Updated {stats['edges_updated']:,} edges in {stats['processing_time']:.2f}s")
+        """
+        self.performance.start_timer("reapply_directional_weights_total")
+
+        # Check if directional weights are enabled
+        if not self.dir_config.get('enabled', False):
+            raise ValueError("Directional weights are disabled in configuration. "
+                           "Set weight_settings.directional_weights.enabled to true in graph_config.yml")
+
+        # Validate table prefix
+        validated_prefix = BaseGraph._validate_identifier(table_prefix, "table prefix")
+        edges_table = f"{validated_prefix}_edges"
+
+        logger.info(f"=== Reapplying Directional Weights ===")
+        logger.info(f"Target table: {self.graph_schema}.{edges_table}")
+        logger.info(f"Batch size: {batch_size:,}, Commit interval: {commit_interval:,}")
+
+        # Extract angle bands configuration
+        angle_bands = self.dir_config.get('angle_bands', [])
+        if not angle_bands:
+            raise ValueError("No angle_bands defined in configuration")
+
+        # Sort angle bands by max_angle for efficient lookup
+        angle_bands_sorted = sorted(angle_bands, key=lambda x: x['max_angle'])
+
+        # Extract two-way traffic configuration
+        two_way_config = self.dir_config.get('two_way_traffic', {})
+        two_way_enabled = two_way_config.get('enabled', True)
+        reverse_threshold = two_way_config.get('reverse_check_threshold', 95)
+
+        logger.info(f"Angle bands configured: {len(angle_bands_sorted)}")
+        logger.info(f"Two-way traffic handling: {'enabled' if two_way_enabled else 'disabled'}")
+        if two_way_enabled:
+            logger.info(f"Reverse check threshold: {reverse_threshold}°")
+
+        try:
+            with self.factory.manager.engine.connect() as conn:
+                # Build qualified table name using the graph schema (not the ENC data schema)
+                if self.graph_schema:
+                    edges_qualified = f'"{self.graph_schema}"."{edges_table}"'
+                else:
+                    edges_qualified = f'"{edges_table}"'
+
+                # Check if required columns exist
+                self.performance.start_timer("column_check_time")
+                check_cols_sql = text(f"""
+                    SELECT column_name
+                    FROM information_schema.columns
+                    WHERE table_name = :table_name
+                    AND column_name IN ('dir_diff', 'dir_trafic', 'wt_dir', 'ft_layer')
+                """)
+
+                existing_cols = {row[0] for row in conn.execute(check_cols_sql, {'table_name': edges_table})}
+
+                if 'dir_diff' not in existing_cols:
+                    raise ValueError(f"Column 'dir_diff' not found in {edges_table}. "
+                                   "Ensure directional weights were calculated during graph enrichment.")
+                if 'wt_dir' not in existing_cols:
+                    raise ValueError(f"Column 'wt_dir' not found in {edges_table}")
+
+                has_trafic = 'dir_trafic' in existing_cols
+                has_layer = 'ft_layer' in existing_cols
+
+                self.performance.end_timer("column_check_time")
+                logger.info(f"Required columns present: dir_diff, wt_dir")
+                logger.info(f"Optional columns: dir_trafic={has_trafic}, ft_layer={has_layer}")
+
+                # Get total edge count
+                self.performance.start_timer("count_edges_time")
+                count_sql = text(f"SELECT COUNT(*) FROM {edges_qualified}")
+                total_edges = conn.execute(count_sql).scalar()
+                self.performance.end_timer("count_edges_time")
+
+                logger.info(f"Total edges in table: {total_edges:,}")
+
+                # Count edges with directional data
+                self.performance.start_timer("count_dir_edges_time")
+                count_dir_sql = text(f"SELECT COUNT(*) FROM {edges_qualified} WHERE dir_diff IS NOT NULL")
+                edges_with_dir = conn.execute(count_dir_sql).scalar()
+                self.performance.end_timer("count_dir_edges_time")
+
+                logger.info(f"Edges with directional data: {edges_with_dir:,} ({edges_with_dir/total_edges*100:.1f}%)")
+
+                if edges_with_dir == 0:
+                    logger.warning("No edges have directional data (dir_diff). Nothing to update.")
+                    return {
+                        'total_edges': total_edges,
+                        'edges_with_dir_diff': 0,
+                        'edges_updated': 0,
+                        'processing_time': 0.0,
+                        'update_rate': 0.0
+                    }
+
+                # Process edges in batches
+                self.performance.start_timer("batch_processing_time")
+                edges_updated = 0
+                batch_num = 0
+
+                # Build SELECT query with optional columns
+                select_cols = "id, dir_diff"
+                if has_trafic:
+                    select_cols += ", dir_trafic"
+                if has_layer:
+                    select_cols += ", ft_layer"
+
+                # Read edges with directional data
+                select_sql = text(f"""
+                    SELECT {select_cols}
+                    FROM {edges_qualified}
+                    WHERE dir_diff IS NOT NULL
+                    ORDER BY id
+                """)
+
+                # Prepare updates list
+                updates = []
+
+                logger.info("Processing edges...")
+                result = conn.execute(select_sql)
+
+                for row in result:
+                    edge_id = row.id
+                    dir_diff = row.dir_diff
+                    dir_trafic = row.dir_trafic if has_trafic else None
+                    ft_layer = row.ft_layer if has_layer else None
+
+                    # Check layer filter if configured
+                    apply_to_layers = self.dir_config.get('apply_to_layers')
+                    if apply_to_layers and ft_layer:
+                        if ft_layer not in apply_to_layers:
+                            continue  # Skip this edge, layer not in filter
+
+                    # Handle two-way traffic (TRAFIC=4)
+                    effective_diff = dir_diff
+                    if two_way_enabled and dir_trafic == 4 and dir_diff > reverse_threshold:
+                        # Check reverse direction (orient + 180)
+                        reverse_diff = abs(180 - dir_diff)
+                        if reverse_diff < dir_diff:
+                            effective_diff = reverse_diff
+
+                    # Find matching angle band
+                    wt_dir = 1.0  # Default weight
+                    for band in angle_bands_sorted:
+                        if effective_diff <= band['max_angle']:
+                            wt_dir = band['weight']
+                            break
+
+                    # Add to updates
+                    updates.append({'edge_id': edge_id, 'wt_dir': wt_dir})
+
+                    # Commit batch if we've reached the interval
+                    if len(updates) >= commit_interval:
+                        self._execute_batch_update(conn, edges_qualified, updates)
+                        edges_updated += len(updates)
+                        batch_num += 1
+                        logger.info(f"Batch {batch_num}: Updated {edges_updated:,} edges")
+                        updates = []
+
+                # Commit remaining updates
+                if updates:
+                    self._execute_batch_update(conn, edges_qualified, updates)
+                    edges_updated += len(updates)
+                    batch_num += 1
+                    logger.info(f"Batch {batch_num} (final): Updated {edges_updated:,} edges")
+
+                batch_time = self.performance.end_timer("batch_processing_time")
+
+                # Update table statistics
+                self.performance.start_timer("analyze_time")
+                conn.execute(text(f"ANALYZE {edges_qualified}"))
+                conn.commit()
+                analyze_time = self.performance.end_timer("analyze_time")
+                logger.info(f"Updated table statistics in {analyze_time:.3f}s")
+
+        except Exception as e:
+            logger.error(f"Failed to reapply directional weights: {e}")
+            raise
+
+        total_time = self.performance.end_timer("reapply_directional_weights_total")
+
+        # Prepare summary
+        summary = {
+            'total_edges': total_edges,
+            'edges_with_dir_diff': edges_with_dir,
+            'edges_updated': edges_updated,
+            'processing_time': total_time,
+            'update_rate': edges_updated / total_time if total_time > 0 else 0.0
+        }
+
+        logger.info(f"=== Directional Weight Update Complete ===")
+        logger.info(f"Total edges: {total_edges:,}")
+        logger.info(f"Edges with directional data: {edges_with_dir:,}")
+        logger.info(f"Edges updated: {edges_updated:,}")
+        logger.info(f"Processing time: {total_time:.3f}s")
+        logger.info(f"Update rate: {summary['update_rate']:,.0f} edges/sec")
+
+        self.performance.log_summary("Directional Weight Reapplication")
+
+        return summary
+
+    def _execute_batch_update(self, conn, edges_qualified: str, updates: List[Dict]) -> None:
+        """
+        Execute a batch update of wt_dir values using PostgreSQL's efficient UPDATE FROM.
+
+        Args:
+            conn: Database connection
+            edges_qualified: Qualified table name
+            updates: List of dicts with 'edge_id' and 'wt_dir' keys
+        """
+        if not updates:
+            return
+
+        # Build VALUES clause for UPDATE FROM
+        values_list = [f"({u['edge_id']}, {u['wt_dir']})" for u in updates]
+        values_str = ', '.join(values_list)
+
+        update_sql = text(f"""
+            UPDATE {edges_qualified} AS e
+            SET wt_dir = v.wt_dir
+            FROM (VALUES {values_str}) AS v(id, wt_dir)
+            WHERE e.id = v.id
+        """)
+
+        conn.execute(update_sql)
+        conn.commit()
 
 
 def main() -> None:

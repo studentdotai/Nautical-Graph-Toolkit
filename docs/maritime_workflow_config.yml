@@ -1,0 +1,188 @@
+# ===============================================
+# Maritime Workflow Orchestration Configuration
+# ===============================================
+# Database credentials loaded from .env (DB_NAME, DB_USER, DB_PASSWORD, DB_HOST, DB_PORT)
+# Graph generation settings loaded from graph_config.yml
+#
+# This config defines workflow orchestration parameters:
+# - Which pipeline steps to run
+# - Geographic area of interest
+# - Port definitions and coordinates
+# - Vessel specifications
+# - Output paths and naming conventions
+
+# --- Configuration Paths ---
+graph_config_path: "src/maritime_module/data/graph_config.yml"
+
+# --- Database Schema Configuration ---
+database:
+  enc_schema: "us_enc_all"        # Schema containing S-57 ENC layers
+  graph_schema: "graph"           # Schema for saving graph tables
+  route_schema: "routes"          # Schema for route storage
+
+# --- Workflow Control ---
+# Enable/disable major pipeline steps
+workflow:
+  run_base_graph: true            # Step 1: Create base 0.3NM resolution graph
+  run_fine_graph: true            # Step 2: Create fine/H3 high-resolution graph
+  run_weighting: true             # Step 3: Apply weighting system
+  run_pathfinding: true           # Step 4: Calculate optimal routes
+
+# ===============================================
+# STEP 1: BASE GRAPH CONFIGURATION
+# ===============================================
+# Creates initial coarse-resolution graph (0.3 NM spacing)
+# Used to establish AOI and baseline routing before fine-resolution work
+
+base_graph:
+  # Area of Interest (AOI) definition
+  # Two ports define the geographic scope; expansion parameter adds buffer
+  departure_port: "Los Angeles"
+  arrival_port: "San Francisco"
+  expansion_nm: 24.0              # Buffer around ports in nautical miles
+
+  # Graph generation parameters
+  layer_table: "seaare"           # Primary navigable layer from S-57
+  spacing_nm: 0.3                 # Node spacing in nautical miles
+  reduce_distance_nm: 0           # Safety buffer reduction (0 = no reduction)
+
+  # Output naming conventions
+  graph_name: "base_graph_PG"
+  route_name: "base_route"
+
+# ===============================================
+# STEP 2: FINE/H3 GRAPH CONFIGURATION
+# ===============================================
+# Creates high-resolution graph for detailed routing
+# Supports two modes: regular grid ("fine") or hexagonal ("h3")
+
+fine_graph:
+  # Graph resolution mode
+  mode: "h3"                      # Options: "fine" (regular grid) or "h3" (hexagonal)
+
+  # Route buffer configuration
+  load_base_route: true           # Load pre-computed base route from PostGIS
+  base_route_name: "base_route"
+  buffer_size_nm: 24.0            # Buffer distance around route (NM)
+
+  # Optional area slicing (for testing/optimization)
+  # Set slice_buffer=true to reduce processing area to specific latitude range
+  slice_buffer: false
+  slice_south_degree: 37.0        # Southern latitude limit (if slice_buffer=true)
+
+  # Fine grid specific parameters (when mode: "fine")
+  # Regular rectangular grid for high-precision routing
+  fine_spacing_nm: 0.1           # Node spacing in NM (smaller = denser graph)
+  fine_max_edge_factor: 3.0       # Max edge length multiplier
+  fine_bridge_components: true    # Bridge disconnected components
+
+  # H3 hexagonal grid parameters inherited from graph_config.yml
+  # See src/maritime_module/data/graph_config.yml for h3_settings
+
+  # Port definitions for route calculation on fine graph
+  departure_port: "Pilot"
+  departure_coords: {lon: -122.27, lat: 37.0}  # Custom pilot point
+  arrival_port: "San Francisco"
+  arrival_coords: null            # null = use World Port Index coordinates
+
+  # Graph table naming
+  graph_name_undirected: "h3_graph_pg_6_11"
+  gpkg_suffix: "pg_6_11"
+  pg_h3_name_suffix: "pg_6_11"
+  pg_opt_h3_name_suffix: "opt_pg_6_11"
+
+  # Save options for fine/H3 graph
+  save_gpkg: true                 # Save to GeoPackage (fastest, portable)
+  save_postgis: false             # Save to PostGIS (standard insert)
+  save_postgis_optimized: true    # Save to PostGIS (optimized bulk insert) - needed for weighting
+  postgis_chunk_size: 500000      # Batch size for optimized inserts
+  drop_existing: true             # Replace existing tables
+
+# ===============================================
+# STEP 3: WEIGHTING CONFIGURATION
+# ===============================================
+# Apply three-tier weighting system:
+# - Static weights: Distance-based penalties from features
+# - Directional weights: Traffic flow alignment
+# - Dynamic weights: Vessel-specific constraints
+
+weighting:
+  # Source and target graph table names
+  # Must match the table name from fine_graph section (with pg_opt_h3_name_suffix if using save_postgis_optimized)
+  # Note: PostgreSQL auto-lowercases identifiers with uppercase letters, so use lowercase here
+  source_graph_undirected: "h3_graph_opt_pg_6_11"
+  target_graph_directed: "h3_graph_directed_pg_6_11"
+
+  # Sub-step control (can skip completed steps)
+  steps:
+    convert_to_directed: true     # Convert undirected → directed graph
+    enrich_features: true         # Add S-57 feature attributes to edges
+    apply_static_weights: true    # Distance-based feature weights
+    apply_directional_weights: true  # Traffic flow alignment weights
+    apply_dynamic_weights: true   # Vessel-specific constraint weights
+
+  # Vessel parameters (override defaults from graph_config.yml)
+  vessel:
+    draft: 7.5                    # meters (depth below waterline)
+    height: 30.0                  # meters (air draft above waterline)
+    safety_margin: 2.0            # meters (under-keel clearance buffer)
+    vessel_type: "cargo"          # vessel type classification
+
+  # Environmental conditions
+  environment:
+    weather_factor: 1.2           # 1.0=good, >1.0=poor (weight multiplier)
+    visibility_factor: 1.1        # 1.0=good, >1.0=poor (weight multiplier)
+    time_of_day: "day"            # "day" or "night"
+
+  # Feature enrichment configuration
+  enrichment:
+    include_sources: false        # Store ENC source names in edge attributes
+    soundg_buffer_meters: 30      # Buffer for sounding point queries
+
+  # Static weights usage bands
+  # Band 3: Approach (1:90K), Band 4: Harbour (1:22K-45K), Band 5: Berthing (1:4K-12K)
+  static_weights_usage_bands: [3, 4, 5]
+
+# ===============================================
+# STEP 4: PATHFINDING CONFIGURATION
+# ===============================================
+# Calculate optimal routes on weighted graph
+
+pathfinding:
+  # Port definitions for route calculation
+  departure_port: "SF Pilot"
+  departure_coords: {lon: -122.780, lat: 37.006}  # Pilot boarding area
+  arrival_port: "San Francisco Arrival"
+  arrival_coords: {lon: -122.400, lat: 37.805}    # Destination port
+
+  # Weight key for routing (use final adjusted weights)
+  weight_key: "adjusted_weight"
+
+  # Export options
+  export_weighted_graph: true     # Save final weighted graph to GeoPackage
+  route_filename_template: "detailed_route_{draft}m_draft.geojson"
+
+# ===============================================
+# OUTPUT CONFIGURATION
+# ===============================================
+
+output:
+  # Base output directory for all generated files
+  base_dir: "docs/notebooks/output"
+  log_dir: "docs/logs"
+
+  # Performance benchmark CSV export
+  benchmarks:
+    enabled: true                 # Save performance metrics to CSV
+    base_graph_file: "benchmark_graph_base.csv"
+    fine_graph_file: "benchmark_graph_fine.csv"
+    weighted_graph_file: "benchmark_graph_weighted_directed.csv"
+
+# ===============================================
+# LOGGING CONFIGURATION
+# ===============================================
+
+logging:
+  console_level: "INFO"           # Console output level: INFO, DEBUG, WARNING
+  file_level: "DEBUG"             # Log file detail level (always DEBUG)
+  progress_bars: true             # Show tqdm progress bars for long operations
