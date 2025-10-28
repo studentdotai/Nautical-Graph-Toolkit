@@ -2,7 +2,7 @@
 """
 Maritime Graph Workflow - PostGIS Backend
 
-Complete pipeline for maritime navigation graph creation, weighting, and pathfinding.
+Complete pipeline for maritime navigation graph creation, weighting, and pathfinding using PostGIS.
 
 This script orchestrates a multi-step workflow:
 1. Base Graph Creation (0.3 NM resolution)
@@ -10,29 +10,42 @@ This script orchestrates a multi-step workflow:
 3. Graph Weighting (static, directional, dynamic)
 4. Pathfinding and Route Optimization
 
-Configuration:
+BACKEND-SPECIFIC FILE:
+    This is the PostGIS-specific implementation of the maritime workflow.
+    For GeoPackage/SpatiaLite backend, use maritime_graph_geopackage_workflow.py
+    Universal configuration shared by all backends: maritime_workflow_config.yml
+
+DOCUMENTATION:
+    Backend-specific guide: docs/WORKFLOW_POSTGIS_GUIDE.md
+    Quick start guide: docs/WORKFLOW_QUICKSTART.md
+    Setup instructions: docs/SETUP.md
+
+CONFIGURATION FILES:
     Database credentials: .env file (DB_NAME, DB_USER, DB_PASSWORD, DB_HOST, DB_PORT)
-    Workflow parameters: maritime_workflow_config.yml
+    Workflow parameters: docs/maritime_workflow_config.yml (universal, backend-agnostic)
     Graph parameters: src/maritime_module/data/graph_config.yml
 
 Usage:
-    python maritime_graph_workflow.py [options]
+    python docs/maritime_graph_postgis_workflow.py [options]
 
 Examples:
     # Full pipeline with defaults
-    python maritime_graph_workflow.py
+    python docs/maritime_graph_postgis_workflow.py
 
     # Skip base graph (already created)
-    python maritime_graph_workflow.py --skip-base
+    python docs/maritime_graph_postgis_workflow.py --skip-base
 
     # Use fine grid instead of H3
-    python maritime_graph_workflow.py --graph-mode fine
+    python docs/maritime_graph_postgis_workflow.py --graph-mode fine
 
     # Custom vessel draft
-    python maritime_graph_workflow.py --vessel-draft 10.5
+    python docs/maritime_graph_postgis_workflow.py --vessel-draft 10.5
 
     # Dry run (validate config only)
-    python maritime_graph_workflow.py --dry-run
+    python docs/maritime_graph_postgis_workflow.py --dry-run
+
+    # Debug mode with verbose logging
+    python docs/maritime_graph_postgis_workflow.py --log-level DEBUG
 """
 
 import os
@@ -137,7 +150,12 @@ class WorkflowLogger:
 
 
 class WorkflowConfig:
-    """Loads and manages workflow configuration."""
+    """Loads and manages workflow configuration.
+
+    NOTE: This loads maritime_workflow_config.yml which is universal across all backends.
+    Backend-specific implementations (PostGIS, GeoPackage) interpret the same config file
+    according to their backend capabilities and storage mechanisms.
+    """
 
     def __init__(self, config_path: Path):
         with open(config_path) as f:
@@ -199,7 +217,14 @@ class PerformanceTracker:
 
 
 class MaritimeWorkflow:
-    """Main workflow orchestrator."""
+    """Main workflow orchestrator for PostGIS backend.
+
+    IMPORTANT: This is the PostGIS-specific implementation.
+    The workflow uses maritime_workflow_config.yml which contains universal settings
+    shared across all backend implementations (PostGIS, GeoPackage, SpatiaLite).
+
+    For GeoPackage/SpatiaLite workflows, refer to maritime_graph_geopackage_workflow.py
+    """
 
     def __init__(
         self,
@@ -226,9 +251,9 @@ class MaritimeWorkflow:
         self._initialize_database()
 
         self.logger("=" * 60)
-        self.logger("=== Maritime Graph Workflow Started ===")
+        self.logger("=== Maritime Graph Workflow Started (PostGIS Backend) ===")
         self.logger("=" * 60)
-        self.logger(f"Configuration: {config_path.name}")
+        self.logger(f"Configuration: {config_path.name} (universal, backend-agnostic)")
         self.logger(f"Log file: {self.logger_manager.log_file}")
 
     def _initialize_database(self):
@@ -782,7 +807,7 @@ Examples:
         '--config',
         type=Path,
         default=Path(__file__).parent / 'maritime_workflow_config.yml',
-        help='Path to workflow configuration YAML'
+        help='Path to workflow configuration YAML file (universal, backend-agnostic)'
     )
 
     parser.add_argument(
