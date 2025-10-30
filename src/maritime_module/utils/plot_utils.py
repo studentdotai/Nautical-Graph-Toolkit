@@ -1,4 +1,20 @@
+# Copyright (C) 2024-2025 Viktor Kolbasov <contact@studentdotai.com>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 import json
+import logging
 from typing import List, Dict, Union
 
 import geopandas as gpd
@@ -8,6 +24,8 @@ from shapely import wkt
 from shapely.geometry import shape, MultiPolygon, Polygon, LineString
 
 from ..utils.misc_utils import Miscellaneous
+
+logger = logging.getLogger(__name__)
 
 
 class PlotlyChart:
@@ -54,9 +72,9 @@ class PlotlyChart:
 		trace_list = self.get_trace_list(fig)
 		for idx, name in trace_list:
 			if name == trace_name:
-				print(f"Found trace with name '{trace_name}' at index {idx}")
+				logger.debug(f"Found trace with name '{trace_name}' at index {idx}")
 				return idx
-		print(f"Error: Trace with name '{trace_name}' not found.")
+		logger.error(f" Trace with name '{trace_name}' not found.")
 		return None
 
 	@staticmethod
@@ -64,14 +82,14 @@ class PlotlyChart:
 		trace_list = self.get_trace_list(fig)
 		for idx, name in trace_list:
 			if name == trace_name:
-				print(f"Found trace with name '{trace_name}' at index {idx}")
+				logger.debug(f"Found trace with name '{trace_name}' at index {idx}")
 				try:
 					return fig.data[idx].__getattribute__(param_name)
 				except AttributeError:
-					print(f"Error: Trace '{trace_name}' does not have attribute '{param_name}'.")
+					logger.error(f" Trace '{trace_name}' does not have attribute '{param_name}'.")
 					return None
 
-		print(f"Error: Trace with name '{trace_name}' not found.")
+		logger.error(f" Trace with name '{trace_name}' not found.")
 		return None
 
 	@staticmethod
@@ -534,7 +552,7 @@ class PlotlyChart:
 				node_lat.append(point.y)
 				node_text.append(f"Node ID: {row[0]}<br>Lat: {point.y:.6f}<br>Lon: {point.x:.6f}")
 			except Exception as e:
-				print("Error processing node:", e)
+				logger.error("Error processing node:", e)
 
 		figure.add_trace(go.Scattermapbox(
 			lon=node_lon,
@@ -571,7 +589,7 @@ class PlotlyChart:
 				edge_lon.append(None)
 				edge_lat.append(None)
 			except Exception as e:
-				print("Error processing edge:", e)
+				logger.error("Error processing edge:", e)
 
 
 		figure.add_trace(go.Scattermapbox(
@@ -632,7 +650,7 @@ class PlotlyChart:
 					edge_lon.append(None)
 					edge_lat.append(None)
 				except Exception as e:
-					print(f"Error processing edge: {e}")
+					logger.error(f"Error processing edge: {e}")
 					continue
 
 			# Skip empty batches
@@ -773,7 +791,7 @@ class PlotlyChart:
 							target = json.loads(edge[1].replace("'", '"'))
 							coords = [source, target]
 						except (ValueError, json.JSONDecodeError, AttributeError):
-							print(f"Could not parse geometry from edge: {edge}")
+							logger.error(f"Could not parse geometry from edge: {edge}")
 							continue
 
 				# Determine category based on thresholds
@@ -802,7 +820,7 @@ class PlotlyChart:
 					edge_categories[category]['texts'].append(None)
 
 			except Exception as e:
-				print(f"Error processing edge: {e}")
+				logger.error(f"Error processing edge: {e}")
 				import traceback
 				traceback.print_exc()
 				continue
@@ -886,12 +904,12 @@ class PlotlyChart:
 						weights.append(None)
 						hover_texts.append(None)
 			except Exception as e:
-				print(f"Error processing edge: {e}")
+				logger.error(f"Error processing edge: {e}")
 				continue
 
 		# If no valid data, return without adding trace
 		if not valid_weights:
-			print("No valid edges to display")
+			logger.warning("No valid edges to display")
 			return figure
 
 		min_weight = min(valid_weights)
@@ -953,7 +971,7 @@ class PlotlyChart:
 		# Now extract coordinates from the Shapely LineString
 		coords = list(line.coords)
 		if not coords:
-			print("Empty LineString provided; no trace added.")
+			logger.warning("Empty LineString provided; no trace added.")
 			return figure
 
 		# Unpack coordinates into separate lists for longitude and latitude
@@ -1243,10 +1261,10 @@ class PlotlyChart:
 		default_zoom = 5
 
 		for action in changes:
-			print(f" Action: {action}")
+			logger.debug(f"Action: {action}")
 			for usage_band, modifications in changes[action].items():
 				trace_name = f"{usage_band} ENCs"
-				print(f"Updating {trace_name} trace...")
+				logger.debug(f"Updating {trace_name} trace...")
 				trace_idx = self.get_trace_by_name(figure, trace_name)
 
 				if trace_idx is not None:
@@ -1277,7 +1295,7 @@ class PlotlyChart:
 						if not activated_enc_data.empty:
 							centroid = activated_enc_data.unary_union.centroid
 							zoom_level = usage_zoom.get(usage_band, default_zoom)
-							print(f"Zoom level for {usage_band} ENCs: {zoom_level}")
+							logger.debug(f"Zoom level for {usage_band} ENCs: {zoom_level}")
 							self.set_zoom_to(figure, centroid, zoom_level=5)
 
 					# Update trace with new data
@@ -1342,7 +1360,7 @@ class PlotlyChart:
 		try:
 			layer_df = layer_df.to_crs(epsg=4326)
 		except Exception as e:
-			print("Error converting CRS:", e)
+			logger.error(f"Error converting CRS: {e}")
 
 		# If 'ENC_NAME' is not available but 'dsid_dsnm' is, use it as ENC_NAME
 		if "ENC_NAME" not in layer_df.columns and "dsid_dsnm" in layer_df.columns:
@@ -1447,7 +1465,7 @@ class PlotlyChart:
 		try:
 			layer_df = layer_df.to_crs(epsg=4326)
 		except Exception as e:
-			print(f"Error converting CRS: {e}")
+			logger.error(f"Error converting CRS: {e}")
 			return figure
 
 		# If 'ENC_NAME' is not available but 'dsid_dsnm' is, use it as ENC_NAME
@@ -1587,6 +1605,56 @@ class PlotlyChart:
 
 		return fig
 
+	def save_layer_by_usage_band(self, factory, layer_name: str, enc_list: List[str], output_path: str):
+		"""
+		Fetches a layer and saves it to a GeoPackage, with each usage band as a separate layer.
+
+		This is useful for inspecting how different navigational scale data (e.g., overview vs. harbour)
+		is represented for a given S-57 feature.
+
+		Args:
+			factory: An initialized ENCDataFactory instance.
+			layer_name (str): The name of the S-57 layer to process (e.g., 'depare', 'obstrn').
+			enc_list (List[str]): A list of ENC names to filter the data.
+			output_path (str): The path for the output GeoPackage file.
+
+		Example:
+			ply = PlotlyChart()
+			output_file = output_dir / "depare_by_band.gpkg"
+			ply.save_layer_by_usage_band(
+				factory=pg_factory,
+				layer_name="depare",
+				enc_list=enc_list,
+				output_path=str(output_file)
+			)
+		"""
+		logger.info(f"Saving layer '{layer_name}' to '{output_path}' by usage band ---")
+
+		# Fetch the entire layer for the given ENCs first to avoid multiple DB calls
+		try:
+			full_layer_gdf = factory.get_layer(layer_name=layer_name, filter_by_enc=enc_list)
+			if full_layer_gdf.empty:
+				logger.warning(f"Layer '{layer_name}' is empty or not found for the given ENCs. No file created.")
+				return
+		except Exception as e:
+			logger.error(f"Error fetching layer '{layer_name}': {e}")
+			return
+
+		# Iterate through usage bands 1 to 6
+		for i in range(1, 7):
+			band_encs = [enc for enc in enc_list if len(enc) > 2 and enc[2] == str(i)]
+			if not band_encs:
+				continue
+
+			# Filter the GeoDataFrame in memory
+			band_gdf = full_layer_gdf[full_layer_gdf['dsid_dsnm'].isin(band_encs)]
+
+			if not band_gdf.empty:
+				band_layer_name = f"{layer_name}_band_{i}"
+				# Use mode 'a' (append) for subsequent layers
+				mode = 'w' if i == 1 else 'a'
+				band_gdf.to_file(output_path, layer=band_layer_name, driver="GPKG", mode=mode)
+				logger.info(f"Saved {len(band_gdf)} features to layer '{band_layer_name}'")
 
 
 	def bbox_plot_plotly(self, bbox_df, port_df, port_names=None, usage_bands=None, show_ports: bool = True):

@@ -1,4 +1,19 @@
 #!/usr/bin/env python3
+# Copyright (C) 2024-2025 Viktor Kolbasov <contact@studentdotai.com>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 """
 graph.py
 
@@ -7,7 +22,6 @@ This module is designed to be data-source agnostic, working with PostGIS,
 GeoPackage, and SpatiaLite through the ENCDataFactory.
 
 """
-import sys
 import ast
 import argparse
 import io
@@ -15,9 +29,20 @@ import json
 import logging
 import math
 import os
+import random
 import re
 import shutil
+import subprocess
 import sys
+import tempfile
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextlib import contextmanager
+from datetime import datetime
+from decimal import Decimal
+from pathlib import Path
+from typing import Union, List, Dict, Any, Optional, Tuple
+
 # Import pysqlite3-binary first (has RTREE support)
 # Force it into sys.modules to prevent builtin sqlite3 from being used
 try:
@@ -26,14 +51,8 @@ try:
     sqlite3 = pysqlite3
 except ImportError:
     import sqlite3  # Fallback to builtin if pysqlite3 not available
-import subprocess
-import time
-from contextlib import contextmanager
-from datetime import datetime
-from decimal import Decimal
-from pathlib import Path
-from typing import Union, List, Dict, Any, Optional, Tuple
 
+import h3
 import networkx as nx
 import numpy as np
 import pandas as pd
@@ -45,11 +64,11 @@ from shapely.geometry import shape, LineString, MultiPolygon, Point, Polygon, bo
 from shapely.geometry.base import BaseGeometry
 from sqlalchemy import text, MetaData, Table, select, func as sql_func, insert, or_, and_
 
-
 from .s57_data import ENCDataFactory
 from ..utils.s57_utils import S57Utils
 from ..utils.s57_classification import S57Classifier, NavClass
 from ..utils.db_utils import PostGISConnector
+from ..utils.port_utils import PortData, Boundaries
 
 logger = logging.getLogger(__name__)
 
@@ -94,7 +113,7 @@ class GraphConfigManager:
                     value = value[key]
             return value
         except (KeyError, IndexError, TypeError):
-            print(f"Key path '{key_path}' not found in configuration.", file=sys.stderr)
+            logger.error(f"Key path '{key_path}' not found in configuration.")
             return None
 
     def set_value(self, key_path: str, new_value: Any) -> None:
@@ -117,9 +136,9 @@ class GraphConfigManager:
                 d[int(last_key)] = new_value
             else:
                 d[last_key] = new_value
-            print(f"Set '{key_path}' to: {new_value}")
+            logger.info(f"Set '{key_path}' to: {new_value}")
         except (KeyError, IndexError, TypeError):
-            print(f"Could not set value for key path '{key_path}'. Path may be invalid.", file=sys.stderr)
+            logger.error(f"Could not set value for key path '{key_path}'. Path may be invalid.")
 
     def add_to_list(self, key_path: str, item_to_add: Dict[str, Any]) -> None:
         """
@@ -130,9 +149,9 @@ class GraphConfigManager:
         target_list = self.get_value(key_path)
         if isinstance(target_list, list):
             target_list.append(item_to_add)
-            print(f"Added new item to '{key_path}'")
+            logger.info(f"Added new item to '{key_path}'")
         else:
-            print(f"Target at '{key_path}' is not a list.", file=sys.stderr)
+            logger.error(f"Target at '{key_path}' is not a list.")
 
     def save(self, output_path: Optional[Union[str, Path]] = None) -> None:
         """
@@ -145,7 +164,7 @@ class GraphConfigManager:
         save_path = output_path or self.config_path
         with open(save_path, 'w') as f:
             self.yaml.dump(self.data, f)
-        print(f"Configuration saved to: {save_path}")
+        logger.info(f"Configuration saved to: {save_path}")
 
 
 class GraphUtils:
@@ -610,8 +629,7 @@ class BaseGraph:
         self.graph_schema = self._validate_identifier(graph_schema_name, "schema name")
         self.s57_utils = S57Utils()
         self.performance = PerformanceMetrics()
-        # --- FIX: Ensure the factory's manager is connected ---
-        # This can prevent errors if the factory was initialized but not used yet.
+        # The factory's manager is ensured to be connected to prevent runtime errors.
         try:
             self.factory.manager.connect()
         except Exception as e:
@@ -1179,9 +1197,18 @@ class BaseGraph:
 
         try:
             # Use the factory's database-side graph creation
-            graph_data = self.factory.manager.create_grid_graph_nodes_and_edges(
-                polygon, spacing, max_edge_factor, max_points
-            )
+            # Note: PostGIS supports max_points parameter, GeoPackage/SpatiaLite don't
+            manager_type = type(self.factory.manager).__name__
+            if manager_type == 'PostGISConnector':
+                # PostGIS version supports max_points
+                graph_data = self.factory.manager.create_grid_graph_nodes_and_edges(
+                    polygon, spacing, max_edge_factor, max_points
+                )
+            else:
+                # GeoPackage/SpatiaLite versions don't support max_points
+                graph_data = self.factory.manager.create_grid_graph_nodes_and_edges(
+                    polygon, spacing, max_edge_factor
+                )
 
             db_time = self.performance.end_timer("database_grid_subgraph_time")
             logger.info(f"Database grid subgraph creation completed in {db_time:.3f}s")
@@ -1513,7 +1540,7 @@ class BaseGraph:
                 output_path='output.gpkg',
                 schema_name='graph'
             )
-            print(f"Exported {summary['node_count']} nodes, {summary['edge_count']} edges")
+            logger.info(f"Exported {summary['node_count']} nodes, {summary['edge_count']} edges")
         """
         save_performance = PerformanceMetrics()
         save_performance.start_timer("export_postgis_to_gpkg_total")
@@ -1780,7 +1807,7 @@ class BaseGraph:
                 target_path='graph_directed.sqlite'
             )
 
-            print(f"Converted {stats['original_edges']:,} → {stats['directed_edges':,} edges")
+            logger.info(f"Converted {stats['original_edges']:,} → {stats['directed_edges']:,} edges")
         """
         perf = PerformanceMetrics()
         perf.start_timer("convert_to_directed_gpkg_total")
@@ -2493,9 +2520,9 @@ class BaseGraph:
                 source_table_prefix='graph_base',
                 target_table_prefix='graph_directed'
             )
-            print(f"Converted {stats['original_edges']:,} → {stats['directed_edges']:,} edges")
-            print(f"Forward edge IDs: 1 to {stats['original_edges']}")
-            print(f"Reverse edge IDs: {stats['original_edges']+1} to {stats['directed_edges']}")
+            logger.info(f"Converted {stats['original_edges']:,} → {stats['directed_edges']:,} edges")
+            logger.info(f"Forward edge IDs: 1 to {stats['original_edges']}")
+            logger.info(f"Reverse edge IDs: {stats['original_edges']+1} to {stats['directed_edges']}")
         """
         perf = PerformanceMetrics()
         perf.start_timer("convert_to_directed_total")
@@ -2739,8 +2766,8 @@ class BaseGraph:
             G_directed = base_graph.convert_to_directed_nx('graph_base')
 
             # Graph is now ready for directional weight application
-            print(f"Directed graph: {G_directed.number_of_nodes():,} nodes")
-            print(f"Directed graph: {G_directed.number_of_edges():,} edges")
+            logger.info(f"Directed graph: {G_directed.number_of_nodes():,} nodes")
+            logger.info(f"Directed graph: {G_directed.number_of_edges():,} edges")
 
         Note:
             For very large graphs (>5M edges), consider using convert_to_directed_postgis()
@@ -3426,8 +3453,7 @@ class H3Graph(BaseGraph):
         logger.info(f"H3 graph construction completed in {graph_construction_time:.3f}s")
         logger.info(f"Added {G.number_of_edges():,} edges to H3 graph.")
 
-        # For the combined grid, we need to re-fetch and union all geometries
-        # --- FIX: Union the actual polygons used for H3 generation, not re-fetch ---
+        # The combined grid geometry is created by unioning all polygons used for H3 generation.
         self.performance.start_timer("h3_grid_union_time")
         combined_grid_geom = gpd.GeoSeries(all_polygons_for_union).unary_union
         combined_grid_geojson = json.dumps(gpd.GeoSeries([combined_grid_geom]).__geo_interface__['features'][0]['geometry'])
@@ -4218,8 +4244,8 @@ class Weights:
         Example:
             weights = Weights(factory)
             columns = weights.get_edge_columns(graph)
-            print(f"Features: {columns['feature_columns']}")
-            print(f"Weights: {columns['weight_columns']}")
+            logger.debug(f"Features: {columns['feature_columns']}")
+            logger.debug(f"Weights: {columns['weight_columns']}")
         """
         # Get all edge attribute keys from first edge (assumes uniform schema)
         if graph.number_of_edges() == 0:
@@ -4283,32 +4309,36 @@ class Weights:
         """
         columns = self.get_edge_columns(graph, update_cache=False)
 
-        print("\n" + "="*60)
-        print("Edge Column Summary")
-        print("="*60)
+        summary_lines = [
+            "\n" + "="*60,
+            "Edge Column Summary",
+            "="*60
+        ]
 
         if columns['feature_columns']:
-            print(f"\nFeature Columns (ft_*): {len(columns['feature_columns'])}")
+            summary_lines.append(f"\nFeature Columns (ft_*): {len(columns['feature_columns'])}")
             for col in sorted(columns['feature_columns']):
-                print(f"  - {col}")
+                summary_lines.append(f"  - {col}")
 
         if columns['weight_columns']:
-            print(f"\nDynamic Weight Columns (wt_* from features): {len(columns['weight_columns'])}")
+            summary_lines.append(f"\nDynamic Weight Columns (wt_* from features): {len(columns['weight_columns'])}")
             for col in sorted(columns['weight_columns']):
-                print(f"  - {col}")
+                summary_lines.append(f"  - {col}")
 
         if columns['static_weight_columns']:
-            print(f"\nStatic Weight Columns (wt_* from layers): {len(columns['static_weight_columns'])}")
+            summary_lines.append(f"\nStatic Weight Columns (wt_* from layers): {len(columns['static_weight_columns'])}")
             for col in sorted(columns['static_weight_columns']):
-                print(f"  - {col}")
+                summary_lines.append(f"  - {col}")
 
         if columns['directional_columns']:
-            print(f"\nDirectional Columns (dir_*): {len(columns['directional_columns'])}")
+            summary_lines.append(f"\nDirectional Columns (dir_*): {len(columns['directional_columns'])}")
             for col in sorted(columns['directional_columns']):
-                print(f"  - {col}")
+                summary_lines.append(f"  - {col}")
 
-        print(f"\nTotal edge attributes: {len(columns['all_columns'])}")
-        print("="*60 + "\n")
+        summary_lines.append(f"\nTotal edge attributes: {len(columns['all_columns'])}")
+        summary_lines.append("="*60 + "\n")
+
+        logger.debug("\n".join(summary_lines))
 
     def clean_graph(self, graph: nx.Graph) -> nx.Graph:
         """
@@ -4420,7 +4450,7 @@ class Weights:
                 graph_name='fine_graph_01',
                 schema_name='graph'
             )
-            print(f"Removed {clean_summary['columns_dropped']} columns")
+            logger.info(f"Removed {clean_summary['columns_dropped']} columns")
         """
         # Validate PostGIS connection
         if not hasattr(self.factory, 'manager') or not hasattr(self.factory.manager, 'engine'):
@@ -5075,7 +5105,7 @@ class Weights:
                  enc_schema='us_enc_all',
                  soundg_buffer_meters=50.0  # ← Larger buffer for sparse soundings
             )
-            print(summary)  # {'ft_depth': 850234, 'ft_sounding_point': 5432, ...}
+            logger.debug(f"Feature enrichment summary: {summary}")
         """
         # Validate PostGIS connection
         if not hasattr(self.factory, 'manager') or not hasattr(self.factory.manager, 'engine'):
@@ -5797,18 +5827,35 @@ class Weights:
                 def materialize_layer_pre_aggregated(layer_name, config, temp_table_name):
                     """
                     Materialize and pre-aggregate one depth layer in parallel.
-                    Returns: (layer_name, row_count, elapsed_time)
+
+                    OPTIMIZATION: Uses worker-specific temp database to eliminate lock contention.
+                    Each worker writes to its own isolated SQLite file instead of competing
+                    to write to the main GeoPackage file.
+
+                    Returns: (layer_name, worker_db_path, row_count, elapsed_time)
                     """
                     import sqlite3
                     import time
                     import random
+                    import tempfile
+                    import os
+
+                    # Create worker-specific temp database (ZERO LOCK CONTENTION)
+                    # Each worker has isolated file, no competing writes
+                    temp_fd, worker_db_path = tempfile.mkstemp(
+                        suffix=f'_{layer_name}_{os.getpid()}.sqlite',
+                        prefix='enrichment_',
+                        dir=tempfile.gettempdir()
+                    )
+                    os.close(temp_fd)
+                    logger.debug(f"Worker temp database for {layer_name}: {worker_db_path}")
 
                     # Random delay to stagger thread starts and reduce WAL checkpoint conflicts
                     # Increased delay helps when some layers complete very quickly (e.g., swpare with 0 edges)
                     time.sleep(random.uniform(0.3, 0.6))
 
-                    # Each thread gets its own connection
-                    thread_conn = sqlite3.connect(graph_gpkg_path, timeout=30.0)
+                    # Each thread gets its own connection to its own worker database
+                    thread_conn = sqlite3.connect(worker_db_path, timeout=30.0)
                     thread_conn.enable_load_extension(True)
                     try:
                         thread_conn.load_extension("mod_spatialite")
@@ -5823,10 +5870,21 @@ class Weights:
                     # Attach ENC database (read-only, no lock contention)
                     thread_conn.execute(f"ATTACH DATABASE '{enc_data_path}' AS enc_db")
 
+                    # Attach graph database as read-only (for edge data)
+                    # Using read-only mode eliminates any lock contention
+                    thread_conn.execute(f"ATTACH DATABASE 'file:{graph_gpkg_path}?mode=ro' AS graph_db")
+
                     thread_cursor = thread_conn.cursor()
 
-                    # NOTE: Temp table already created by main thread before parallel execution
-                    # This eliminates CREATE TABLE lock contention between threads
+                    # Create temp table in WORKER'S database, not main GeoPackage
+                    # This is the critical optimization - each worker works in isolation
+                    thread_cursor.execute(f"""
+                        CREATE TABLE {temp_table_name} (
+                            fid INTEGER PRIMARY KEY,
+                            depth_value REAL,
+                            usage_band INTEGER
+                        )
+                    """)
 
                     # Extract configuration (same logic as before)
                     if 'attributes' in config:
@@ -5919,7 +5977,7 @@ class Weights:
                             e.fid,
                             MIN({attr_expression}) AS depth_value,
                             CAST(SUBSTR(f.dsid_dsnm, 3, 1) AS INTEGER) AS usage_band
-                        FROM edges e
+                        FROM graph_db.edges e
                         JOIN enc_db.{enc_layer_name_quoted} f
                             ON f.ROWID IN (
                                 SELECT id FROM enc_db.{rtree_name_quoted}
@@ -5937,8 +5995,8 @@ class Weights:
                     # CRITICAL OPTIMIZATION: For heavy layers, process in batches
                     # This prevents SQLite from trying to materialize huge join results in memory
                     if is_heavy_layer:
-                        # Get total edge count
-                        thread_cursor.execute("SELECT COUNT(*) FROM edges")
+                        # Get total edge count from read-only graph database
+                        thread_cursor.execute("SELECT COUNT(*) FROM graph_db.edges")
                         total_edges = thread_cursor.fetchone()[0]
 
                         batch_size = 50000  # Process 50k edges at a time
@@ -5950,8 +6008,8 @@ class Weights:
 
                             # Modify query to add LIMIT/OFFSET
                             batch_insert_sql = insert_sql.replace(
-                                "FROM edges e",
-                                f"FROM (SELECT * FROM edges LIMIT {batch_size} OFFSET {offset}) e"
+                                "FROM graph_db.edges e",
+                                f"FROM (SELECT * FROM graph_db.edges LIMIT {batch_size} OFFSET {offset}) e"
                             )
 
                             thread_cursor.execute(batch_insert_sql, enc_names)
@@ -5984,13 +6042,15 @@ class Weights:
                     time.sleep(0.1)
 
                     thread_conn.close()
-                    return (layer_name, rows, elapsed)
+                    # Return worker database path so aggregation can read results from worker's isolated DB
+                    return (layer_name, worker_db_path, rows, elapsed)
 
                 # Retry wrapper for database lock issues
                 def materialize_with_retry(layer_name, config, temp_table_name, max_retries=3):
                     """
                     Retry wrapper for materialization with exponential backoff.
                     Handles intermittent "database is locked" errors.
+                    Returns: (layer_name, worker_db_path, row_count, elapsed_time)
                     """
                     import random
                     for attempt in range(max_retries):
@@ -6017,6 +6077,7 @@ class Weights:
 
                     total_edges_processed = 0
                     successful_layers = []
+                    worker_databases = {}  # Track worker database paths for aggregation
 
                     with ThreadPoolExecutor(max_workers=max_workers) as executor:
                         futures = {}
@@ -6032,9 +6093,10 @@ class Weights:
                         for future in as_completed(futures):
                             layer_name = futures[future]
                             try:
-                                layer_name_result, rows, elapsed = future.result()
+                                layer_name_result, worker_db_path, rows, elapsed = future.result()
                                 total_edges_processed += rows
                                 successful_layers.append(layer_name)
+                                worker_databases[layer_name] = worker_db_path  # Store for aggregation
                                 throughput = rows / elapsed if elapsed > 0 else 0
                                 logger.info(
                                     f"  ✓ {layer_name}: {rows:,} edges in {elapsed:.1f}s "
@@ -6051,14 +6113,16 @@ class Weights:
                     # Sequential fallback for single layer
                     logger.info("Single depth layer - using sequential processing")
                     total_edges_processed = 0
+                    worker_databases = {}  # Track worker database paths for aggregation
 
                     for layer_name, config in depth_layers_config.items():
                         temp_table_name = f"temp_{layer_name.lower()}_candidates"
                         try:
-                            layer_name_result, rows, elapsed = materialize_with_retry(
+                            layer_name_result, worker_db_path, rows, elapsed = materialize_with_retry(
                                 layer_name, config, temp_table_name
                             )
                             total_edges_processed += rows
+                            worker_databases[layer_name] = worker_db_path  # Store for aggregation
                             throughput = rows / elapsed if elapsed > 0 else 0
                             logger.info(
                                 f"  + {layer_name}: {rows:,} edges in {elapsed:.1f}s "
@@ -6078,7 +6142,7 @@ class Weights:
                     enrichment_summary['ft_depth'] = 0
                 else:
                     # --- Step 2: Cross-Layer Aggregation with UNION ALL ---
-                    logger.info("--- Phase 2: Cross-Layer Aggregation ---")
+                    logger.info("--- Phase 2: Cross-Layer Aggregation from Worker Databases ---")
 
                     # Start a new transaction for aggregation and updates
                     cursor_graph.execute("BEGIN DEFERRED TRANSACTION")
@@ -6086,25 +6150,33 @@ class Weights:
 
                     start_agg_time = time.perf_counter()
 
-                    # Build UNION ALL query to combine all temp tables
+                    # CRITICAL OPTIMIZATION: Attach worker databases and build UNION ALL from them
+                    # This reads results from isolated worker files, not from main GeoPackage
+                    logger.info(f"Attaching {len(worker_databases)} worker databases for aggregation")
+
+                    worker_attach_statements = []
+                    for idx, (layer_name, worker_db_path) in enumerate(worker_databases.items()):
+                        alias = f"worker_{idx}"
+                        try:
+                            cursor_graph.execute(f"ATTACH DATABASE 'file:{worker_db_path}?mode=ro' AS {alias}")
+                            worker_attach_statements.append((layer_name, alias))
+                            logger.debug(f"Attached worker DB for {layer_name}: {alias}")
+                        except sqlite3.Error as e:
+                            logger.error(f"Failed to attach worker database for {layer_name}: {e}")
+                            continue
+
+                    # Build UNION ALL query from worker databases (not main GeoPackage tables)
+                    temp_table_name_pattern = "temp_{layer_name}_candidates"
                     union_clauses = [
-                        f"SELECT fid, depth_value, usage_band FROM {table_name}"
-                        for table_name in active_temp_tables
+                        f"SELECT fid, depth_value, usage_band FROM {alias}.{temp_table_name_pattern.format(layer_name=layer_name.lower())}"
+                        for layer_name, alias in worker_attach_statements
                     ]
                     union_sql = " UNION ALL ".join(union_clauses)
 
-                    logger.info(f"Combining {len(active_temp_tables)} temp tables with UNION ALL")
+                    logger.info(f"Combining {len(union_clauses)} worker database tables with UNION ALL")
 
-                    # OPTIMIZATION: Add indexes on temp tables before aggregation
-                    start_index_time = time.perf_counter()
-                    for table_name in active_temp_tables:
-                        try:
-                            cursor_graph.execute(f"CREATE INDEX IF NOT EXISTS idx_{table_name}_fid ON {table_name}(fid)")
-                            cursor_graph.execute(f"CREATE INDEX IF NOT EXISTS idx_{table_name}_band ON {table_name}(usage_band)")
-                        except Exception as e:
-                            logger.warning(f"Could not create indexes on {table_name}: {e}")
-                    index_elapsed = time.perf_counter() - start_index_time
-                    logger.debug(f"Created indexes on {len(active_temp_tables)} temp tables in {index_elapsed:.1f}s")
+                    # Note: No need to add indexes on worker tables - they're already indexed by workers
+                    # and this aggregation happens in a single main thread with no contention
 
                     # OPTIMIZATION: Materialize aggregation results first, then use efficient JOIN-based UPDATE
 
@@ -6161,7 +6233,6 @@ class Weights:
                     agg_elapsed = time.perf_counter() - start_agg_time
 
                     logger.info(f"Phase 2 timing breakdown:")
-                    logger.info(f"  - Index creation: {index_elapsed:.1f}s")
                     logger.info(f"  - UNION ALL + aggregation (materialize): {materialize_elapsed:.1f}s")
                     logger.info(f"  - UPDATE edges: {update_elapsed:.1f}s")
                     logger.info(f"  - Total Phase 2: {agg_elapsed:.1f}s")
@@ -6190,16 +6261,27 @@ class Weights:
                     phase2_throughput = rows_updated / agg_elapsed if agg_elapsed > 0 else 0
                     logger.info(f"Phase 2 throughput: {phase2_throughput:.0f} edges/sec")
 
-                    # Cleanup temp tables
-                    for table_name in active_temp_tables:
+                    # CRITICAL CLEANUP: Delete worker database files to free resources
+                    # These are temporary files created for isolation - no longer needed
+                    # Using OSError for more specific error handling (preferred for OS operations)
+                    import os
+                    worker_cleanup_count = 0
+                    for layer_name, worker_db_path in worker_databases.items():
                         try:
-                            cursor_graph.execute(f"DROP TABLE IF EXISTS {table_name}")
-                        except sqlite3.Error as e:
-                            logger.warning(f"Could not drop temp table {table_name}: {e}")
+                            if os.path.exists(worker_db_path):
+                                os.remove(worker_db_path)
+                                worker_cleanup_count += 1
+                                logger.debug(f"Cleaned up worker database for {layer_name}")
+                        except OSError as e:
+                            logger.warning(f"Could not delete worker database {worker_db_path}: {e}")
+                            # Continue with other cleanup even if one fails
+
+                    if worker_cleanup_count > 0:
+                        logger.debug(f"Successfully cleaned {worker_cleanup_count} worker database files")
 
                     # Commit the depth aggregation transaction
                     conn_graph.commit()
-                    logger.info("Committed depth enrichment and cleaned up temporary tables")
+                    logger.info("Committed depth enrichment and cleaned up worker databases")
 
             # If no depth layers were processed, we still need to start a transaction
             # for the non-depth layers
@@ -6505,9 +6587,15 @@ class Weights:
                                           layer_name, 'failed', target_column)
                     continue
 
-            # --- Cleanup and Final Commit ---
-            # Drop temp tables (edge_updates is auto-dropped as TEMPORARY)
-            cursor_graph.execute("DROP TABLE IF EXISTS all_depth_candidates;")
+            # --- Cleanup Temporary Tables ---
+            # Drop persistent temp_{layer}_candidates tables that were created in Phase 1
+            # These are regular (non-TEMPORARY) tables, so they don't auto-drop on connection close
+            logger.debug(f"Dropping {len(temp_table_names)} temporary candidate tables...")
+            for layer_name, temp_table_name in temp_table_names:
+                cursor_graph.execute(f"DROP TABLE IF EXISTS {temp_table_name}")
+                logger.debug(f"Dropped {temp_table_name}")
+
+            # Note: edge_updates is auto-dropped as TEMPORARY when connection closes (no explicit drop needed)
 
             # Commit transaction BEFORE detaching database
             conn_graph.commit()
@@ -6533,6 +6621,28 @@ class Weights:
             conn_graph.rollback()
             raise
         finally:
+            # CRITICAL: Clean up worker database files (guaranteed cleanup on all code paths)
+            # This is crucial - if an error occurs, we must still delete temp worker files
+            # to prevent accumulation in the system temp directory
+            if 'worker_databases' in locals():
+                import os
+                cleanup_count = 0
+                cleanup_errors = 0
+                for layer_name, worker_db_path in worker_databases.items():
+                    try:
+                        if os.path.exists(worker_db_path):
+                            os.remove(worker_db_path)
+                            cleanup_count += 1
+                            logger.debug(f"Cleaned up worker database for {layer_name}")
+                    except OSError as e:
+                        cleanup_errors += 1
+                        logger.warning(f"Could not delete worker database {worker_db_path}: {e}")
+
+                if cleanup_count > 0:
+                    logger.debug(f"Cleaned up {cleanup_count} worker database files")
+                if cleanup_errors > 0:
+                    logger.warning(f"Failed to clean up {cleanup_errors} worker database files - may need manual cleanup")
+
             # Restore default PRAGMAs
             try:
                 conn_graph.execute("PRAGMA journal_mode = DELETE;")
@@ -7300,7 +7410,7 @@ class Weights:
                 schema_name='graph',
                 enc_schema='us_enc_all'
             )
-            print(f"Modified {summary['layers_applied']} layers")
+            logger.info(f"Modified {summary['layers_applied']} layers")
         """
         # Validate PostGIS connection
         if not hasattr(self.factory, 'manager') or not hasattr(self.factory.manager, 'engine'):
@@ -7762,8 +7872,8 @@ class Weights:
                  schema_name='graph',
                  environmental_conditions=env_conditions
             )
-            print(f"Updated {summary['edges_updated']} edges")
-            print(f"Blocked {summary['edges_blocked']} edges")
+            logger.info(f"Updated {summary['edges_updated']} edges")
+            logger.info(f"Blocked {summary['edges_blocked']} edges")
         """
         # Validate PostGIS availability
         if self.factory.manager.engine.dialect.name != 'postgresql':
@@ -8204,8 +8314,8 @@ class Weights:
                 reverse_check_threshold=100.0
             )
 
-            print(f"Updated {summary['edges_updated']} edges")
-            print(f"Edges with orientation: {summary['edges_with_orient']}")
+            logger.info(f"Updated {summary['edges_updated']} edges")
+            logger.info(f"Edges with orientation: {summary['edges_with_orient']}")
         """
         # Validate PostGIS availability
         if self.factory.manager.engine.dialect.name != 'postgresql':
@@ -8823,7 +8933,7 @@ class Weights:
                 enc_names=['US5FL14M', 'US5FL13M'],
                 land_area_layer='land_grid'  # Enable fast LNDARE with land grid
             )
-            print(f"Modified {summary['layers_applied']} layers")
+            logger.info(f"Modified {summary['layers_applied']} layers")
 
             # If results show all/zero edges blocked, run diagnostic:
             # python diagnose_land_grid.py graph_base.gpkg land_grid
@@ -10038,8 +10148,8 @@ class Weights:
                 vessel_parameters=vessel_params,
                 environmental_conditions=env_conditions
             )
-            print(f"Updated {summary['edges_updated']} edges")
-            print(f"Blocked {summary['edges_blocked']} edges")
+            logger.info(f"Updated {summary['edges_updated']} edges")
+            logger.info(f"Blocked {summary['edges_blocked']} edges")
         """
         from pathlib import Path
         import sqlite3
@@ -10422,7 +10532,7 @@ class Weights:
                 graph_gpkg_path='graph_directed.gpkg'
             )
 
-            print(f"Updated {summary['edges_updated']:,} edges with directional weights")
+            logger.info(f"Updated {summary['edges_updated']:,} edges with directional weights")
         """
         from pathlib import Path
         import sqlite3
@@ -10455,8 +10565,7 @@ class Weights:
 
         cursor = conn.cursor()
 
-        # --- FIX: Dynamically detect the geometry column name ---
-        # GeoPackage files can use 'geom' or 'geometry'
+        # Geometry column name is dynamically detected to support various GIS formats.
         cursor.execute("PRAGMA table_info(edges)")
         columns = [row[1] for row in cursor.fetchall()]
         geom_col = 'geom' if 'geom' in columns else 'geometry'
@@ -11241,7 +11350,7 @@ def main_config_example() -> None:
 
         # 1. Read a value
         current_type = config_manager.get_value('graph_type')
-        print(f"Current graph_type: {current_type}\n")
+        logger.debug(f"Current graph_type: {current_type}")
 
         # 2. Change a top-level value
         config_manager.set_value('graph_type', 'grid')
@@ -11260,18 +11369,18 @@ def main_config_example() -> None:
         # 6. Save the changes back to the original file
         config_manager.save()
 
-        print("\n--- Verifying changes ---")
+        logger.debug("Verifying changes...")
         # Re-load the config to verify changes were saved
         reloaded_manager = GraphConfigManager(config_file)
-        print(f"New graph_type: {reloaded_manager.get_value('graph_type')}")
-        print(f"New spacing_nm: {reloaded_manager.get_value('grid_settings.spacing_nm')}")
-        print(f"New H3 resolution: {reloaded_manager.get_value('h3_settings.resolution_mapping.0.resolution')}")
-        print(f"New subtract layers: {reloaded_manager.get_value('h3_settings.subtract_layers')}")
+        logger.debug(f"New graph_type: {reloaded_manager.get_value('graph_type')}")
+        logger.debug(f"New spacing_nm: {reloaded_manager.get_value('grid_settings.spacing_nm')}")
+        logger.debug(f"New H3 resolution: {reloaded_manager.get_value('h3_settings.resolution_mapping.0.resolution')}")
+        logger.debug(f"New subtract layers: {reloaded_manager.get_value('h3_settings.subtract_layers')}")
 
     except FileNotFoundError as e:
-        print(e)
+        logger.error(f"Configuration file not found: {e}")
     except Exception as e:
-        print(f"An error occurred: {e}")
+        logger.error(f"An error occurred: {e}")
 
 
 def main_graph_creation() -> None:
@@ -11469,7 +11578,7 @@ class FineTuning:
                  table_prefix='fine_graph_01',
                  batch_size=10000
             )
-            print(f"Updated {stats['edges_updated']:,} edges in {stats['processing_time']:.2f}s")
+            logger.info(f"Updated {stats['edges_updated']:,} edges in {stats['processing_time']:.2f}s")
         """
         self.performance.start_timer("reapply_directional_weights_total")
 

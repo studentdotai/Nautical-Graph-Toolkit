@@ -1,4 +1,19 @@
 #!/usr/bin/env python3
+# Copyright (C) 2024-2025 Viktor Kolbasov <contact@studentdotai.com>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 """
 s57_data.py
 
@@ -929,7 +944,7 @@ class S57Advanced:
             for i, mem_ds in enumerate(temp_datasets):
                 access_mode = 'overwrite' if (is_first_batch and i == 0) else 'append'
 
-                # --- FIX: Add mapFieldType for GPKG to prevent truncation ---
+                # mapFieldType is added for GPKG to prevent field value truncation
                 translate_options = {
                     'layerName': layer_name.lower(),
                     'accessMode': access_mode,
@@ -3032,9 +3047,8 @@ class ENCDataFactory:
             if col.lower() in ['geometry', 'ogc_fid']:  # Skip non-attribute columns
                 continue
 
-            # --- FIX: Explicitly handle core integer identifiers FIRST ---
-            # These are critical for linking data and are known to be integers.
-            # This ensures they are cast correctly even if the S57 attribute lookup fails.
+            # Core integer identifiers (RCID, OBJL, RVER, AGEN, FIDN, FIDS) are processed first.
+            # These are critical for data linking and are enforced as integers.
             # Also handle ENC stamping columns that are not in S-57 standard
             integer_columns = ['rcid', 'fidn', 'fids', 'prim', 'grup', 'objl', 'rver', 'agen',
                              'dsid_edtn', 'dsid_updn']  # Added ENC stamping columns
@@ -3086,9 +3100,8 @@ class ENCDataFactory:
 
         # Process only the existing list attributes
         for col_acronym in existing_list_attrs:
-            # --- FIX: Ensure list-type columns exist before trying to parse them ---
-            # If a list column is missing from a source (e.g., lnam_refs in SpatiaLite),
-            # create it and fill with empty lists for schema consistency.
+            # List-type columns are created if missing from a source to ensure schema consistency.
+            # Missing columns (e.g., lnam_refs in SpatiaLite) are filled with empty lists.
             col = col_acronym.lower()
             if col not in unified_gdf.columns:
                 # Check if this attribute is relevant for any object in the current GDF
@@ -3107,9 +3120,8 @@ class ENCDataFactory:
                 # The `pyogrio` engine often reads list-like columns as object arrays of lists already.
                 # The PostGIS driver may read them as JSON strings. This handles both cases.
                 if unified_gdf[col].dtype == 'object':
-                    # --- FIX: Handle rows that are None before applying list functions ---
-                    # This prevents errors when a list column has missing values. We replace
-                    # None with an empty list to ensure consistent data structure.
+                    # Missing values (None) in list columns are replaced with empty lists
+                    # to ensure consistent data structure across all rows.
                     is_list_or_none = unified_gdf[col].apply(lambda x: isinstance(x, (list, type(None), str)))
                     if not is_list_or_none.all():
                         logger.warning(f"Column '{col}' contains non-list/string types. Skipping unification.")
@@ -3130,9 +3142,8 @@ class ENCDataFactory:
                             if item is None:
                                 return []
 
-                            # --- FIX: Now, if the item is a list, ensure all its elements are strings. ---
-                            # This is the key change. It handles lists from all sources (already parsed or from JSON)
-                            # and guarantees that [17] becomes ['17'] and [022614076BFD0E9F] becomes ['022614076BFD0E9F'].
+                            # List elements are converted to strings for consistency across all sources.
+                            # This ensures [17] becomes ['17'] and handles parsed lists from JSON sources.
                             if isinstance(item, list):
                                 return [str(i) for i in item if i is not None]
                             return item
@@ -3295,8 +3306,8 @@ class ENCDataFactory:
             logger.info("No bounding boxes found for any ENCs.")
             return []
 
-        # --- FIX: Ensure both geometries have the same CRS before intersection ---
-        # Set the CRS for the bounding box GeoDataFrame if it's not already set.
+        # Both geometries are ensured to have the same CRS (EPSG:4326) before spatial operations.
+        # The CRS is explicitly set for the bounding box GeoDataFrame if not already defined.
         if enc_bboxes_gdf.crs is None:
             enc_bboxes_gdf.set_crs("EPSG:4326", inplace=True)
 
@@ -4257,8 +4268,8 @@ class SpatiaLiteManager:
             conn_str = f"sqlite:///{str(self.db_path)}"
             self.engine = create_engine(conn_str)
 
-            # --- FIX: Load SpatiaLite extension on each connection ---
-            # This ensures that spatial functions like MakePoint and ST_Contains are available.
+            # SpatiaLite extension is loaded on each connection to enable spatial functions
+            # such as MakePoint and ST_Contains.
             @event.listens_for(self.engine, "connect")
             def load_spatialite(dbapi_conn, connection_record):
                 # The path to mod_spatialite can vary. None is often sufficient.
@@ -4391,7 +4402,7 @@ class SpatiaLiteManager:
                 if 'geom' in gdf.columns:
                     gdf = gdf.rename_geometry('wkb_geometry')
 
-                # --- FIX: Standardize output to only include essential columns ---
+                # Output is standardized to include only essential columns: ENC source and geometry.
                 if not gdf.empty:
                     gdf = gdf[['dsid_dsnm', gdf.geometry.name]]
                     all_gdfs.append(gdf)
@@ -4920,7 +4931,7 @@ class GPKGManager:
         inspector = inspect(self.engine)
         safe_layer_name = layer_name.lower()
 
-        # --- FIX: GPKG uses uppercase layer names, so we check for both cases ---
+        # Layer name case handling: GeoPackage may use uppercase or lowercase, so both are checked.
         if not inspector.has_table(safe_layer_name):
             safe_layer_name = layer_name.upper()
 
@@ -4938,9 +4949,8 @@ class GPKGManager:
         # Use fiona engine for consistent handling of StringList/IntegerList fields across formats
         gdf = gpd.read_file(self.gpkg_path, layer=safe_layer_name, where=where_clause, engine='fiona')
 
-        # --- FIX: Standardize column names to lowercase for consistency ---
-        # This ensures that subsequent operations (like filtering by 'dsid_dsnm')
-        # work regardless of the source's original casing.
+        # Column names are standardized to lowercase for consistency across all sources,
+        # ensuring filtering operations work uniformly regardless of the source's original casing.
         if not gdf.empty:
             gdf.columns = [col.lower() for col in gdf.columns]
         return gdf
@@ -5043,7 +5053,7 @@ class GPKGManager:
             # GPKG columns are uppercase, so we standardize them here for consistency.
             gdf.columns = [c.lower() for c in gdf.columns]
 
-            # --- FIX: Standardize output to only include essential columns ---
+            # Output is standardized to include only essential columns: ENC source and geometry.
             if not gdf.empty:
                 gdf = gdf[['dsid_dsnm', gdf.geometry.name]]
 
@@ -5389,7 +5399,7 @@ class GPKGManager:
         for layer in extra_grid_layers:
             gdf = self.get_layer(layer, filter_by_enc=enc_names)
             if not gdf.empty:
-                # --- FIX: Filter extra grids by usage bands (mirroring PostGIS logic) ---
+                # Extra grids are filtered by usage bands to match PostGIS behavior.
                 gdf = gdf[gdf['dsid_dsnm'].str[2].isin(['3', '4'])]
                 if gdf.empty:
                     continue

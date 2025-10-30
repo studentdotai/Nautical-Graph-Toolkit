@@ -1,5 +1,21 @@
 #!/usr/bin/env python3
+# Copyright (C) 2024-2025 Viktor Kolbasov <contact@studentdotai.com>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 import argparse
+import logging
 import os
 from pathlib import Path
 import sys
@@ -13,9 +29,10 @@ except ImportError:
 
 # --- Configuration ---
 
-
 # Use exceptions to handle errors
 gdal.UseExceptions()
+
+logger = logging.getLogger(__name__)
 
 
 class S57Converter:
@@ -62,11 +79,11 @@ class S57Converter:
 
     def _find_s57_files(self):
         """Find all S-57 base files (.000) in the input directory."""
-        print(f"Scanning for S-57 files in: {self.input_dir}")
+        logger.info(f"Scanning for S-57 files in: {self.input_dir}")
         self.s57_files = list(self.input_dir.rglob('*.000'))
         if not self.s57_files:
             raise FileNotFoundError("No S-57 (.000) files found in the specified directory.")
-        print(f"Found {len(self.s57_files)} S-57 file(s).")
+        logger.info(f"Found {len(self.s57_files)} S-57 file(s).")
 
     def convert(self):
         """Public method to start the conversion process."""
@@ -75,16 +92,16 @@ class S57Converter:
             self._convert_by_enc()
         elif self.mode == 'by_layer':
             self._convert_by_layer()
-        print("\nConversion process completed successfully.")
+        logger.info("Conversion process completed successfully.")
 
     def _convert_by_enc(self):
         """Converts each S-57 file to a separate destination."""
-        print(f"\n--- Starting conversion: Mode 'by_enc' to format '{self.output_format}' ---")
+        logger.info(f"Starting conversion: Mode 'by_enc' to format '{self.output_format}'")
         output_dir = Path(self.output_dest)
         output_dir.mkdir(parents=True, exist_ok=True)
 
         for s57_file in self.s57_files:
-            print(f"\nProcessing: {s57_file.name}")
+            logger.debug(f"Processing: {s57_file.name}")
             base_name = s57_file.stem
             dest_ds_path = ""
             options = {}
@@ -99,10 +116,10 @@ class S57Converter:
                 dest_ds_path = self.output_dest  # PG connection string
                 options = {'format': 'PostgreSQL', 'layerCreationOptions': [f'SCHEMA={base_name}']}
                 if self.overwrite:
-                    print(f"Note: Overwriting will drop and recreate schema '{base_name}' in PostGIS.")
+                    logger.info(f"Overwriting will drop and recreate schema '{base_name}' in PostGIS.")
 
             if Path(dest_ds_path).exists() and self.overwrite and self.output_format != 'postgis':
-                print(f"Overwriting existing file: {dest_ds_path}")
+                logger.debug(f"Overwriting existing file: {dest_ds_path}")
 
             try:
                 gdal.VectorTranslate(
@@ -114,40 +131,40 @@ class S57Converter:
                         dstSRS='EPSG:4326'  # Standardize to WGS84
                     )
                 )
-                print(f"-> Successfully converted {s57_file.name} to {dest_ds_path}")
+                logger.info(f"Successfully converted {s57_file.name} to {dest_ds_path}")
             except Exception as e:
-                print(f"!! ERROR converting {s57_file.name}: {e}", file=sys.stderr)
+                logger.error(f"Error converting {s57_file.name}: {e}")
 
     def _get_all_layer_names(self):
         """Scans all S-57 files to get a unique set of all layer names."""
         all_layers = set()
-        print("\nScanning all files to determine unique layers...")
+        logger.debug("Scanning all files to determine unique layers...")
         for s57_file in self.s57_files:
             ds = None
             try:
                 ds = gdal.OpenEx(str(s57_file))
                 if not ds:
-                    print(f"Warning: Could not open {s57_file.name}", file=sys.stderr)
+                    logger.warning(f"Could not open {s57_file.name}")
                     continue
                 for i in range(ds.GetLayerCount()):
                     layer = ds.GetLayerByIndex(i)
                     if layer:
                         all_layers.add(layer.GetName())
             except Exception as e:
-                print(f"Warning: Error reading layers from {s57_file.name}: {e}", file=sys.stderr)
+                logger.warning(f"Error reading layers from {s57_file.name}: {e}")
             finally:
                 # Dereference the dataset to close it
                 ds = None
 
-        print(f"Found {len(all_layers)} unique layers across all files.")
+        logger.info(f"Found {len(all_layers)} unique layers across all files.")
         return sorted(list(all_layers))
 
     def _convert_by_layer(self):
         """Merges all S-57 files, grouping features by their layer name."""
-        print(f"\n--- Starting conversion: Mode 'by_layer' to format '{self.output_format}' ---")
+        logger.info(f"Starting conversion: Mode 'by_layer' to format '{self.output_format}'")
         all_layer_names = self._get_all_layer_names()
         if not all_layer_names:
-            print("No layers found to process. Exiting.", file=sys.stderr)
+            logger.error("No layers found to process. Exiting.")
             return
 
         dest_ds_path = self.output_dest
@@ -161,7 +178,7 @@ class S57Converter:
 
         # For file-based formats, remove the old file if overwriting
         if self.output_format in ['gpkg', 'spatialite'] and Path(dest_ds_path).exists() and self.overwrite:
-            print(f"Overwriting: removing existing file {dest_ds_path}")
+            logger.debug(f"Overwriting: removing existing file {dest_ds_path}")
             Path(dest_ds_path).unlink()
 
         # Process each layer, appending it to the destination dataset
@@ -238,10 +255,10 @@ def main():
         )
         converter.convert()
     except (ValueError, FileNotFoundError) as e:
-        print(f"\nError: {e}", file=sys.stderr)
+        logger.error(f"Error: {e}")
         sys.exit(1)
     except Exception as e:
-        print(f"\nAn unexpected error occurred: {e}", file=sys.stderr)
+        logger.error(f"An unexpected error occurred: {e}")
         sys.exit(1)
 
 

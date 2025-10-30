@@ -1,4 +1,19 @@
 #!/usr/bin/env python3
+# Copyright (C) 2024-2025 Viktor Kolbasov <contact@studentdotai.com>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 """
 s57_classification.py
 
@@ -7,8 +22,11 @@ encapsulating navigation risk, cost, and other attributes for pathfinding.
 """
 
 import csv
+import logging
 from enum import Enum
 from typing import Tuple, Optional, Dict, Any
+
+logger = logging.getLogger(__name__)
 
 
 class NavClass(Enum):
@@ -61,7 +79,7 @@ class S57Classifier:
             'CANBNK': (NavClass.INFORMATIONAL, 'Terrestrial', 0, 0, 'Canal bank'),
             'LAKARE': (NavClass.INFORMATIONAL, 'Terrestrial', 0, 0, 'Lake area'),
             'LAKSHR': (NavClass.INFORMATIONAL, 'Terrestrial', 0, 0, 'Lake shore'),
-            'LNDARE': (NavClass.INFORMATIONAL, 'Terrestrial', 100, 0, 'Land area'),
+
             'LNDELV': (NavClass.INFORMATIONAL, 'Terrestrial', 0, 0, 'Land elevation'),
             'LNDRGN': (NavClass.INFORMATIONAL, 'Terrestrial', 0, 0, 'Land region'),
             'LNDMRK': (NavClass.INFORMATIONAL, 'Terrestrial', 0, 0, 'Landmark'),
@@ -135,10 +153,12 @@ class S57Classifier:
             'DWRTCL': (NavClass.SAFE, 'Route', 0.5, 0, 'Deep water route centerline', ['drval1', 'orient', 'trafic']),
             'DWRTPT': (NavClass.SAFE, 'Route', 0.5, 0, 'Deep water route part', ['drval1', 'orient', 'trafic', 'restrn']),
             'FERYRT': (NavClass.SAFE, 'Route', 0.8, 50, 'Ferry route'),
-            'SUBTLN': (NavClass.SAFE, 'Route', 0.6, 100, 'Submarine transit lane', ['restrn']),
+            'SUBTLN': (NavClass.SAFE, 'Route', 0.6, 50, 'Submarine transit lane', ['restrn']),
             'TRFLNE': (NavClass.SAFE, 'Route', 0.7, 0, 'Traffic line'),
-            'TRNBSN': (NavClass.SAFE, 'Route', 0.8, 50, 'Turning basin'),
+            'TRNBSN': (NavClass.SAFE, 'Route', 0.8, 0, 'Turning basin'),
             'wtwaxs': (NavClass.SAFE, 'Route', 0.6, 0, 'Waterway axis'),
+            'PRCARE': (NavClass.SAFE, 'Route', 0.9, 0, 'Precautionary area', ['restrn']),
+            'TSSLPT': (NavClass.SAFE, 'Route', 0.7, 0, 'TSS lane part', ['orient', 'restrn']),
 
             # Safe Water Marks
             'BCNSAW': (NavClass.SAFE, 'Aid', 1.0, 50, 'Beacon safe water'),
@@ -153,6 +173,7 @@ class S57Classifier:
 
             # Deep Water Areas
             'DEPARE': (NavClass.SAFE, 'Depth', 1.0, 0, 'Depth area - check vessel draft', ['drval1']),
+            'SOUNDG': (NavClass.SAFE, 'Depth', 1, 0, 'Sounding - isolated danger', ['depth']),
             'SWPARE': (NavClass.SAFE, 'Depth', 0.8, 0, 'Swept area', ['drval1']),
             'DRGARE': (NavClass.SAFE, 'Depth', 0.9, 0, 'Dredged area', ['drval1', 'restrn']),
             'SEAARE': (NavClass.SAFE, 'Area', 1.0, 0, 'Sea area/named water'),
@@ -177,7 +198,7 @@ class S57Classifier:
             # Restricted Areas
             'RESARE': (NavClass.CAUTION, 'Restricted', 5.0, 200, 'Restricted area', ['restrn']),
             'CTNARE': (NavClass.CAUTION, 'Restricted', 4.0, 150, 'Caution area'),
-            'PRCARE': (NavClass.CAUTION, 'Restricted', 4.5, 150, 'Precautionary area', ['restrn']),
+
             'MIPARE': (NavClass.CAUTION, 'Restricted', 8.0, 300, 'Military practice area', ['restrn']),
             'ICNARE': (NavClass.CAUTION, 'Restricted', 6.0, 200, 'Incineration area', ['restrn']),
             'DMPGRD': (NavClass.CAUTION, 'Restricted', 5.0, 150, 'Dumping ground', ['restrn']),
@@ -191,7 +212,6 @@ class S57Classifier:
             'TSELNE': (NavClass.CAUTION, 'Traffic', 3.0, 100, 'Traffic separation line'),
             'TSSBND': (NavClass.CAUTION, 'Traffic', 3.5, 100, 'TSS boundary'),
             'TSSCRS': (NavClass.CAUTION, 'Traffic', 4.0, 150, 'TSS crossing', ['restrn']),
-            'TSSLPT': (NavClass.CAUTION, 'Traffic', 2.5, 50, 'TSS lane part', ['orient', 'restrn']),
             'TSSRON': (NavClass.CAUTION, 'Traffic', 4.5, 200, 'TSS roundabout', ['restrn']),
             'TSEZNE': (NavClass.CAUTION, 'Traffic', 3.0, 100, 'Traffic separation zone'),
             'ISTZNE': (NavClass.CAUTION, 'Traffic', 3.5, 100, 'Inshore traffic zone', ['restrn']),
@@ -261,7 +281,7 @@ class S57Classifier:
             'FOULAR': (NavClass.DANGEROUS, 'Obstruction', 80.0, 400, 'Foul area'),
             'ACHPNT': (NavClass.DANGEROUS, 'Obstruction', 60.0, 300, 'Anchor on seabed'),
             'PILPNT': (NavClass.DANGEROUS, 'Obstruction', 70.0, 400, 'Pile'),
-            'SOUNDG': (NavClass.DANGEROUS, 'Depth', 40.0, 200, 'Sounding - isolated danger', ['depth']),
+
             'ZEMCNT': (NavClass.DANGEROUS, 'Depth', 100.0, 500, 'Zero meter contour'),
 
             # Isolated Danger Marks
@@ -276,6 +296,7 @@ class S57Classifier:
             'brgare': (NavClass.DANGEROUS, 'Structure', 100.0, 300, 'Bridge area'),
 
             # Coastline & Shoreline
+            'LNDARE': (NavClass.DANGEROUS, 'Coastline', 100, 0, 'Land area'),
             'COALNE': (NavClass.DANGEROUS, 'Coastline', 100.0, 500, 'Coastline'),
             'SLCONS': (NavClass.DANGEROUS, 'Coastline', 90.0, 400, 'Shoreline construction', ['horclr']),
             'CAUSWY': (NavClass.DANGEROUS, 'Structure', 100.0, 500, 'Causeway'),
@@ -368,7 +389,7 @@ class S57Classifier:
         if not classification_db:
             raise ValueError("CSV file is empty or contains no valid data")
 
-        print(f"✓ Loaded {len(classification_db)} classifications from {csv_path}")
+        logger.info(f" Loaded {len(classification_db)} classifications from {csv_path}")
         return classification_db
 
     def get_classification(self, acronym: str) -> Optional[Dict[str, Any]]:
@@ -473,7 +494,7 @@ class S57Classifier:
                     'IsTraversable': nav_class != NavClass.DANGEROUS,
                     'Description': desc
                 })
-        print(f"✓ Successfully generated classification CSV: {output_filename}")
+        logger.info(f" Successfully generated classification CSV: {output_filename}")
 
     @classmethod
     def _generate_layer_summary(cls, output_filename: str):
@@ -508,12 +529,12 @@ class S57Classifier:
                     for acronym, desc in sorted(by_category[category]):
                         f.write(f"    - {acronym:8s}: {desc}\n")
 
-        print(f"✓ Successfully generated summary file: {output_filename}")
+        logger.info(f" Successfully generated summary file: {output_filename}")
 
 
 if __name__ == "__main__":
     # This allows you to generate the static files from the command line
     # python -m maritime_module.utils.s57_classification
-    print("Generating static classification files...")
+    logger.info("Generating static classification files...")
     S57Classifier.generate_static_files()
-    print("\nGeneration complete.")
+    logger.info("Generation complete.")
