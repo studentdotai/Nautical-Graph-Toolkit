@@ -88,7 +88,7 @@ MAPBOX_TOKEN="your_mapbox_token"
 The script uses two configuration files:
 
 - **`docs/maritime_workflow_config.yml`** - Workflow orchestration (ports, AOI, steps)
-- **`src/maritime_module/data/graph_config.yml`** - Graph parameters (layers, weights, H3)
+- **`src/nautical_graph_toolkit/data/graph_config.yml`** - Graph parameters (layers, weights, H3)
 
 ## Configuration Guide
 
@@ -116,7 +116,12 @@ base_graph:
 #### Fine/H3 Graph Configuration
 ```yaml
 fine_graph:
-  mode: "h3"                 # "fine" or "h3"
+  # Naming: Graphs auto-generated as {mode}_graph_{name_suffix}
+  #   - Undirected: h3_graph_20 or fine_graph_20
+  #   - Weighted: h3_graph_wt_20 or fine_graph_wt_20
+  mode: "h3"                 # "fine" (grid) or "h3" (hexagonal)
+  name_suffix: "20"          # Change to customize all graph names
+
   buffer_size_nm: 24.0       # Buffer around base route
 
   # Fine grid specific (if mode: "fine")
@@ -131,8 +136,13 @@ fine_graph:
 #### Weighting Configuration
 ```yaml
 weighting:
-  source_graph_undirected: "h3_graph_pg_6_11"
-  target_graph_directed: "h3_graph_directed_pg_6_11_v3"
+  # IMPORTANT: Graph names are automatically constructed from fine_graph config:
+  #   - source (undirected): {mode}_graph_{name_suffix}
+  #   - target (directed): {mode}_graph_wt_{name_suffix}
+  # Examples (fine_graph.mode="h3", fine_graph.name_suffix="20"):
+  #   - source: h3_graph_20
+  #   - target: h3_graph_wt_20
+  # Do NOT manually set these; they are auto-generated.
 
   steps:
     convert_to_directed: true
@@ -164,7 +174,7 @@ pathfinding:
 
 ### graph_config.yml
 
-This file (in `src/maritime_module/data/`) defines graph generation parameters:
+This file (in `src/nautical_graph_toolkit/data/`) defines graph generation parameters:
 
 - **Navigable layers**: Which S-57 features define safe water (seaare, fairwy, etc.)
 - **Obstacle layers**: Which features are hazards (lndare, slcons, etc.)
@@ -293,14 +303,19 @@ routes.base_routes             - Baseline route
 
 #### Step 2: Fine/H3 Graph
 ```
-graph.h3_graph_pg_6_11_nodes   - High-resolution node geometries
-graph.h3_graph_pg_6_11_edges   - High-resolution edge geometries
+graph.{mode}_graph_{suffix}_nodes   - High-resolution node geometries
+graph.{mode}_graph_{suffix}_edges   - High-resolution edge geometries
+                                      (e.g., h3_graph_20_nodes, h3_graph_20_edges)
 ```
+
+**Note:** Names automatically constructed from config: `{mode}_graph_{name_suffix}`
+- Example: `fine_graph.mode="h3"` + `fine_graph.name_suffix="20"` → `h3_graph_20`
 
 #### Step 3: Weighted Graph
 ```
-graph.h3_graph_directed_pg_6_11_v3_nodes    - Directed node geometries
-graph.h3_graph_directed_pg_6_11_v3_edges    - Directed edges with weights:
+graph.{mode}_graph_wt_{suffix}_nodes    - Directed node geometries
+graph.{mode}_graph_wt_{suffix}_edges    - Directed edges with weights:
+                                          (e.g., h3_graph_wt_20_nodes, h3_graph_wt_20_edges)
   - weight: Original distance (NM)
   - adjusted_weight: Final routing weight
   - wt_static_blocking: Hazard penalties
@@ -477,7 +492,7 @@ Warning: H3 graph is not connected. Selecting the largest component.
 
 ### Custom Graph Configurations
 
-Edit `src/maritime_module/data/graph_config.yml` to customize:
+Edit `src/nautical_graph_toolkit/data/graph_config.yml` to customize:
 
 - **Layer definitions**: Add/remove navigable or obstacle layers
 - **Weight settings**: Adjust static layer weights and factors
@@ -555,7 +570,7 @@ print(df[['timestamp', 'node_count', 'edge_count', 'total_pipeline_sec']])
 ### Related Files
 - **Script**: `docs/maritime_graph_workflow.py`
 - **Configuration**: `docs/maritime_workflow_config.yml`
-- **Graph Config**: `src/maritime_module/data/graph_config.yml`
+- **Graph Config**: `src/nautical_graph_toolkit/data/graph_config.yml`
 - **Setup Guide**: `docs/SETUP.md`
 - **Troubleshooting**: `docs/TROUBLESHOOTING.md`
 

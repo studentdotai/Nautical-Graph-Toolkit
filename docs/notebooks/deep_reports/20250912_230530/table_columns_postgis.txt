@@ -1,7 +1,0 @@
-Detailed Table Column Analysis for POSTGIS
-==================================================
-
-Schema: postgis://s57_deeptest
-
-
-Properties found in tables:

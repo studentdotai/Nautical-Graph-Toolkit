@@ -9,7 +9,7 @@
 #   DB_HOST=localhost (or your database host)
 #   DB_PORT=5432 (default PostgreSQL port)
 #
-# REQUIRED: Graph configuration loaded from src/maritime_module/data/graph_config.yml
+# REQUIRED: Graph configuration loaded from src/nautical_graph_toolkit/data/graph_config.yml
 #
 # This config defines workflow orchestration parameters:
 # - Which pipeline steps to run (base_graph → fine_graph → weighting → pathfinding)
@@ -21,11 +21,11 @@
 # --- Configuration Paths ---
 # IMPORTANT: Path is relative to the project root directory
 # This file must exist and contain graph generation parameters (H3 resolution, spacing, etc.)
-graph_config_path: "src/maritime_module/data/graph_config.yml"
+graph_config_path: "src/nautical_graph_toolkit/data/graph_config.yml"
 
 # --- Database Schema Configuration ---
 database:
-  enc_schema: "us_enc_all"        # Schema containing S-57 ENC layers
+  enc_schema: "enc_west"        # Schema containing S-57 ENC layers
   graph_schema: "graph"           # Schema for saving graph tables
   route_schema: "routes"          # Schema for route storage
 
@@ -57,8 +57,9 @@ base_graph:
   reduce_distance_nm: 0           # Safety buffer reduction (0 = no reduction)
 
   # Output naming conventions
-  graph_name: "base_graph"
-  route_name: "base_route"
+  graph_name: "base_graph"        # Table/file name for base graph
+  base_route_name: "base_route"   # Route identifier name
+  base_routes_table_name: "base_routes"  # Table name in routes GeoPackage (GeoPackage backend)
 
 # ===============================================
 # STEP 2: FINE/H3 GRAPH CONFIGURATION
@@ -67,12 +68,15 @@ base_graph:
 # Supports two modes: regular grid ("fine") or hexagonal ("h3")
 
 fine_graph:
-  # Graph resolution mode
-  mode: "h3"                      # Options: "fine" (regular grid) or "h3" (hexagonal)
+  # Graph resolution mode and naming
+  # NOTE: Graph table names are automatically constructed from these values:
+  #   - Undirected graph: {mode}_graph_{name_suffix}    (e.g., "h3_graph_20")
+  #   - Weighted graph: {mode}_graph_wt_{name_suffix}   (e.g., "h3_graph_wt_20")
+  mode: "fine"                      # Options: "fine" (regular grid) or "h3" (hexagonal)
+  name_suffix: "20"               # Suffix for graph table/file names
 
   # Route buffer configuration
-  load_base_route: true           # Load pre-computed base route from PostGIS
-  base_route_name: "base_route"
+  load_base_route: true           # Load pre-computed base route from step 1
   buffer_size_nm: 24.0            # Buffer distance around route (NM)
 
   # Optional area slicing (for testing/optimization/reducing memory usage)
@@ -86,12 +90,12 @@ fine_graph:
 
   # Fine grid specific parameters (when mode: "fine")
   # Regular rectangular grid for high-precision routing
-  fine_spacing_nm: 0.1           # Node spacing in NM (smaller = denser graph)
+  fine_spacing_nm: 0.1            # Node spacing in NM (smaller = denser graph)
   fine_max_edge_factor: 3.0       # Max edge length multiplier
   fine_bridge_components: true    # Bridge disconnected components
 
   # H3 hexagonal grid parameters inherited from graph_config.yml
-  # See src/maritime_module/data/graph_config.yml for h3_settings
+  # See src/nautical_graph_toolkit/data/graph_config.yml for h3_settings
 
   # Port definitions for route calculation on fine graph
   # These are the actual routing start/end points (may differ from base_graph ports)
@@ -99,13 +103,6 @@ fine_graph:
   departure_coords: {lon: -122.27, lat: 37.0}  # Custom pilot boarding point (not WPI)
   arrival_port: "San Francisco"
   arrival_coords: null            # null = use World Port Index coordinates for SF
-
-  # Graph table naming
-  # Naming convention: h3_graph_{suffix} (PostGIS) or h3_graph_{suffix}.gpkg (GeoPackage)
-  graph_name_undirected: "h3_graph_pg_6_11"  # Base undirected graph table name
-  gpkg_suffix: "pg_6_11"                     # GeoPackage file suffix
-  pg_h3_name_suffix: "pg_6_11"               # PostGIS table suffix (standard insert)
-  pg_opt_h3_name_suffix: "opt_pg_6_11"       # PostGIS table suffix (optimized bulk insert)
 
   # Save options for fine/H3 graph
   save_gpkg: true                 # Save to GeoPackage (fastest, portable)
@@ -123,13 +120,14 @@ fine_graph:
 # - Dynamic weights: Vessel-specific constraints
 
 weighting:
-  # Source and target graph table names
-  # IMPORTANT: source_graph_undirected must match the output from fine_graph step
-  #   - If save_postgis_optimized=true: use pg_opt_h3_name_suffix (e.g., "h3_graph_opt_pg_6_11")
-  #   - If save_postgis=true: use pg_h3_name_suffix (e.g., "h3_graph_pg_6_11")
-  # NOTE: PostgreSQL auto-lowercases identifiers, so use lowercase table names
-  source_graph_undirected: "h3_graph_opt_pg_6_11"
-  target_graph_directed: "h3_graph_directed_pg_6_11"
+  # Graph table naming
+  # IMPORTANT: Graph names are automatically constructed from fine_graph configuration:
+  #   - Source (undirected): {fine_graph.mode}_graph_{fine_graph.name_suffix}
+  #   - Target (directed): {fine_graph.mode}_graph_wt_{fine_graph.name_suffix}
+  # Example with fine_graph.mode="h3" and fine_graph.name_suffix="20":
+  #   - source_graph_undirected = "h3_graph_20"
+  #   - target_graph_directed = "h3_graph_wt_20"
+  # You do NOT need to manually set these values; they are auto-generated by the workflow.
 
   # Sub-step control (can skip completed steps)
   steps:
@@ -172,6 +170,11 @@ weighting:
 # Calculate optimal routes on weighted graph
 
 pathfinding:
+  # Graph table naming
+  # Routes are calculated on the weighted graph automatically named:
+  #   {fine_graph.mode}_graph_wt_{fine_graph.name_suffix}
+  # Example: h3_graph_wt_20 (derived from fine_graph.mode="h3", fine_graph.name_suffix="20")
+
   # Port definitions for route calculation (final routing endpoints)
   # These may differ from fine_graph ports if different start/end points are desired
   departure_port: "SF Pilot"
@@ -193,7 +196,7 @@ pathfinding:
 
 output:
   # Base output directories (created automatically if they don't exist)
-  base_dir: "docs/notebooks/output"  # Where GeoPackage files and routes are saved
+  base_dir: "output"  # Where GeoPackage files and routes are saved
   log_dir: "docs/logs"               # Where workflow logs and debug files are saved
 
   # Performance benchmark CSV export (optional)
@@ -223,6 +226,14 @@ logging:
 # 4. Adjust vessel parameters (draft, height) for your vessel
 # 5. Set departure/arrival ports and coordinates for your route
 #
+# NAMING CONVENTIONS (auto-generated, do not modify):
+# - Base graph: {base_graph.graph_name}.gpkg (e.g., base_graph.gpkg)
+# - Base route: {base_graph.base_route_name} (e.g., base_route)
+# - Fine undirected: {fine_graph.mode}_graph_{fine_graph.name_suffix} (e.g., h3_graph_20)
+# - Fine weighted: {fine_graph.mode}_graph_wt_{fine_graph.name_suffix} (e.g., h3_graph_wt_20)
+# NOTE: Only modify base_graph.graph_name, base_graph.base_route_name, fine_graph.mode,
+#       and fine_graph.name_suffix to customize naming. Other naming fields are auto-generated.
+#
 # WORKFLOW EXECUTION ORDER (do not skip steps):
 # 1. base_graph: Creates initial coarse graph and baseline route
 # 2. fine_graph: Creates high-resolution graph from base route buffer
@@ -230,14 +241,15 @@ logging:
 # 4. pathfinding: Calculates final optimized route on weighted graph
 #
 # COMMON ISSUES:
-# - Table not found: Verify table name matches weighting.source_graph_undirected
+# - Table not found: Verify fine_graph.mode and fine_graph.name_suffix are set correctly
+#   (auto-generated table names depend on these values)
 # - Coordinates out of bounds: Check longitude (negative = West), latitude ranges
 # - Memory errors: Reduce fine_spacing_nm, reduce buffer_size_nm, or enable slice_buffer
 #   (slice_buffer restricts area with: slice_south/north_degree, slice_west/east_degree)
 # - Slow performance: Increase spacing_nm, disable unused weighting steps
 #
 # OUTPUT FILES:
-# - GeoPackage files: {base_dir}/h3_graph_{suffix}.gpkg
+# - GeoPackage files: {base_dir}/{mode}_graph_{suffix}.gpkg (e.g., h3_graph_20.gpkg)
 # - Routes (GeoJSON): {base_dir}/detailed_route_{draft}m_draft.geojson
 # - Logs: {log_dir}/*.log
 # - Benchmarks (CSV): {base_dir}/benchmark_*.csv

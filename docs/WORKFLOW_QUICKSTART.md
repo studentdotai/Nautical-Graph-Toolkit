@@ -9,17 +9,173 @@ This unified quick-start guide covers all workflow types. Currently implemented:
 2. **`maritime_workflow_config.yml`** - Workflow configuration
 3. **`WORKFLOW_POSTGIS_GUIDE.md`** - Comprehensive documentation
 
-### Future Workflows
-- GeoPackage-based workflow (coming soon)
-- SpatiaLite-based workflow (coming soon)
+### GeoPackage/SpatiaLite Workflow
+1. **`maritime_graph_geopackage_workflow.py`** - Main executable script
+2. **`maritime_workflow_config.yml`** - Workflow configuration (shared)
+3. **`WORKFLOW_GEOPACKAGE_GUIDE.md`** - Comprehensive documentation
+
+---
+
+## Prerequisites: Data Import Pipeline
+
+Before running any workflow, you must first convert S-57 ENC data to a GIS-ready format using **`import_s57.py`**. This creates the core database that feeds all maritime graphs.
+
+### 2-Step Pipeline Overview
+
+```
+Step 1: Data Import (import_s57.py)
+  S-57 Files (.000)
+       ↓
+  Choose Import Mode
+  ├─ S57Advanced: Merge all ENCs by layer with source tracking (RECOMMENDED)
+  └─ S57Updater: Update existing database with new charts
+       ↓
+  Choose Output Backend
+  ├─ PostGIS: Server-based (recommended for production)
+  ├─ GeoPackage: File-based (portable, single file)
+  └─ SpatiaLite: File-based (lightweight SQLite)
+       ↓
+  Core Database Created (us_enc_all schema/file)
+  └─ Layers: seaare, lndare, fairwy, drgare, tsslpt, etc.
+            + dsid_dsnm column (source ENC tracking)
+
+Step 2: Maritime Workflow (workflow scripts)
+  Workflow Script (PostGIS or GeoPackage)
+       ↓
+  Queries Core Database → Builds Graphs → Applies Weights → Routes
+
+Result: Optimal Maritime Routes
+```
+
+### S57Advanced: Initial Import (Most Common)
+
+**Purpose**: Convert all S-57 files to a merged, queryable database with source tracking.
+
+```bash
+# PostGIS Backend (Recommended for Production)
+python scripts/import_s57.py \
+  --mode advanced \
+  --input-path data/ENC_ROOT \
+  --output-format postgis \
+  --schema us_enc_all \
+  --verify \
+  --db-host 127.0.0.1 \
+  --db-user postgres \
+  --db-password <password>
+
+# GeoPackage Backend (Portable, File-Based)
+python scripts/import_s57.py \
+  --mode advanced \
+  --input-path data/ENC_ROOT \
+  --output-format gpkg \
+  --schema enc_charts \
+  --output-dir docs/notebooks/output \
+  --verify
+```
+
+**What It Creates**:
+- Single schema/file (us_enc_all) with all ENCs merged by layer
+- ~20+ S-57 layers (seaare, lndare, soundg, fairwy, drgare, etc.)
+- Each feature has `dsid_dsnm` column indicating source ENC
+- Spatial indexes for fast querying
+- Verification report showing layer counts
+
+### S57Updater: Maintaining Chart Currency
+
+**Purpose**: Update existing database when new ENC charts are released.
+
+```bash
+# Incremental Update (Fastest - only updates changed charts)
+python scripts/import_s57.py \
+  --mode update \
+  --update-source data/ENC_ROOT_UPDATE \
+  --output-format postgis \
+  --schema us_enc_all \
+  --db-host 127.0.0.1 \
+  --db-user postgres
+
+# Force Update (Complete Reimport - ensures clean state)
+python scripts/import_s57.py \
+  --mode update \
+  --update-source data/ENC_ROOT_UPDATE \
+  --output-format postgis \
+  --schema us_enc_all \
+  --force-update \
+  --enc-filter US3CA52M US1GC09M  # Optional: specific ENCs
+  --db-host 127.0.0.1 \
+  --db-user postgres
+```
+
+**Impact on Existing Workflows**:
+- After update, recommend regenerating graphs for accuracy
+- Can reuse base_graph if only minor updates (evaluate performance)
+- Always regenerate fine/weighted graphs for precise routes
+- Verification step important after updates
+
+### Backend Selection: Import vs Workflow Consistency
+
+**IMPORTANT**: Your import backend should match your workflow backend!
+
+| Scenario | Import Backend | Workflow Backend | Reason |
+|----------|---|---|---|
+| Production server with large data | PostGIS | PostGIS | Optimal performance, database-side operations |
+| Portable/offline deployment | GeoPackage | GeoPackage | Single file, portable, no server |
+| Quick testing | GeoPackage | GeoPackage | Fast setup, portable for sharing |
+| Multi-user environment | PostGIS | PostGIS | Concurrent access, advanced indexing |
+| Mixed use (testing + production) | Both (separate) | Depends on use | Different imports for different needs |
+
+### Verification: Quick Checks Before Workflow
+
+After import completes, verify the database before running workflows:
+
+**PostGIS Verification**:
+```bash
+# Check schema exists
+psql -h localhost -U postgres -d ENC_db -c \
+  "SELECT * FROM information_schema.schemata WHERE schema_name = 'us_enc_all';"
+
+# Check key layers exist
+psql -h localhost -U postgres -d ENC_db -c \
+  "SELECT table_name FROM information_schema.tables
+   WHERE table_schema='us_enc_all' ORDER BY table_name;"
+
+# Verify layer has features
+psql -h localhost -U postgres -d ENC_db -c \
+  "SELECT 'seaare' as layer, COUNT(*) as feature_count FROM us_enc_all.seaare
+   UNION ALL
+   SELECT 'lndare', COUNT(*) FROM us_enc_all.lndare
+   UNION ALL
+   SELECT 'soundg', COUNT(*) FROM us_enc_all.soundg;"
+
+# Check source tracking column
+psql -h localhost -U postgres -d ENC_db -c \
+  "SELECT DISTINCT dsid_dsnm FROM us_enc_all.seaare LIMIT 5;"
+```
+
+**GeoPackage Verification**:
+```bash
+# List layers in GeoPackage
+ogrinfo docs/notebooks/output/enc_charts.gpkg
+
+# Count features in key layers
+ogrinfo docs/notebooks/output/enc_charts.gpkg seaare -summary | grep "Feature Count"
+ogrinfo docs/notebooks/output/enc_charts.gpkg lndare -summary | grep "Feature Count"
+
+# Check file size
+ls -lh docs/notebooks/output/enc_charts.gpkg
+```
+
+---
 
 ## Quick Start (5 minutes)
+
+**IMPORTANT**: This assumes S-57 data has been imported. See "Prerequisites: Data Import Pipeline" above if you haven't run `import_s57.py` yet.
 
 ### PostGIS Workflow
 
 #### 1. Verify Configuration
 ```bash
-.venv/bin/python docs/maritime_graph_postgis_workflow.py --dry-run
+python docs/maritime_graph_postgis_workflow.py --dry-run
 ```
 
 Expected output:
@@ -30,7 +186,7 @@ Dry run mode - configuration validated, exiting
 
 #### 2. Run Full Pipeline
 ```bash
-.venv/bin/python docs/maritime_graph_postgis_workflow.py
+python docs/maritime_graph_postgis_workflow.py
 ```
 
 **Estimated time: 45-60 minutes**
@@ -42,7 +198,7 @@ The script will:
 - ✓ Calculate optimal routes
 - ✓ Generate benchmarks and logs
 
-### 3. Check Results
+#### 3. Check Results
 ```bash
 # View log file
 tail -f docs/logs/maritime_workflow_*.log
@@ -53,6 +209,262 @@ ls -lh docs/notebooks/output/
 # Check benchmark results
 cat docs/notebooks/output/benchmark_graph_*.csv
 ```
+
+### GeoPackage Workflow
+
+#### 1. Verify Configuration
+```bash
+python docs/maritime_graph_geopackage_workflow.py --dry-run
+```
+
+#### 2. Run Full Pipeline
+```bash
+python docs/maritime_graph_geopackage_workflow.py
+```
+
+**Estimated time: 14-20 minutes** (faster than PostGIS for file-based operations)
+
+#### 3. Check Results
+```bash
+# List output files
+ls -lh docs/notebooks/output/
+
+# View GeoPackage layers
+ogrinfo docs/notebooks/output/base_graph.gpkg
+```
+
+---
+
+## Complete End-to-End Examples
+
+### Example 1: Full PostGIS Pipeline (LA → SF Route)
+
+**Total Time: ~2 hours** (1 hour import + 1 hour workflow)
+
+#### Step 1: Import S-57 Data
+```bash
+# Import all S-57 files to PostGIS
+python scripts/import_s57.py \
+  --mode advanced \
+  --input-path data/ENC_SF_LA/ENC_ROOT \
+  --output-format postgis \
+  --schema us_enc_all \
+  --enable-parallel \
+  --max-workers 4 \
+  --verify \
+  --db-host 127.0.0.1 \
+  --db-user postgres \
+  --db-password <password>
+
+# Expected output
+# ✓ Connected to PostGIS: ENC_db@127.0.0.1:5432
+# ✓ Found 47 S-57 files
+# ✓ Conversion completed in 3245s
+# ✓ Feature update status verified
+# ✓ All validation checks passed
+```
+
+#### Step 2: Verify Import
+```bash
+# Confirm schema and layers exist
+psql -h 127.0.0.1 -U postgres -d ENC_db -c \
+  "SELECT table_name FROM information_schema.tables
+   WHERE table_schema='us_enc_all' LIMIT 10;"
+
+# Expected: seaare, lndare, fairwy, drgare, tsslpt, soundg, etc.
+
+# Quick feature count
+psql -h 127.0.0.1 -U postgres -d ENC_db -c \
+  "SELECT 'seaare' as layer, COUNT(*) FROM us_enc_all.seaare
+   UNION ALL SELECT 'lndare', COUNT(*) FROM us_enc_all.lndare;"
+```
+
+#### Step 3: Configure Workflow
+Edit `docs/maritime_workflow_config.yml`:
+```yaml
+base_graph:
+  departure_port: "Los Angeles"
+  arrival_port: "San Francisco"
+  expansion_nm: 24.0
+
+fine_graph:
+  mode: "h3"              # Graph names auto-generated: h3_graph_20, h3_graph_wt_20
+  name_suffix: "20"       # Change this to customize graph names
+  buffer_size_nm: 24.0
+
+weighting:
+  vessel:
+    draft: 7.5
+  # Graph names automatically constructed from fine_graph.mode and fine_graph.name_suffix
+```
+
+#### Step 4: Run Workflow
+```bash
+# Dry run first (validate setup)
+python docs/maritime_graph_postgis_workflow.py --dry-run
+
+# Full workflow
+python docs/maritime_graph_postgis_workflow.py
+
+# Expected output
+# Base Graph Creation: 127.4s (2.1 min)
+# Fine/H3 Graph Creation: 22.9s (0.4 min)
+# Graph Weighting: 460.5s (7.7 min)
+# Pathfinding & Export: 261.6s (4.4 min)
+# Total: 872.3s (14.5 min)
+```
+
+#### Step 5: Visualize Results
+```bash
+# Check generated route
+cat docs/notebooks/output/detailed_route_7.5m_draft.geojson | head -50
+
+# Open GeoPackage in QGIS
+open docs/notebooks/output/h3_graph_directed_pg_6_11.gpkg
+
+# Check performance benchmarks
+cat docs/notebooks/output/benchmark_graph_base.csv
+```
+
+---
+
+### Example 2: Full GeoPackage Pipeline (Portable, Offline)
+
+**Total Time: ~1.5 hours** (40 min import + 14 min workflow)
+
+#### Step 1: Import S-57 Data
+```bash
+# Import to GeoPackage (single file, portable)
+python scripts/import_s57.py \
+  --mode advanced \
+  --input-path data/ENC_SF_LA/ENC_ROOT \
+  --output-format gpkg \
+  --schema enc_west \
+  --output-dir docs/notebooks/output \
+  --verify
+
+# Expected output
+# ✓ Found 47 S-57 files
+# ✓ Conversion completed in 2400s
+# ✓ Output file: docs/notebooks/output/enc_west.gpkg (1.2 GB)
+# ✓ Feature verification complete
+```
+
+#### Step 2: Verify Import
+```bash
+# List all layers in GeoPackage
+ogrinfo docs/notebooks/output/enc_west.gpkg | grep "^  "
+
+# Expected: seaare, lndare, fairwy, drgare, tsslpt, soundg, etc.
+
+# Count features
+ogrinfo docs/notebooks/output/enc_west.gpkg seaare -summary | grep "Feature Count"
+```
+
+#### Step 3: Configure Workflow
+Same as PostGIS (uses same YAML file)
+
+#### Step 4: Run Workflow
+```bash
+# Workflow uses GeoPackage automatically
+python docs/maritime_graph_geopackage_workflow.py
+
+# Expected output (faster than PostGIS)
+# Base Graph Creation: 117.5s (2.0 min)
+# Fine/H3 Graph Creation: 21.1s (0.4 min)
+# Graph Weighting: 615.3s (10.3 min)
+# Pathfinding & Export: 85.1s (1.4 min)
+# Total: 839.0s (14.0 min)
+```
+
+#### Step 5: Share/Deploy
+```bash
+# All outputs in single portable directory
+ls -lh docs/notebooks/output/
+
+# Copy to USB drive or share
+tar -czf maritime_workflow.tar.gz docs/notebooks/output/*.gpkg docs/logs/
+
+# On another machine, extract and open in QGIS (no server needed!)
+tar -xzf maritime_workflow.tar.gz
+open docs/notebooks/output/h3_graph_wt_20.gpkg
+```
+
+---
+
+### Example 3: Update Workflow (Maintaining Chart Currency)
+
+**When to Use**: New ENC charts released, need to refresh routes.
+
+#### Step 1: Update S-57 Database
+```bash
+# Incremental update (fastest)
+python scripts/import_s57.py \
+  --mode update \
+  --update-source data/ENC_UPDATES_2025 \
+  --output-format postgis \
+  --schema us_enc_all \
+  --db-host 127.0.0.1 \
+  --db-user postgres
+
+# Expected: Updates only changed charts, preserves other data
+```
+
+#### Step 2: Regenerate Graphs
+```bash
+# Regenerate all graphs with updated data
+python docs/maritime_graph_postgis_workflow.py
+
+# For GeoPackage: graphs reload updated data automatically
+python docs/maritime_graph_geopackage_workflow.py
+```
+
+#### Step 3: Compare Routes
+```bash
+# Check if route changed due to updated charts
+# Previous: detailed_route_7.5m_draft.geojson (59.43 NM)
+# New: same file now has updated route
+
+cat docs/notebooks/output/detailed_route_7.5m_draft.geojson
+```
+
+---
+
+## Backend Selection Considerations
+
+### Choose PostGIS If:
+- ✓ Production deployment with server infrastructure
+- ✓ Multi-user environment (concurrent route calculations)
+- ✓ Large datasets (100+ ENCs, frequent updates)
+- ✓ Database-side spatial operations needed
+- ✓ Server handles graph generation better
+
+### Choose GeoPackage If:
+- ✓ Single-user or testing environment
+- ✓ Need to share workflows (USB drive, cloud, email)
+- ✓ No server infrastructure available
+- ✓ Offline operation required
+- ✓ Portable deployment needed
+- ✓ Moderate dataset size (10-100 ENCs)
+
+### Consistency Requirement
+**IMPORTANT**: Import and workflow backends MUST match:
+
+```bash
+# ✓ CORRECT: PostGIS → PostGIS
+python scripts/import_s57.py ... --output-format postgis --schema us_enc_all
+python docs/maritime_graph_postgis_workflow.py
+
+# ✓ CORRECT: GeoPackage → GeoPackage
+python scripts/import_s57.py ... --output-format gpkg ... enc_west.gpkg
+python docs/maritime_graph_geopackage_workflow.py
+
+# ✗ WRONG: Different backends (workflow won't find data)
+python scripts/import_s57.py ... --output-format postgis
+python docs/maritime_graph_geopackage_workflow.py  # Fails - no GeoPackage data!
+```
+
+---
 
 ## Common Commands (PostGIS)
 
@@ -131,18 +543,21 @@ See `WORKFLOW_GUIDE.md` for complete reference.
 ## Output Files
 
 ### Database Tables (PostGIS)
+Auto-generated names from `fine_graph.mode` and `fine_graph.name_suffix`:
 ```
-graph.base_graph_PG_*              # Base graph
-graph.h3_graph_pg_6_11_*           # H3 graph
-graph.h3_graph_directed_pg_6_11_v3_*  # Weighted graph
-routes.base_routes                 # Base route
+graph.base_graph_nodes/edges         # Base graph
+graph.{mode}_graph_{suffix}_*        # Fine/H3 graph (e.g., h3_graph_20_*)
+graph.{mode}_graph_wt_{suffix}_*     # Weighted graph (e.g., h3_graph_wt_20_*)
+routes.base_routes                   # Base route
 ```
 
 ### GeoPackage Files
+Auto-generated names from `fine_graph.mode` and `fine_graph.name_suffix`:
 ```
-docs/notebooks/output/base_graph_PG.gpkg
-docs/notebooks/output/h3_graph_PG_6_11.gpkg
-docs/notebooks/output/h3_graph_directed_pg_6_11_v3.gpkg
+docs/notebooks/output/base_graph.gpkg
+docs/notebooks/output/{mode}_graph_{suffix}.gpkg         (e.g., h3_graph_20.gpkg)
+docs/notebooks/output/{mode}_graph_wt_{suffix}.gpkg      (e.g., h3_graph_wt_20.gpkg)
+docs/notebooks/output/maritime_routes.gpkg (GeoPackage only)
 ```
 Open in QGIS for visualization
 
@@ -168,7 +583,103 @@ Detailed operation logs (DEBUG level)
 
 ## Troubleshooting
 
-### Database Connection Error
+### Import-Related Issues
+
+#### Error: No S-57 Files Found
+```
+Error: No S-57 files (*.000) found in /path/to/data
+```
+
+**Solution:**
+- S-57 files must have `.000` extension (base files)
+- Verify directory contains ENCs: `find /path/to/data -name "*.000" -type f`
+- Check read permissions: `ls -la /path/to/data`
+
+---
+
+#### Error: Database Schema Not Found After Import
+```
+ProgrammingError: schema "us_enc_all" does not exist
+```
+
+**Why This Happens**: Workflow can't find imported data
+
+**Solution**:
+1. Verify import completed: `python scripts/import_s57.py ... --verify`
+2. Check schema exists: `psql -d ENC_db -c "SELECT schema_name FROM information_schema.schemata;"`
+3. Verify correct backend:
+   ```bash
+   # If you imported to PostGIS, use PostGIS workflow
+   python docs/maritime_graph_postgis_workflow.py
+
+   # If you imported to GeoPackage, use GeoPackage workflow
+   python docs/maritime_graph_geopackage_workflow.py
+   ```
+
+---
+
+#### Error: Missing Required Layers
+```
+FileNotFoundError: Layer 'seaare' not found
+```
+
+**Why This Happens**: Import didn't include all necessary layers
+
+**Solution**:
+1. Verify what layers were imported:
+   ```bash
+   # PostGIS
+   psql -d ENC_db -c "SELECT table_name FROM information_schema.tables
+                      WHERE table_schema='us_enc_all' ORDER BY table_name;"
+
+   # GeoPackage
+   ogrinfo docs/notebooks/output/enc_west.gpkg | grep "^  "
+   ```
+
+2. If critical layers missing, re-import with `--overwrite`:
+   ```bash
+   python scripts/import_s57.py --mode advanced ... --overwrite --verify
+   ```
+
+---
+
+#### Error: Import Took Too Long / Out of Memory
+```
+MemoryError: Unable to allocate array
+```
+
+**Why This Happens**: Too many ENCs processed simultaneously
+
+**Solution**:
+1. Use parallel processing with fewer workers:
+   ```bash
+   python scripts/import_s57.py --mode advanced ... \
+     --enable-parallel --max-workers 2 --memory-limit-mb 2048
+   ```
+
+2. Reduce batch size:
+   ```bash
+   python scripts/import_s57.py --mode advanced ... \
+     --batch-size 250 --no-auto-tune
+   ```
+
+---
+
+#### Error: GeoPackage File Locked During Import
+```
+DatabaseError: database is locked
+```
+
+**Solution**:
+1. Close other applications using the file (QGIS, etc.)
+2. Delete lock files: `rm docs/notebooks/output/enc_west.gpkg-wal`
+3. Retry import
+
+---
+
+### Workflow-Related Issues
+
+#### Database Connection Error
 ```bash
 # Check PostgreSQL is running
 sudo systemctl status postgresql
@@ -177,61 +688,124 @@ sudo systemctl status postgresql
 psql -h localhost -U postgres -d ENC_db -c "SELECT version();"
 ```
 
-### Missing S-57 Data
-```bash
-# Check schema exists
-psql -d ENC_db -c "SELECT * FROM information_schema.schemata WHERE schema_name = 'us_enc_all';"
-
-# Convert S-57 if needed
-See docs/SETUP.md
-```
-
-### Port Not Found
+#### Port Not Found
 ```bash
 # List available ports
-.venv/bin/python -c "from src.maritime_module.utils.port_utils import PortData; p = PortData(); print(p.get_port_by_name('Los Angeles'))"
+python -c "from src.nautical_graph_toolkit.utils.port_utils import PortData; p = PortData(); print(p.get_port_by_name('Los Angeles'))"
 
 # Use exact port name from World Port Index
 ```
 
-### Memory Issues
+#### Memory Issues During Workflow
 ```bash
 # Use fine grid mode (more memory-efficient)
-.venv/bin/python docs/maritime_graph_workflow.py --graph-mode fine --skip-base
+python docs/maritime_graph_postgis_workflow.py --graph-mode fine --skip-base
 
 # Or reduce buffer size in config
+# fine_graph.buffer_size_nm: 12.0  # Reduced from 24.0
+```
+
+#### Workflow Fails After S57Updater
+```
+Graph creation fails with different results than before update
+```
+
+**Why This Happens**: Updated ENC data affects graph generation
+
+**Solution**:
+1. Always regenerate fine/weighted graphs after S57Updater
+2. Base graph can sometimes be reused (check performance)
+3. Re-run full workflow:
+   ```bash
+   python docs/maritime_graph_postgis_workflow.py
+   ```
+
+---
+
+### Backend Mismatch Issues
+
+#### Error: Workflow Can't Find Data
+```
+FileNotFoundError: No such file or directory: '.../us_enc_all.gpkg'
+OR
+schema "us_enc_all" does not exist
+```
+
+**Why This Happens**: Import and workflow backends don't match
+
+**Solution**:
+```bash
+# Verify which backend you used for import
+# If PostGIS: use PostGIS workflow
+python docs/maritime_graph_postgis_workflow.py
+
+# If GeoPackage: use GeoPackage workflow
+python docs/maritime_graph_geopackage_workflow.py
+
+# If unsure, check what exists:
+psql -d ENC_db -c "SELECT schema_name FROM information_schema.schemata LIKE 'us_enc%';"
+ls docs/notebooks/output/*.gpkg
 ```
 
 ## File Structure
 
 ```
-docs/
-├── maritime_graph_postgis_workflow.py  # PostGIS workflow (executable)
-├── maritime_workflow_config.yml        # Configuration (shared across workflows)
-├── WORKFLOW_POSTGIS_GUIDE.md           # PostGIS-specific documentation
-├── WORKFLOW_QUICKSTART.md              # This file (unified for all workflows)
-├── logs/                               # Auto-created log directory
-└── notebooks/
-    └── output/                         # Generated outputs
-        ├── *.gpkg                      # GeoPackage files
-        ├── *.geojson                   # Route files
-        └── benchmark_*.csv             # Performance metrics
+Project Root/
+├── scripts/
+│   ├── import_s57.py                  # S-57 data import tool (Step 1)
+│   └── SCRIPTS_GUIDE.md                # Scripts reference guide
+│
+├── docs/
+│   ├── maritime_graph_postgis_workflow.py   # PostGIS workflow (Step 2)
+│   ├── maritime_graph_geopackage_workflow.py # GeoPackage workflow (Step 2)
+│   ├── maritime_workflow_config.yml   # Configuration (shared)
+│   ├── WORKFLOW_QUICKSTART.md         # This file
+│   ├── WORKFLOW_POSTGIS_GUIDE.md      # PostGIS details
+│   ├── WORKFLOW_GEOPACKAGE_GUIDE.md   # GeoPackage details
+│   ├── WORKFLOW_S57_IMPORT_GUIDE.md   # Import detailed guide
+│   ├── logs/                           # Auto-created log directory
+│   └── notebooks/
+│       └── output/                     # Generated outputs
+│           ├── *.gpkg (ENCs + graphs)  # GeoPackage files
+│           ├── *.geojson               # Route files
+│           └── benchmark_*.csv         # Performance metrics
+│
+├── data/
+│   └── ENC_ROOT/                      # S-57 files (.000) - source data
+│
+└── .env                               # Database credentials (PostGIS only)
 ```
 
-## Next Steps (PostGIS Workflow)
+## Next Steps
 
-1. **Review configuration**: `cat docs/maritime_workflow_config.yml`
-2. **Dry run test**: `.venv/bin/python docs/maritime_graph_postgis_workflow.py --dry-run`
-3. **Run workflow**: `.venv/bin/python docs/maritime_graph_postgis_workflow.py`
-4. **Check results**: `ls -lh docs/notebooks/output/`
-5. **Visualize in QGIS**: Open GeoPackage files from output directory
+### For First-Time Users
+
+1. **Import data**: Choose between PostGIS or GeoPackage, then follow "Example 1" or "Example 2" above
+2. **Verify import**: Use verification commands in "Prerequisites: Data Import Pipeline"
+3. **Configure workflow**: Edit `docs/maritime_workflow_config.yml` (departure/arrival ports)
+4. **Run workflow**: Execute the appropriate workflow script for your backend
+5. **Visualize results**: Open output `.gpkg` files in QGIS
+
+### For Updating Charts
+
+1. **Update data**: Use Example 3 "Update Workflow" with `S57Updater`
+2. **Regenerate graphs**: Re-run workflow scripts with updated data
+3. **Compare routes**: Check if updated ENC data affected optimal routes
 
 ## Complete Documentation
 
-For detailed information, see:
-- **WORKFLOW_POSTGIS_GUIDE.md** - PostGIS-specific reference guide
-- **maritime_workflow_config.yml** - Configuration file (well-commented, shared across workflows)
-- **src/maritime_module/data/graph_config.yml** - Graph parameters
+### Data Import (Step 1)
+- **WORKFLOW_S57_IMPORT_GUIDE.md** - Complete import reference (modes, backends, parameters)
+- **scripts/SCRIPTS_GUIDE.md** - Overview of all production scripts
+
+### Maritime Workflows (Step 2)
+- **WORKFLOW_POSTGIS_GUIDE.md** - PostGIS backend deep dive
+- **WORKFLOW_GEOPACKAGE_GUIDE.md** - GeoPackage backend deep dive
+- **WORKFLOW_QUICKSTART.md** - This file (unified guide covering both)
+
+### Configuration
+- **maritime_workflow_config.yml** - Workflow configuration (well-commented, shared across backends)
+- **src/nautical_graph_toolkit/data/graph_config.yml** - Graph parameters (grid, H3, layers)
 
 ## Performance Expectations
 

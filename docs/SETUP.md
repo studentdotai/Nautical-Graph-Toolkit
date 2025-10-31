@@ -414,9 +414,9 @@ Solution:
 After completing setup:
 
 1. **Start with basic graph notebooks** to verify your data is working
-2. **Review the graph configuration** (`src/maritime_module/data/graph_config.yml`)
+2. **Review the graph configuration** (`src/nautical_graph_toolkit/data/graph_config.yml`)
 3. **Explore advanced features** in fine graph and H3 graph notebooks
-4. **Customize port data** if needed (`src/maritime_module/data/custom_ports.csv`)
+4. **Customize port data** if needed (`src/nautical_graph_toolkit/data/custom_ports.csv`)
 
 ---
 

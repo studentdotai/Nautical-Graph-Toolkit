@@ -82,7 +82,7 @@ GeoPackage uses file-based storage - no server credentials required. Just ensure
 The script uses two configuration files:
 
 - **`docs/maritime_workflow_config.yml`** - Workflow orchestration (ports, AOI, steps)
-- **`src/maritime_module/data/graph_config.yml`** - Graph parameters (layers, weights, H3)
+- **`src/nautical_graph_toolkit/data/graph_config.yml`** - Graph parameters (layers, weights, H3)
 
 ## Configuration Guide
 
@@ -110,8 +110,12 @@ base_graph:
 #### Fine/H3 Graph Configuration
 ```yaml
 fine_graph:
-  mode: "h3"                 # "fine" or "h3"
-  name_suffix: "20"          # Used to construct graph names: {mode}_graph_{suffix}
+  # Naming: Graphs auto-generated as {mode}_graph_{name_suffix}
+  #   - Undirected: h3_graph_20 or fine_graph_20
+  #   - Weighted: h3_graph_wt_20 or fine_graph_wt_20
+  mode: "h3"                 # "fine" (grid) or "h3" (hexagonal)
+  name_suffix: "20"          # Change to customize all graph names
+
   buffer_size_nm: 24.0       # Buffer around base route
   slice_buffer: true         # Optional area slicing
   slice_north_degree: 38.0
@@ -130,9 +134,13 @@ fine_graph:
 #### Weighting Configuration
 ```yaml
 weighting:
-  # Graph names are automatically constructed from fine_graph config:
-  # - source: {mode}_graph_{name_suffix}  (e.g., "h3_graph_20", "fine_graph_20")
-  # - target: {mode}_graph_wt_{name_suffix}  (e.g., "h3_graph_wt_20", "fine_graph_wt_20")
+  # IMPORTANT: Graph names are automatically constructed from fine_graph config:
+  #   - source (undirected): {mode}_graph_{name_suffix}
+  #   - target (directed): {mode}_graph_wt_{name_suffix}
+  # Examples (fine_graph.mode="h3", fine_graph.name_suffix="20"):
+  #   - source: h3_graph_20
+  #   - target: h3_graph_wt_20
+  # Do NOT manually set these; they are auto-generated.
 
   steps:
     convert_to_directed: true
@@ -164,7 +172,7 @@ pathfinding:
 
 ### graph_config.yml
 
-This file (in `src/maritime_module/data/`) defines graph generation parameters:
+This file (in `src/nautical_graph_toolkit/data/`) defines graph generation parameters:
 
 - **Navigable layers**: Which S-57 features define safe water (seaare, fairwy, etc.)
 - **Obstacle layers**: Which features are hazards (lndare, slcons, etc.)
@@ -339,14 +347,15 @@ This is a **critical prerequisite** for Step 2 (fine graph creation needs to loa
 
 #### Step 2: Fine/H3 Graph
 ```
-h3_graph_20.gpkg              - High-resolution H3 graph (or fine_graph_20.gpkg)
-  ├── nodes                   - High-resolution node geometries
-  ├── edges                   - High-resolution edge geometries
-  ├── land_grid               - Polygons of land areas (from fine grid generation)
-  └── sea_grid                - Polygons of sea areas (combined navigable water)
+{mode}_graph_{name_suffix}.gpkg     - High-resolution graph (e.g., h3_graph_20.gpkg)
+  ├── nodes                         - High-resolution node geometries
+  ├── edges                         - High-resolution edge geometries
+  ├── land_grid                     - Polygons of land areas (from fine grid generation)
+  └── sea_grid                      - Polygons of sea areas (combined navigable water)
 ```
 
-**Note:** Name constructed from config: `{mode}_graph_{name_suffix}` (e.g., h3_graph_20, fine_graph_20)
+**Note:** Name automatically constructed from config: `{mode}_graph_{name_suffix}`
+- Example: `fine_graph.mode="h3"` + `fine_graph.name_suffix="20"` → `h3_graph_20.gpkg`
 
 **IMPORTANT:** Land and sea grid layers are **required** for weighting in Step 3. They are created by `create_fine_grid()` and saved using:
 ```python
@@ -393,9 +402,9 @@ The `land_area_layer: "land_grid"` parameter is **essential** for optimization:
 
 #### Weighted Graph Output
 ```
-h3_graph_wt_20.gpkg           - Weighted directed graph (or fine_graph_wt_20.gpkg)
-  ├── nodes          - Directed node geometries
-  └── edges          - Directed edges with weights:
+{mode}_graph_wt_{name_suffix}.gpkg  - Weighted directed graph (e.g., h3_graph_wt_20.gpkg)
+  ├── nodes                         - Directed node geometries
+  └── edges                         - Directed edges with weights:
       - weight: Original distance (NM)
       - adjusted_weight: Final routing weight
       - wt_static_blocking: Hazard penalties
@@ -613,7 +622,7 @@ Error: database disk image is malformed / database is locked
 
 ### Custom Graph Configurations
 
-Edit `src/maritime_module/data/graph_config.yml` to customize:
+Edit `src/nautical_graph_toolkit/data/graph_config.yml` to customize:
 
 - **Layer definitions**: Add/remove navigable or obstacle layers
 - **Weight settings**: Adjust static layer weights and factors
@@ -659,7 +668,7 @@ List available WPI ports:
 ```bash
 # Query the port database
 python -c "
-from src.maritime_module.utils.port_utils import PortUtils
+from src.nautical_graph_toolkit.utils.port_utils import PortUtils
 ports = PortUtils.load_wpi_ports()
 for port in ports[ports['NAME'].str.contains('Francisco|Angeles')]:
     print(f\"{port['NAME']}: {port['LATITUDE']}, {port['LONGITUDE']}\")
@@ -667,7 +676,7 @@ for port in ports[ports['NAME'].str.contains('Francisco|Angeles')]:
 ```
 
 #### 2. Custom Ports File
-Add custom ports to `src/maritime_module/data/custom_ports.csv`:
+Add custom ports to `src/nautical_graph_toolkit/data/custom_ports.csv`:
 
 ```csv
 PORT_NAME,LATITUDE,LONGITUDE,COUNTRY,REGION
@@ -835,7 +844,7 @@ TOTAL WORKFLOW TIME:                    872.3s (14.5 min)
 ### Related Files
 - **Script**: `docs/maritime_graph_geopackage_workflow.py`
 - **Configuration**: `docs/maritime_workflow_config.yml`
-- **Graph Config**: `src/maritime_module/data/graph_config.yml`
+- **Graph Config**: `src/nautical_graph_toolkit/data/graph_config.yml`
 - **Setup Guide**: `docs/SETUP.md`
 - **Quick Start**: `docs/WORKFLOW_QUICKSTART.md`
 - **PostGIS Guide**: `docs/WORKFLOW_POSTGIS_GUIDE.md`

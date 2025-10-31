@@ -139,8 +139,8 @@ Step 3b: Dynamic Weights Server-Side
 ### Example 1: Basic Workflow (Python/NetworkX)
 
 ```python
-from maritime_module.core.graph import H3Graph, Weights
-from maritime_module.core.s57_data import ENCDataFactory
+from nautical_graph_toolkit.core.graph import H3Graph, Weights
+from nautical_graph_toolkit.core.s57_data import ENCDataFactory
 
 # ============================================================================
 # STEP 1: Initialize
@@ -352,8 +352,8 @@ new_weighted = weights.calculate_dynamic_weights(clean_graph, different_params)
 ### Example 2: High-Performance PostGIS Workflow
 
 ```python
-from maritime_module.core.graph import H3Graph, Weights
-from maritime_module.core.s57_data import ENCDataFactory
+from nautical_graph_toolkit.core.graph import H3Graph, Weights
+from nautical_graph_toolkit.core.s57_data import ENCDataFactory
 
 # ============================================================================
 # STEP 1: Initialize (Same as Example 1)
@@ -500,8 +500,8 @@ new_dynamic = weights.calculate_dynamic_weights_postgis(
 ### Example 3: Comparing Different Weight Strategies
 
 ```python
-from maritime_module.core.graph import Weights
-from maritime_module.core.s57_data import ENCDataFactory
+from nautical_graph_toolkit.core.graph import Weights
+from nautical_graph_toolkit.core.s57_data import ENCDataFactory
 import networkx as nx
 
 # Initialize

@@ -1,5 +1,0 @@
-layer_name,format_a_columns,format_b_columns,common_columns,missing_in_a_count,missing_in_b_count,type_mismatches_count,columns_match
-connectednode,10,10,10,0,0,0,True
-edge,22,22,22,0,0,0,True
-face,10,10,10,0,0,0,True
-isolatednode,10,10,10,0,0,0,True

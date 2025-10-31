@@ -114,7 +114,7 @@ The codebase now uses the Fiona engine for GeoPackage read/write operations, whi
 **If you still see warnings:**
 1. Ensure you're using the latest version:
    ```bash
-   cd /path/to/maritime_module
+   cd /path/to/nautical_graph_toolkit
    git pull origin feature-stamps
    uv sync
    ```
@@ -133,11 +133,11 @@ The codebase now uses the Fiona engine for GeoPackage read/write operations, whi
 
 ## Environment Setup Issues
 
-### Issue: `ModuleNotFoundError` when importing maritime_module
+### Issue: `ModuleNotFoundError` when importing nautical_graph_toolkit
 
 **Symptoms:**
 ```python
-ModuleNotFoundError: No module named 'maritime_module'
+ModuleNotFoundError: No module named 'nautical_graph_toolkit'
 ```
 
 **Solutions:**
@@ -771,10 +771,10 @@ for var in ['DB_NAME', 'DB_USER', 'DB_HOST', 'DB_PORT', 'MAPBOX_TOKEN']:
 
 print(f"\n=== Module Imports ===")
 try:
-    from src.maritime_module.core.s57_data import ENCDataFactory
-    print("maritime_module: ✓")
+    from src.nautical_graph_toolkit.core.s57_data import ENCDataFactory
+    print("nautical_graph_toolkit: ✓")
 except ImportError as e:
-    print(f"maritime_module: ✗ ({e})")
+    print(f"nautical_graph_toolkit: ✗ ({e})")
 
 try:
     import geopandas
