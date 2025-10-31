@@ -1,29 +1,33 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=68.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "maritime-module-v1"
+name = "nautical-graph-toolkit"
 version = "0.1.0"
 authors = [
   { name="Viktor Kolbasov", email="contact@studentdotai.com" },
 ]
 
-description = "A comprehensive maritime analysis and routing toolkit."
+description = "A comprehensive maritime analysis and routing toolkit for converting NOAA S-57 Electronic Navigational Charts (ENC) into analysis-ready geospatial formats."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "AGPL-3.0-only" }
-keywords = ["maritime", "navigation", "ENC", "S-57", "geospatial", "GIS", "routing"]
+keywords = ["maritime", "navigation", "ENC", "S-57", "geospatial", "GIS", "routing", "GDAL"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Environment :: Console",
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: GNU Affero General Public License v3",
     "Operating System :: OS Independent",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Topic :: Scientific/Engineering :: GIS",
+    "Topic :: Scientific/Engineering :: Information Analysis",
 ]
 dependencies = [
     "beautifulsoup4>=4.13.4",
@@ -54,12 +58,18 @@ Issues = "https://github.com/studentdotai/Nautical-Graph-Toolkit/issues"
 Documentation = "https://github.com/studentdotai/Nautical-Graph-Toolkit/tree/main/docs"
 
 [tool.setuptools]
-packages = ["maritime_module"]
+# Automatically find packages in src/ directory
 package-dir = { "" = "src" }
 
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["nautical_graph_toolkit*"]
+
 [tool.setuptools.package-data]
-maritime_module = [
-    "data/*.csv",
-    "data/*.yml",
+nautical_graph_toolkit = [
+    "data/**/*.csv",
+    "data/**/*.yml",
+    "data/**/*.sqlite",
+    "py.typed",
 ]
 

@@ -1,13 +1,13 @@
 # Third-Party Licenses
 
-This document acknowledges the open-source software used in the Maritime Module (maritime-module-v1).
+This document acknowledges the open-source software used in the Nautical Graph Toolkit (nautical-graph-toolkit).
 
-**Maritime Module Copyright:** © 2024-2025 Viktor Kolbasov
+**Nautical Graph Toolkit Copyright:** © 2024-2025 Viktor Kolbasov
 **Project License:** GNU Affero General Public License v3 (see LICENSE.md)
 
 ## Overview
 
-The Maritime Module is built on a foundation of excellent open-source libraries. All third-party dependencies are compatible with the AGPL v3 license under which this project is released. This document provides attribution and license information for all major dependencies.
+The Nautical Graph Toolkit is built on a foundation of excellent open-source libraries. All third-party dependencies are compatible with the AGPL v3 license under which this project is released. This document provides attribution and license information for all major dependencies.
 
 **Note:** Version numbers reflect the constraints specified in `pyproject.toml`. Exact pinned versions can be found in `uv.lock`.
 
@@ -47,7 +47,7 @@ SOFTWARE.
 - **Homepage:** https://gdal.org/
 - **Repository:** https://github.com/OSGeo/gdal
 - **License:** X/MIT (dual licensed)
-- **Note:** CRITICAL DEPENDENCY - Pinned to exact version 3.11.3. This library provides the fundamental S-57 ENC parsing and vector translation capabilities essential to the Maritime Module.
+- **Note:** CRITICAL DEPENDENCY - Pinned to exact version 3.11.3. This library provides the fundamental S-57 ENC parsing and vector translation capabilities essential to the Nautical Graph Toolkit.
 
 #### SQLAlchemy 2.0.41+
 - **Purpose:** SQL toolkit and Object-Relational Mapping (ORM) for database operations
@@ -293,7 +293,7 @@ License along with this library.  If not, see <https://www.gnu.org/licenses/>.
 
 ## Summary of License Compatibility
 
-The Maritime Module is released under the **GNU Affero General Public License v3** (see LICENSE.md). All third-party dependencies are compatible with AGPL v3:
+The Nautical Graph Toolkit is released under the **GNU Affero General Public License v3** (see LICENSE.md). All third-party dependencies are compatible with AGPL v3:
 
 | License Type | Count | Compatible with AGPL v3 |
 |---|---|---|
@@ -303,7 +303,7 @@ The Maritime Module is released under the **GNU Affero General Public License v3
 | LGPL v3 | 1 | ✓ Yes |
 | **Total** | **20+** | **✓ All Compatible** |
 
-**Key Point:** When using the Maritime Module under AGPL v3, you must make source code available to users interacting with network server software. LGPL components remain under their respective copyleft terms.
+**Key Point:** When using the Nautical Graph Toolkit under AGPL v3, you must make source code available to users interacting with network server software. LGPL components remain under their respective copyleft terms.
 
 ---
 
