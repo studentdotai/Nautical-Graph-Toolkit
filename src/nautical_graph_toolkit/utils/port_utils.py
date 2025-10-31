@@ -74,12 +74,17 @@ class PortData:
             if custom_ports_df.empty:
                 return standard_ports
 
+            # Drop the 'geometry' column from CSV if it exists (it will be recreated from LAT/LON)
+            if 'geometry' in custom_ports_df.columns:
+                custom_ports_df = custom_ports_df.drop(columns=['geometry'])
+
             # Create geometry from longitude and latitude
             geometry = gpd.points_from_xy(custom_ports_df.LONGITUDE, custom_ports_df.LATITUDE)
             custom_ports_gdf = gpd.GeoDataFrame(custom_ports_df, geometry=geometry, crs="EPSG:4326")
 
             # Ensure column names match for concatenation
-            custom_ports_gdf.columns = [col.upper() for col in custom_ports_gdf.columns]
+            # IMPORTANT: Keep 'geometry' lowercase - it's a special GeoDataFrame column
+            custom_ports_gdf.columns = [col.upper() if col != 'geometry' else col for col in custom_ports_gdf.columns]
 
             logger.info(f"Loaded {len(custom_ports_gdf)} custom ports. Merging with standard ports.")
             # Concatenate and return the merged GeoDataFrame
@@ -96,8 +101,9 @@ class PortData:
         """
         if not self.custom_ports_path.exists():
             logger.info(f"Custom ports file not found. Creating template at: {self.custom_ports_path}")
-            # Use the schema from the standard ports dataframe
-            schema = self.standard_ports_df.columns.tolist()
+            # Use the schema from the standard ports dataframe, excluding 'geometry'
+            # Geometry will be recreated from LAT/LON when loading
+            schema = [col for col in self.standard_ports_df.columns.tolist() if col != 'geometry']
             # Create an empty dataframe with this schema and save it
             pd.DataFrame(columns=schema).to_csv(self.custom_ports_path, index=False)
 
@@ -142,9 +148,7 @@ class PortData:
         lat_deg, lat_min, lat_hemi = CoordinateConverter.decimal_to_dmh(lat, is_latitude=True)
         lon_deg, lon_min, lon_hemi = CoordinateConverter.decimal_to_dmh(lon, is_latitude=False)
 
-        # Create a Shapely Point and get its WKT representation for the geometry column
-        point_geom = Point(lon, lat)
-
+        # Note: Do not store geometry in CSV; it will be recreated from LAT/LON when loading
         new_port_data = {
             'PORT_NAME': port_name.upper(),
             'COUNTRY': country.upper(),
@@ -156,7 +160,6 @@ class PortData:
             'LONG_DEG': lon_deg,
             'LONG_MIN': lon_min,
             'LONG_HEMI': lon_hemi,
-            'geometry': point_geom.wkt,
         }
 
         # Add any additional user-provided attributes
@@ -164,7 +167,8 @@ class PortData:
 
         # Get the full list of expected columns from the standard port dataframe
         # This ensures that the new row has all columns, filling missing ones with None/NaN
-        full_schema_columns = self.standard_ports_df.columns.tolist()
+        # Exclude 'geometry' - it will be recreated from LAT/LON when loading
+        full_schema_columns = [col for col in self.standard_ports_df.columns.tolist() if col != 'geometry']
 
         # Create a dictionary with all schema columns, filling with None for missing values
         # and then updating with the provided new_port_data
@@ -234,7 +238,6 @@ class PortData:
         if 'lat' in kwargs or 'lon' in kwargs:
             lat_deg, lat_min, lat_hemi = CoordinateConverter.decimal_to_dmh(new_lat, is_latitude=True)
             lon_deg, lon_min, lon_hemi = CoordinateConverter.decimal_to_dmh(new_lon, is_latitude=False)
-            point_geom = Point(new_lon, new_lat)
 
             custom_ports_df.loc[idx, 'LATITUDE'] = new_lat
             custom_ports_df.loc[idx, 'LONGITUDE'] = new_lon
@@ -244,7 +247,7 @@ class PortData:
             custom_ports_df.loc[idx, 'LONG_DEG'] = lon_deg
             custom_ports_df.loc[idx, 'LONG_MIN'] = lon_min
             custom_ports_df.loc[idx, 'LONG_HEMI'] = lon_hemi
-            custom_ports_df.loc[idx, 'geometry'] = point_geom.wkt
+            # Note: geometry will be recreated from LAT/LON when reloading
 
         # Update other provided attributes
         for key, value in kwargs.items():
