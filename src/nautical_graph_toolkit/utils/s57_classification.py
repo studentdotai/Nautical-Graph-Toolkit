@@ -534,7 +534,7 @@ class S57Classifier:
 
 if __name__ == "__main__":
     # This allows you to generate the static files from the command line
-    # python -m maritime_module.utils.s57_classification
+    # python -m nautical_graph_toolkit.utils.s57_classification
     logger.info("Generating static classification files...")
     S57Classifier.generate_static_files()
     logger.info("Generation complete.")

@@ -1830,7 +1830,7 @@ class BaseGraph:
 
             # Step 2: Read edges from target file
             perf.start_timer("read_edges_time")
-                edges_gdf = gpd.read_file(target_path, layer='edges', engine='fiona')
+            edges_gdf = gpd.read_file(target_path, layer='edges', engine='fiona')
             original_count = len(edges_gdf)
             logger.info(f"Original edges: {original_count:,}")
             read_time = perf.end_timer("read_edges_time")
@@ -1870,7 +1870,7 @@ class BaseGraph:
 
             # Step 5: Verify final count and get nodes
             perf.start_timer("verify_time")
-                conn = sqlite3.connect(target_path)
+            conn = sqlite3.connect(target_path)
             cursor = conn.cursor()
             cursor.execute("SELECT COUNT(*) FROM edges")
             final_count = cursor.fetchone()[0]
@@ -3223,7 +3223,9 @@ class H3Graph(BaseGraph):
         self.performance.start_timer("create_h3_graph_total")
 
         try:
-            except ImportError:
+            # Verify h3 library is available
+            import h3
+        except ImportError:
             logger.error("h3-py library is not installed. Please install it to use H3Graph features.")
             raise
 
@@ -3503,7 +3505,9 @@ class H3Graph(BaseGraph):
             connectivity_config: Configuration parameters
         """
         try:
-            except ImportError:
+            # Verify h3 library is available
+            import h3
+        except ImportError:
             logger.warning("h3-py library not available for bridge connectivity enhancement")
             return
 
@@ -11309,7 +11313,7 @@ def main_config_example() -> None:
     Example usage for GraphConfigManager - demonstrates how to programmatically
     read and modify graph configuration files.
     """
-    config_file = 'src/maritime_module/data/graph_config.yml'
+    config_file = 'src/nautical_graph_toolkit/data/graph_config.yml'
 
     try:
         config_manager = GraphConfigManager(config_file)
@@ -11782,10 +11786,10 @@ def main() -> None:
         epilog="""
 Examples:
   # Create a graph from configuration
-  python -m maritime_module.core.graph create --config config.yml --dep-port "LOS ANGELES" --arr-port "SAN FRANCISCO" --source-db data.gpkg
+  python -m nautical_graph_toolkit.core.graph create --config config.yml --dep-port "LOS ANGELES" --arr-port "SAN FRANCISCO" --source-db data.gpkg
 
   # Run configuration manager example
-  python -m maritime_module.core.graph config-example
+  python -m nautical_graph_toolkit.core.graph config-example
         """
     )
 

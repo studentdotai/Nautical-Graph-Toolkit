@@ -822,7 +822,7 @@ class PlotlyChart:
 
 			except Exception as e:
 				logger.error(f"Error processing edge: {e}")
-					traceback.print_exc()
+				traceback.print_exc()
 				continue
 
 		# Create traces for each category
