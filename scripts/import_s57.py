@@ -48,7 +48,7 @@ if str(project_root / "src") not in sys.path:
     sys.path.insert(0, str(project_root / "src"))
 
 # Project imports
-from maritime_module.core.s57_data import (
+from nautical_graph_toolkit.core.s57_data import (
     S57Base,
     S57Advanced,
     S57Updater,
@@ -57,7 +57,7 @@ from maritime_module.core.s57_data import (
     SpatiaLiteManager,
     GPKGManager,
 )
-from maritime_module.utils.db_utils import PostGISConnector
+from nautical_graph_toolkit.utils.db_utils import PostGISConnector
 
 
 # ============================================================================

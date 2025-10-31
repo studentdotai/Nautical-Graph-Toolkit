@@ -23,7 +23,7 @@ DOCUMENTATION:
 CONFIGURATION FILES:
     Database credentials: .env file (DB_NAME, DB_USER, DB_PASSWORD, DB_HOST, DB_PORT)
     Workflow parameters: docs/maritime_workflow_config.yml (universal, backend-agnostic)
-    Graph parameters: src/maritime_module/data/graph_config.yml
+    Graph parameters: src/nautical_graph_toolkit/data/graph_config.yml
 
 Usage:
     python docs/maritime_graph_postgis_workflow.py [options]
@@ -77,13 +77,13 @@ if str(PROJECT_ROOT) not in sys.path:
 
 import geopandas as gpd
 
-from src.maritime_module.core.graph import (
+from nautical_graph_toolkit.core.graph import (
     BaseGraph, FineGraph, H3Graph, Weights, GraphConfigManager
 )
-from src.maritime_module.core.s57_data import ENCDataFactory
-from src.maritime_module.core.pathfinding_lite import Route
-from src.maritime_module.utils.port_utils import Boundaries, PortData
-from src.maritime_module.utils.geometry_utils import Buffer, Slicer
+from nautical_graph_toolkit.core.s57_data import ENCDataFactory
+from nautical_graph_toolkit.core.pathfinding_lite import Route
+from nautical_graph_toolkit.utils.port_utils import Boundaries, PortData
+from nautical_graph_toolkit.utils.geometry_utils import Buffer, Slicer
 
 try:
     from tqdm import tqdm
@@ -322,7 +322,7 @@ class MaritimeWorkflow:
                     return False
 
             # Validate output directories
-            output_dir = Path(self.config.get('output.base_dir', 'docs/notebooks/output'))
+            output_dir = Path(self.config.get('output.base_dir', 'output'))
             output_dir.mkdir(parents=True, exist_ok=True)
 
             self.output_dir = output_dir

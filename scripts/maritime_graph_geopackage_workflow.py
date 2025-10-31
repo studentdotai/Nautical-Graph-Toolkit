@@ -24,7 +24,7 @@ DOCUMENTATION:
 CONFIGURATION FILES:
     Database files: Located in local directory (portable, no server required)
     Workflow parameters: docs/maritime_workflow_config.yml (universal, backend-agnostic)
-    Graph parameters: src/maritime_module/data/graph_config.yml
+    Graph parameters: src/nautical_graph_toolkit/data/graph_config.yml
 
 Usage:
     python docs/maritime_graph_geopackage_workflow.py [options]
@@ -77,13 +77,13 @@ if str(PROJECT_ROOT) not in sys.path:
 
 import geopandas as gpd
 
-from src.maritime_module.core.graph import (
+from nautical_graph_toolkit.core.graph import (
     BaseGraph, FineGraph, H3Graph, Weights, GraphConfigManager
 )
-from src.maritime_module.core.s57_data import ENCDataFactory
-from src.maritime_module.core.pathfinding_lite import Route
-from src.maritime_module.utils.port_utils import Boundaries, PortData
-from src.maritime_module.utils.geometry_utils import Buffer, Slicer
+from nautical_graph_toolkit.core.s57_data import ENCDataFactory
+from nautical_graph_toolkit.core.pathfinding_lite import Route
+from nautical_graph_toolkit.utils.port_utils import Boundaries, PortData
+from nautical_graph_toolkit.utils.geometry_utils import Buffer, Slicer
 
 try:
     from tqdm import tqdm
@@ -270,6 +270,10 @@ class MaritimeWorkflow:
 
         # Load configuration
         self.config = WorkflowConfig(config_path)
+
+        # Use provided output_dir, or fall back to config setting
+        if output_dir is None:
+            output_dir = Path(self.config.get('output.base_dir', 'output'))
         self.output_dir = output_dir
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.dry_run = dry_run
@@ -291,7 +295,8 @@ class MaritimeWorkflow:
         """Initialize database connection and factory."""
         try:
             # For GeoPackage, we use local file paths instead of connection params
-            enc_data_file = self.output_dir / "us_enc_all.gpkg"
+            geopackage_filename = self.config.get('database.geopackage_filename', 'us_enc_all.gpkg')
+            enc_data_file = self.output_dir / geopackage_filename
 
             self.factory = ENCDataFactory(source=enc_data_file)
             self.logger(f"Database: GeoPackage file at {enc_data_file}")
@@ -856,8 +861,8 @@ Examples:
     parser.add_argument(
         '--output-dir',
         type=Path,
-        default=Path(__file__).parent / 'notebooks' / 'output',
-        help='Output directory for graph files and results'
+        default=None,
+        help='Output directory for graph files and results (default: from config output.base_dir)'
     )
 
     parser.add_argument(
