@@ -75,6 +75,8 @@ PROJECT_ROOT = Path(__file__).parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+import geopandas as gpd
+
 from src.maritime_module.core.graph import (
     BaseGraph, FineGraph, H3Graph, Weights, GraphConfigManager
 )
@@ -431,8 +433,6 @@ class MaritimeWorkflow:
             self.logger("Saving base route...")
             try:
                 # Compute base route using A* pathfinding
-                from src.maritime_module.core.pathfinding_lite import Route
-
                 route = Route(graph=G, data_manager=self.factory.manager)
                 route_geom, distance = route.base_route(
                     departure_point=port1.geometry,
@@ -666,7 +666,6 @@ class MaritimeWorkflow:
             target_graph = self.config.graph_names['fine_weighted']
 
             # Get ENCs for this graph
-            import geopandas as gpd
             graph_file = self.output_dir / f"{source_graph}.gpkg"
 
             if not graph_file.exists():

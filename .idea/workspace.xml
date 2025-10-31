@@ -5,35 +5,40 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="2a0852ca-6674-4955-b8d6-f606e8da5fc3" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/docs/notebooks/graph.ipynb" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/docs/notebooks/graph_GeoPackage.ipynb" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/docs/notebooks/graph_PostGIS.ipynb" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/docs/notebooks/graph_SpatiaLite.ipynb" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/docs/notebooks/graph_fine_GPKG.ipynb" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/docs/notebooks/graph_fine_PostGIS.ipynb" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/docs/notebooks/layers_inspect.ipynb" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/docs/notebooks/port_utils.ipynb" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/maritime_module/core/graph.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/maritime_module/core/pathfinding_lite.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/maritime_module/data/graph_config.yml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/maritime_module/utils/geometry_utils.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/maritime_module/utils/misc_utils.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/maritime_module/utils/plot_utils.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/maritime_module/utils/port_utils.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/dataSources.local.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/dataSources.local.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/dataSources.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/dataSources.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/NOAA_DB.csv" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/NoaaDB.csv" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/docs/notebooks/enc_factory.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/docs/notebooks/enc_factory.ipynb" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/docs/notebooks/import_s57.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/docs/notebooks/import_s57.ipynb" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/docs/notebooks/s57utils.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/docs/notebooks/s57utils.ipynb" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pyproject.toml" beforeDir="false" afterPath="$PROJECT_DIR$/pyproject.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/maritime_module/core/s57_data.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/maritime_module/core/s57_data.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/maritime_module/utils/db_utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/maritime_module/utils/db_utils.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/maritime_module/utils/s57_utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/maritime_module/utils/s57_utils.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/uv.lock" beforeDir="false" afterPath="$PROJECT_DIR$/uv.lock" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/C:/Users/Vikont/AppData/Local/JetBrains/PyCharm2025.2/terminal/history/1_MaritimeModule_V1-history" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/C:/Users/Vikont/AppData/Local/JetBrains/PyCharm2025.2/terminal/history/1_MaritimeModule_V1-history1" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/C:/Users/Vikont/AppData/Local/JetBrains/PyCharm2025.2/terminal/history/1_MaritimeModule_V1-history2" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/GDAL-3.11.3.1-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.whl:Zone.Identifier" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/GDAL-3.11.3.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl:Zone.Identifier" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/SourceCode/Data.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/SourceCode/ENC_S57.ipynb" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/SourceCode/ENC_S57_Convert.ipynb" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/SourceCode/ENC_S57_v2.ipynb" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/SourceCode/GRAPH.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/SourceCode/MARITIME_MODULE.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/SourceCode/Models.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/SourceCode/pages/enc_analysis.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/SourceCode/pages/home.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/SourceCode/pages/port_info.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/SourceCode/pages/route_planning.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/SourceCode/pages/weather.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Start.ipynb" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/TEST_LAYER_CONFIGURATION.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/analyze_depth_sources.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/analyze_depth_sources.sql" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/ENC_GPKG/US1EEZ1M.gpkg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/ENC_GPKG/US1PO02M.gpkg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/ENC_GPKG/US2WC12M.gpkg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/ENC_GPKG/US3CA52M.gpkg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/ENC_GPKG/US4CA60M.gpkg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/maritime_graph_geopackage_workflow.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/maritime_graph_postgis_workflow.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/enterprise_parallel_example.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/maritime_module/core/graph.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/maritime_module/core/graph.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/test_all_layers_example.sh" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/test_depth_filter.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/verify_usage_band_priority.sql" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -65,39 +70,39 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "RunOnceActivity.ChatTagsLlmMigration": "true",
-    "RunOnceActivity.ClientConfigCleanupMigration": "true",
-    "RunOnceActivity.CodyAccountHistoryMigration": "true",
-    "RunOnceActivity.CodyAccountsIdsRefresh": "true",
-    "RunOnceActivity.CodyAssignOrphanedChatsToActiveAccount": "true",
-    "RunOnceActivity.CodyConvertUrlToCodebaseName": "true",
-    "RunOnceActivity.CodyHistoryLlmMigration": "true",
-    "RunOnceActivity.CodyMigrateChatHistory-v2": "true",
-    "RunOnceActivity.CodyProjectSettingsMigration": "true",
-    "RunOnceActivity.DeprecatedChatLlmMigration": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
-    "RunOnceActivity.ToggleCodyToolWindowAfterMigration": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "database.data.extractors.current.export.id": "Comma-separated (CSV)_id",
-    "git-widget-placeholder": "feature-stamps",
-    "last_opened_file_path": "//wsl.localhost/Ubuntu-22.04/home/vikont_tux/python_projects_wsl2/1_MaritimeModule_V1/docs/notebooks",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "settings.editor.selected.configurable": "ml.llm.LLMThirdPartyAiProvidersConfigurable",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;RunOnceActivity.ChatTagsLlmMigration&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ClientConfigCleanupMigration&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.CodyAccountHistoryMigration&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.CodyAccountsIdsRefresh&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.CodyAssignOrphanedChatsToActiveAccount&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.CodyConvertUrlToCodebaseName&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.CodyHistoryLlmMigration&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.CodyMigrateChatHistory-v2&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.CodyProjectSettingsMigration&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.DeprecatedChatLlmMigration&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ToggleCodyToolWindowAfterMigration&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;database.data.extractors.current.export.id&quot;: &quot;Comma-separated (CSV)_id&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;feature-stamps&quot;,
+    &quot;last_opened_file_path&quot;: &quot;//wsl.localhost/Ubuntu-22.04/home/vikont_tux/python_projects_wsl2/1_MaritimeModule_V1/docs/notebooks&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;ml.llm.LLMThirdPartyAiProvidersConfigurable&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   },
-  "keyToStringList": {
-    "DatabaseDriversLRU": [
-      "postgresql"
+  &quot;keyToStringList&quot;: {
+    &quot;DatabaseDriversLRU&quot;: [
+      &quot;postgresql&quot;
     ]
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
       <recent name="\\wsl.localhost\Ubuntu-22.04\home\vikont_tux\python_projects_wsl2\1_MaritimeModule_V1\docs\notebooks" />
@@ -186,6 +191,7 @@
       <workItem from="1758956799059" duration="23035000" />
       <workItem from="1759128710791" duration="27672000" />
       <workItem from="1759219300890" duration="22958000" />
+      <workItem from="1761897795470" duration="5392000" />
     </task>
     <servers />
   </component>

@@ -75,6 +75,8 @@ PROJECT_ROOT = Path(__file__).parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+import geopandas as gpd
+
 from src.maritime_module.core.graph import (
     BaseGraph, FineGraph, H3Graph, Weights, GraphConfigManager
 )
@@ -662,7 +664,6 @@ class MaritimeWorkflow:
             target_graph = self.config.graph_names['fine_weighted']
 
             # Get ENCs for this graph
-            import geopandas as gpd
             nodes_df = gpd.read_postgis(
                 f'SELECT geometry FROM graph."{source_graph}_nodes"',
                 self.factory.manager.engine,
