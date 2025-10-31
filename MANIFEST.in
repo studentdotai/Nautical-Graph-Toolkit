@@ -1,0 +1,15 @@
+include README.md
+include LICENSE.md
+include THIRD_PARTY_LICENSES.md
+include pyproject.toml
+include uv.lock
+
+recursive-include scripts *.py *.md
+recursive-include docs *.md *.yml *.ipynb
+recursive-include src/maritime_module/data *.csv *.yml
+recursive-include tests *.py
+
+global-exclude __pycache__
+global-exclude *.pyc
+global-exclude .DS_Store
+global-exclude *.egg-info
