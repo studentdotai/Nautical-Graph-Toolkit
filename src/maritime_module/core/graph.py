@@ -1477,8 +1477,6 @@ class BaseGraph:
                     output_path=output_dir / 'fine_graph_01.gpkg'
                 )
         """
-        from pathlib import Path
-
         output_file = Path(output_path)
 
         if not output_file.exists():
@@ -1665,8 +1663,6 @@ class BaseGraph:
         Returns:
             tuple: Parsed tuple with plain Python float values
         """
-        import re
-
         # Remove outer parentheses and split by comma
         inner = tuple_str.strip()[1:-1]  # Remove '(' and ')'
 
@@ -1834,8 +1830,7 @@ class BaseGraph:
 
             # Step 2: Read edges from target file
             perf.start_timer("read_edges_time")
-            import geopandas as gpd
-            edges_gdf = gpd.read_file(target_path, layer='edges', engine='fiona')
+                edges_gdf = gpd.read_file(target_path, layer='edges', engine='fiona')
             original_count = len(edges_gdf)
             logger.info(f"Original edges: {original_count:,}")
             read_time = perf.end_timer("read_edges_time")
@@ -1875,8 +1870,7 @@ class BaseGraph:
 
             # Step 5: Verify final count and get nodes
             perf.start_timer("verify_time")
-            import sqlite3
-            conn = sqlite3.connect(target_path)
+                conn = sqlite3.connect(target_path)
             cursor = conn.cursor()
             cursor.execute("SELECT COUNT(*) FROM edges")
             final_count = cursor.fetchone()[0]
@@ -3229,8 +3223,7 @@ class H3Graph(BaseGraph):
         self.performance.start_timer("create_h3_graph_total")
 
         try:
-            import h3
-        except ImportError:
+            except ImportError:
             logger.error("h3-py library is not installed. Please install it to use H3Graph features.")
             raise
 
@@ -3510,8 +3503,7 @@ class H3Graph(BaseGraph):
             connectivity_config: Configuration parameters
         """
         try:
-            import h3
-        except ImportError:
+            except ImportError:
             logger.warning("h3-py library not available for bridge connectivity enhancement")
             return
 
@@ -3727,7 +3719,6 @@ class EdgeCleaner:
                 return land_geom
             else:
                 logger.warning("No land areas found, returning empty land mask")
-                from shapely.geometry import Polygon
                 return Polygon()
         except Exception as e:
             logger.error(f"Fallback land mask creation failed: {e}")
@@ -3795,7 +3786,6 @@ class EdgeCleaner:
         penalties = land_crossing_config.get('penalties', {})
 
         for u, v, data in graph.edges(data=True):
-            from shapely.geometry import LineString
             edge_line = LineString([u, v])
 
             # Check intersection with land mask
@@ -3964,8 +3954,6 @@ class Weights:
         - Band 1 (Deep): UKC > draft → bonus (deep water)
 
     Example:
-        from maritime_module.core.graph import Weights
-        from maritime_module.core.s57_data import ENCDataFactory
 
         # Initialize
         factory = ENCDataFactory(source='data.gpkg')
@@ -5662,9 +5650,6 @@ class Weights:
             ... )
             >>> print(f"Enriched {summary['ft_depth']} edges with depth data")
         """
-        from pathlib import Path
-        import sqlite3
-        import time
 
         # Validate inputs
         graph_path = Path(graph_gpkg_path)
@@ -5834,11 +5819,6 @@ class Weights:
 
                     Returns: (layer_name, worker_db_path, row_count, elapsed_time)
                     """
-                    import sqlite3
-                    import time
-                    import random
-                    import tempfile
-                    import os
 
                     # Create worker-specific temp database (ZERO LOCK CONTENTION)
                     # Each worker has isolated file, no competing writes
@@ -6052,7 +6032,6 @@ class Weights:
                     Handles intermittent "database is locked" errors.
                     Returns: (layer_name, worker_db_path, row_count, elapsed_time)
                     """
-                    import random
                     for attempt in range(max_retries):
                         try:
                             return materialize_layer_pre_aggregated(layer_name, config, temp_table_name)
@@ -6070,7 +6049,6 @@ class Weights:
 
                 # Execute materialization (parallel if 2+ layers, sequential otherwise)
                 if len(depth_layers_config) >= 2:
-                    from concurrent.futures import ThreadPoolExecutor, as_completed
 
                     max_workers = min(4, len(depth_layers_config))
                     logger.info(f"Using {max_workers} parallel workers for depth layer materialization")
@@ -6264,7 +6242,6 @@ class Weights:
                     # CRITICAL CLEANUP: Delete worker database files to free resources
                     # These are temporary files created for isolation - no longer needed
                     # Using OSError for more specific error handling (preferred for OS operations)
-                    import os
                     worker_cleanup_count = 0
                     for layer_name, worker_db_path in worker_databases.items():
                         try:
@@ -6691,7 +6668,6 @@ class Weights:
             Dict[str, int]: Dictionary with a single key 'edges_propagated'
                             and the count of reverse edges updated.
         """
-        import sqlite3
 
         conn = sqlite3.connect(graph_gpkg_path)
         conn.enable_load_extension(True)
@@ -6780,7 +6756,6 @@ class Weights:
                                                            graph_gpkg_path: str,
                                                            feature_columns: List[str] = None) -> Dict[str, int]:
         """Fallback propagation method using source/target join for non-standard fids."""
-        import sqlite3
         propagation_stats = {}
         conn = sqlite3.connect(graph_gpkg_path)
         conn.enable_load_extension(True)
@@ -8938,9 +8913,6 @@ class Weights:
             # If results show all/zero edges blocked, run diagnostic:
             # python diagnose_land_grid.py graph_base.gpkg land_grid
         """
-        from pathlib import Path
-        import sqlite3
-        import time
 
         # Validate inputs and resolve to absolute paths
         graph_path = Path(graph_gpkg_path).resolve()
@@ -10151,8 +10123,6 @@ class Weights:
             logger.info(f"Updated {summary['edges_updated']} edges")
             logger.info(f"Blocked {summary['edges_blocked']} edges")
         """
-        from pathlib import Path
-        import sqlite3
 
         # Validate input
         graph_path = Path(graph_gpkg_path)
@@ -10534,8 +10504,6 @@ class Weights:
 
             logger.info(f"Updated {summary['edges_updated']:,} edges with directional weights")
         """
-        from pathlib import Path
-        import sqlite3
 
         # Validate input
         graph_path = Path(graph_gpkg_path)
@@ -11570,8 +11538,7 @@ class FineTuning:
             ValueError: If required columns (dir_diff, wt_dir) are missing
 
         Example:
-            from maritime_module.core.s57_data import ENCDataFactory
-            factory = ENCDataFactory.create_postgis("postgresql://user:pass@localhost/db")
+                factory = ENCDataFactory.create_postgis("postgresql://user:pass@localhost/db")
             fine_tuning = FineTuning(factory, graph_schema='graph')
 
             stats = fine_tuning.reapply_directional_weights(

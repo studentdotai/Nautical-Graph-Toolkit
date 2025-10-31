@@ -11,8 +11,10 @@ import math
 from pathlib import Path
 from typing import Tuple, Optional, Union, Type, Any
 
+import geopandas as gpd
 import networkx as nx
-from shapely.geometry import Point, LineString
+import pandas as pd
+from shapely.geometry import Point, LineString, mapping
 
 logger = logging.getLogger(__name__)
 
@@ -442,7 +444,6 @@ class Route:
                 print(f"Number of segments: {detailed_info['num_edges']}")
 
                 # Export edge details to CSV
-                import pandas as pd
                 df = pd.DataFrame(detailed_info['edge_details'])
                 df.to_csv('route_analysis.csv', index=False)
         """
@@ -556,8 +557,6 @@ class Route:
             )
         """
         from pathlib import Path
-        import geopandas as gpd
-        from shapely.geometry import mapping
 
         output_path = Path(output_path)
 
@@ -660,7 +659,6 @@ class Route:
             )
         """
         import pandas as pd
-        import geopandas as gpd
 
         output_path = Path(output_path)
 

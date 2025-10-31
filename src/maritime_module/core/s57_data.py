@@ -30,10 +30,12 @@ This module provides classes for:
 import argparse
 import json
 import logging
+import math
 import os
 import sys
 import time
 from abc import abstractmethod
+from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Dict, Any, Optional, List, Union
@@ -59,7 +61,7 @@ try:
     import psutil
     import requests
     from bs4 import BeautifulSoup
-    from shapely.geometry import shape, mapping, Polygon, Point, MultiPolygon, LineString
+    from shapely.geometry import shape, mapping, Polygon, Point, MultiPolygon, LineString, box
     from shapely.geometry.base import BaseGeometry
     from shapely import wkt, wkb, unary_union, contains_xy
     from shapely.ops import nearest_points
@@ -4031,7 +4033,6 @@ class PostGISManager:
         """
         Creates graph nodes and edges using spatial subdivision for large polygons.
         """
-        from shapely.geometry import box
 
         minx, miny, maxx, maxy = polygon.bounds
         expected_points = int((maxx - minx) / spacing) * int((maxy - miny) / spacing)
@@ -4096,8 +4097,6 @@ class PostGISManager:
         """
         Connects nodes at subdivision boundaries to maintain graph connectivity.
         """
-        from collections import defaultdict
-        import math
 
         if not nodes:
             return []

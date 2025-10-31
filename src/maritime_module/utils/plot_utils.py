@@ -15,6 +15,7 @@
 
 import json
 import logging
+import traceback
 from typing import List, Dict, Union
 
 import geopandas as gpd
@@ -821,8 +822,7 @@ class PlotlyChart:
 
 			except Exception as e:
 				logger.error(f"Error processing edge: {e}")
-				import traceback
-				traceback.print_exc()
+					traceback.print_exc()
 				continue
 
 		# Create traces for each category
@@ -963,8 +963,7 @@ class PlotlyChart:
 		if not hasattr(line, 'coords'):
 			# If line is a string, convert it to a dict first
 			if isinstance(line, str):
-				import json
-				line = json.loads(line)
+					line = json.loads(line)
 			# Convert GeoJSON to a Shapely geometry
 			line = shape(line)
 
@@ -1535,11 +1534,8 @@ class PlotlyChart:
 
 		# Handle different polygon types
 		if isinstance(polygon, dict):  # GeoJSON dictionary
-			from shapely.geometry import shape
 			polygon = shape(polygon)
 		elif isinstance(polygon, str):  # GeoJSON string
-			import json
-			from shapely.geometry import shape
 			polygon = shape(json.loads(polygon))
 
 		# Handle MultiPolygon by taking the largest polygon
@@ -1561,7 +1557,6 @@ class PlotlyChart:
 
 		# Optionally densify the polygon by adding points along the boundary
 		if densify_distance is not None and densify_distance > 0:
-			from shapely.geometry import LineString
 
 			# Create a LineString from the exterior coordinates
 			line = LineString(coords)
