@@ -28,6 +28,7 @@ database:
   enc_schema: "enc_west"        # Schema containing S-57 ENC layers
   graph_schema: "graph"           # Schema for saving graph tables
   route_schema: "routes"          # Schema for route storage
+  geopackage_filename: "enc_west.gpkg"  # GeoPackage backend: Source ENC data file
 
 # --- Workflow Control ---
 # Enable/disable major pipeline steps
@@ -196,8 +197,8 @@ pathfinding:
 
 output:
   # Base output directories (created automatically if they don't exist)
-  base_dir: "output"  # Where GeoPackage files and routes are saved
-  log_dir: "docs/logs"               # Where workflow logs and debug files are saved
+  base_dir: "output"      # Where GeoPackage files and routes are saved
+  log_dir: "docs/logs"    # Where workflow logs and debug files are saved
 
   # Performance benchmark CSV export (optional)
   benchmarks:
