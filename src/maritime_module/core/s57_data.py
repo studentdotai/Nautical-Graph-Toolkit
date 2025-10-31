@@ -3606,7 +3606,7 @@ class PostGISManager:
 
             # Add the 'is_outdated' column to the original dataframe
             # Fill NaNs (for ENCs not in NOAA DB) with False, as their status can't be confirmed.
-            # FIX: Avoid chained assignment with inplace=True to prevent FutureWarning.
+            # Use direct assignment to avoid pandas chained assignment warnings.
             df = merged_df
             df['is_outdated'] = df['Status'].str.contains('Outdated', na=False)
 
@@ -3804,7 +3804,7 @@ class PostGISManager:
               AND ST_Intersects(tbl.geom, ST_GeomFromText(:port_boundary_wkt, 4326))
             GROUP BY grid_name
         ), land_areas AS (
-            -- --- FIX: Subtract land areas to ensure navigability ---
+            -- Subtract land areas to ensure navigability
             -- This CTE unions all relevant land areas within the boundary.
             SELECT ST_Union(l.wkb_geometry) as geom
             FROM "{self.schema}"."lndare" l
@@ -4493,7 +4493,7 @@ class SpatiaLiteManager:
                                 merged_df['DB_Update'] < merged_df['NOAA_Update']))
             )
 
-            # FIX: Avoid chained assignment with inplace=True to prevent FutureWarning.
+            # Use direct assignment to avoid pandas chained assignment warnings.
             df = merged_df
             df['is_outdated'] = df['Status'].str.contains('Outdated', na=False)
             df.drop(columns=['ENC_Name_Clean'], inplace=True, errors='ignore')
@@ -5133,7 +5133,7 @@ class GPKGManager:
                                 merged_df['DB_Update'] < merged_df['NOAA_Update']))
             )
 
-            # FIX: Avoid chained assignment with inplace=True to prevent FutureWarning.
+            # Use direct assignment to avoid pandas chained assignment warnings.
             df = merged_df
             df['is_outdated'] = df['Status'].str.contains('Outdated', na=False)
             df.drop(columns=['ENC_Name_Clean'], inplace=True, errors='ignore')
