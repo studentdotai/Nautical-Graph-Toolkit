@@ -23,6 +23,7 @@ encapsulating navigation risk, cost, and other attributes for pathfinding.
 
 import csv
 import logging
+import os
 from enum import Enum
 from typing import Tuple, Optional, Dict, Any
 
@@ -349,7 +350,6 @@ class S57Classifier:
             FileNotFoundError: If the CSV file doesn't exist.
             ValueError: If the CSV file has invalid format or data.
         """
-        import os
         if not os.path.exists(csv_path):
             raise FileNotFoundError(f"CSV file not found: {csv_path}")
 

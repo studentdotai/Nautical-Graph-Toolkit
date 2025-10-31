@@ -556,8 +556,6 @@ class Route:
                 route_properties={'vessel_type': 'cargo', 'draft': 12.5}
             )
         """
-        from pathlib import Path
-
         output_path = Path(output_path)
 
         # Load the route from the data manager
@@ -658,8 +656,6 @@ class Route:
                 include_summary=True
             )
         """
-        import pandas as pd
-
         output_path = Path(output_path)
 
         if not detailed_route_info or not detailed_route_info.get('edge_details'):

@@ -1,7 +1,9 @@
 import logging
+import sqlite3
 from pathlib import Path
 from typing import Dict, Any, Union, List
 
+import geopandas as gpd
 import pandas as pd
 from sqlalchemy import create_engine, text, inspect
 from sqlalchemy.engine import Engine
@@ -117,8 +119,6 @@ class PostGISConnector(DatabaseConnector):
         Returns:
             GeoDataFrame with the table data
         """
-        import geopandas as gpd
-
         schema_name = schema_name or self.schema
         self.connect()
 
@@ -458,8 +458,6 @@ class FileDBConnector(DatabaseConnector):
                 ['final_weight', 'wt_static_factor', 'old_column']
             )
         """
-        import sqlite3
-
         # Normalize to list
         if isinstance(columns, str):
             columns = [columns]

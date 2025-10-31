@@ -3722,7 +3722,6 @@ class EdgeCleaner:
                 return Polygon()
         except Exception as e:
             logger.error(f"Fallback land mask creation failed: {e}")
-            from shapely.geometry import Polygon
             return Polygon()
 
     def analyze_land_crossing_edges(self, graph: nx.Graph, route_buffer: Polygon,
@@ -6602,7 +6601,6 @@ class Weights:
             # This is crucial - if an error occurs, we must still delete temp worker files
             # to prevent accumulation in the system temp directory
             if 'worker_databases' in locals():
-                import os
                 cleanup_count = 0
                 cleanup_errors = 0
                 for layer_name, worker_db_path in worker_databases.items():
@@ -11389,7 +11387,6 @@ def main_graph_creation() -> None:
     config = config_manager.data
 
     # 2. Initialize utilities and data sources
-    from ..utils.port_utils import PortData, Boundaries
     port_data = PortData()
     boundaries = Boundaries()
     factory = ENCDataFactory(source=str(args.source_db))

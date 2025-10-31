@@ -4,7 +4,7 @@ from typing import Union, List, Dict
 
 import geopandas as gpd
 import pandas as pd
-from shapely.geometry import box, MultiPolygon
+from shapely.geometry import box, MultiPolygon, mapping
 from shapely.geometry.base import BaseGeometry
 
 
@@ -38,7 +38,6 @@ class Miscellaneous:
     @staticmethod
     def shapely_polygon_to_geojson(polygon: Union[BaseGeometry]) -> dict:
         """Converts a Shapely Polygon or MultiPolygon into a GeoJSON dictionary."""
-        from shapely.geometry import mapping
         return mapping(polygon)
 
     @staticmethod
