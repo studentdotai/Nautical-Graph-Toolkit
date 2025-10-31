@@ -18,20 +18,20 @@ This is a comprehensive maritime analysis toolkit for working with S-57 Electron
 
 The project follows a layered architecture:
 
-- **Core Layer** (`src/maritime_module/core/`): Main conversion and data processing classes
+- **Core Layer** (`src/nautical_graph_toolkit/core/`): Main conversion and data processing classes
   - `S57Converter`: High-performance bulk S-57 to GIS format conversion
   - `S57Base`: Simple one-to-one ENC conversions using gdal.VectorTranslate
   - `S57Advanced`: Optimized feature-level conversions with ENC source stamping, batch processing, and memory management
   - `S57Updater`: Incremental, transactional updates for PostGIS
   - `PostGISManager`: Database querying and analysis tools
 
-- **Utils Layer** (`src/maritime_module/utils/`): Support utilities and database connectors
+- **Utils Layer** (`src/nautical_graph_toolkit/utils/`): Support utilities and database connectors
   - `S57Utils`: S-57 attribute/object class lookups and property conversion
   - `NoaaDatabase`: Live NOAA ENC data scraping with Pydantic validation
   - `DatabaseConnector`: Base class for database operations
   - `PostGISConnector`/`FileDBConnector`: Database-specific connection handlers
 
-- **Data Layer** (`src/maritime_module/data/`): S-57 reference data (CSV files for attributes, object classes)
+- **Data Layer** (`src/nautical_graph_toolkit/data/`): S-57 reference data (CSV files for attributes, object classes)
 
 ## Development Commands
 
@@ -82,6 +82,7 @@ ruff format
 - **SQLAlchemy/psycopg2**: Database connectivity (PostGIS support)
 - **Pydantic**: Data validation for NOAA integration
 - **BeautifulSoup4/requests**: Web scraping for NOAA ENC data
+- **pysqlite3-binary**: SQLite with rtree spatial index support (required for GeoPackage graph enrichment operations)
 
 ## Common Workflows
 
@@ -103,10 +104,17 @@ The system supports two primary conversion strategies:
 
 ## Important Configuration
 
+### SQLite and Spatial Indexes
+The code uses `pysqlite3-binary` to access SQLite with rtree (spatial index) support:
+- **Why rtree is needed**: GeoPackage files use r-tree virtual tables for spatial indexing. Graph enrichment operations (`enrich_edges_with_features_gpkg_v3()`) query these indexes for high performance.
+- **Implementation**: Code at lines 48-53 of `src/nautical_graph_toolkit/core/graph.py` imports `pysqlite3` and injects it into `sys.modules`, replacing the built-in `sqlite3` module (which lacks rtree).
+- **Fallback**: If pysqlite3 import fails, code falls back to built-in sqlite3, but spatial index queries will fail with "no such module: rtree" errors.
+- **Installation**: `pysqlite3-binary>=0.5.4` is automatically installed via `uv sync`.
+
 ### GDAL S-57 Driver Settings
 The module automatically configures GDAL S-57 options:
 - `RETURN_PRIMITIVES=OFF`
-- `SPLIT_MULTIPOINT=ON`  
+- `SPLIT_MULTIPOINT=ON`
 - `ADD_SOUNDG_DEPTH=ON`
 - `UPDATES=APPLY`
 - `LNAM_REFS=ON`
@@ -114,7 +122,7 @@ The module automatically configures GDAL S-57 options:
 - `RECODE_BY_DSSI=ON`
 
 ### Data Location
-S-57 reference data (attributes, object classes) is located in `src/maritime_module/data/` and loaded automatically by utility classes.
+S-57 reference data (attributes, object classes) is located in `src/nautical_graph_toolkit/data/` and loaded automatically by utility classes.
 
 ## Testing Structure
 
