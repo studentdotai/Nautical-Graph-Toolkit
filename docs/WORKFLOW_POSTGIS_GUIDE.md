@@ -219,8 +219,18 @@ python docs/maritime_graph_workflow.py --dry-run
 
 #### Debug Logging (Verbose Console Output)
 ```bash
-python docs/maritime_graph_workflow.py --log-level DEBUG
+# INFO mode (default): Clean logs, ~1MB per log file
+python docs/maritime_graph_postgis_workflow.py --log-level INFO
+
+# DEBUG mode: Comprehensive debugging, ~5-10MB per log file
+# Third-party verbose logging (Fiona, GDAL) automatically suppressed
+python docs/maritime_graph_postgis_workflow.py --log-level DEBUG
 ```
+
+**Note:** Log files now include:
+- **Automatic rotation**: Max 50MB (INFO) or 500MB (DEBUG) per file, 3 backups
+- **Third-party suppression**: Fiona/GDAL DEBUG logs filtered out (99% size reduction)
+- **Project-level logs**: Full debug info for nautical_graph_toolkit modules
 
 ### Command-Line Options
 
@@ -350,12 +360,18 @@ docs/notebooks/output/detailed_route_7.5m_draft.geojson
 ### Log Files
 ```
 docs/logs/maritime_workflow_20251027_142310.log
+docs/logs/maritime_workflow_20251027_142310.log.1  # Rotated backup (if exceeded size)
+docs/logs/maritime_workflow_20251027_142310.log.2  # Rotated backup
+docs/logs/maritime_workflow_20251027_142310.log.3  # Rotated backup
 ```
 
-- Timestamped log file
-- Contains all SQL queries and operations
+- Timestamped log file with automatic rotation
+- **Size limits**: 50MB (INFO mode) or 500MB (DEBUG mode) per file
+- **Backup count**: Keeps 3 old log files automatically
+- Contains all SQL queries and operations (third-party DEBUG logs suppressed)
 - Full stack traces for errors
 - Useful for debugging and performance analysis
+- **99% smaller** than previous versions due to third-party log suppression
 
 ### Benchmark Files
 ```

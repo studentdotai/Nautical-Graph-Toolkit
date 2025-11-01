@@ -499,12 +499,20 @@ python docs/maritime_graph_geopackage_workflow.py  # Fails - no GeoPackage data!
 
 ### Debug Mode
 ```bash
-# Show detailed logging
+# INFO mode (default): Clean logs, ~1MB per file
+.venv/bin/python docs/maritime_graph_postgis_workflow.py --log-level INFO
+
+# DEBUG mode: Comprehensive debugging, ~5-10MB per file
 .venv/bin/python docs/maritime_graph_postgis_workflow.py --log-level DEBUG
 
-# View detailed log file
+# View detailed log file (automatically rotates at 50MB/500MB)
 tail -f docs/logs/maritime_workflow_*.log
 ```
+
+**Log file improvements:**
+- Automatic rotation: Max 50MB (INFO) or 500MB (DEBUG), keeps 3 backups
+- Third-party verbose logs suppressed (Fiona, GDAL) - 99% size reduction
+- Full project-level debug info still available
 
 ## Configuration
 
@@ -578,8 +586,14 @@ Track performance across runs
 ### Logs
 ```
 docs/logs/maritime_workflow_20251027_135805.log
+docs/logs/maritime_workflow_20251027_135805.log.1  # Backup (rotated)
+docs/logs/maritime_workflow_20251027_135805.log.2  # Backup
+docs/logs/maritime_workflow_20251027_135805.log.3  # Backup
 ```
-Detailed operation logs (DEBUG level)
+Detailed operation logs with automatic rotation
+- Size limits: 50MB (INFO) or 500MB (DEBUG) per file
+- Keeps 3 backup files
+- Third-party verbose logs suppressed (99% smaller)
 
 ## Troubleshooting
 

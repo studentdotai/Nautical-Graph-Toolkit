@@ -57,6 +57,7 @@ import time
 from pathlib import Path
 from datetime import datetime
 from typing import Dict, Any, Optional
+from logging.handlers import RotatingFileHandler
 from dotenv import load_dotenv
 
 try:
@@ -93,9 +94,15 @@ except ImportError:
 
 
 class WorkflowLogger:
-    """Manages dual logging (console + file)."""
+    """Manages dual logging (console + file) with third-party log suppression.
 
-    def __init__(self, log_dir: Path, console_level: str = "INFO"):
+    Features:
+    - Dynamic file size limits based on log level (INFO: 50MB, DEBUG: 500MB)
+    - Log rotation with 3 backup files
+    - Suppression of verbose third-party library logging (Fiona, GDAL, etc.)
+    """
+
+    def __init__(self, log_dir: Path, console_level: str = "INFO", file_level: str = "INFO"):
         self.log_dir = log_dir
         self.log_dir.mkdir(parents=True, exist_ok=True)
 
@@ -111,9 +118,22 @@ class WorkflowLogger:
         for handler in self.logger.handlers[:]:
             self.logger.removeHandler(handler)
 
-        # File handler (DEBUG level)
-        fh = logging.FileHandler(self.log_file)
-        fh.setLevel(logging.DEBUG)
+        # Determine file size limit based on log level
+        # DEBUG mode allows larger files (500MB) for comprehensive debugging
+        # INFO mode uses smaller files (50MB) for cleaner, production logs
+        file_level_enum = getattr(logging, file_level.upper(), logging.INFO)
+        if file_level_enum == logging.DEBUG:
+            max_bytes = 500 * 1024 * 1024  # 500MB for DEBUG mode
+        else:
+            max_bytes = 50 * 1024 * 1024   # 50MB for INFO mode
+
+        # File handler with rotation (replaces FileHandler)
+        fh = RotatingFileHandler(
+            self.log_file,
+            maxBytes=max_bytes,
+            backupCount=3  # Keep 3 backup files
+        )
+        fh.setLevel(file_level_enum)
         fh.setFormatter(logging.Formatter(
             '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
         ))
@@ -127,6 +147,22 @@ class WorkflowLogger:
             datefmt='%Y-%m-%d %H:%M:%S'
         ))
         self.logger.addHandler(ch)
+
+        # Suppress verbose third-party loggers
+        # Fiona (GeoPackage writer) emits DEBUG logs for every feature property
+        logging.getLogger('fiona').setLevel(logging.WARNING)
+        logging.getLogger('fiona.ogrext').setLevel(logging.WARNING)
+        logging.getLogger('fiona._env').setLevel(logging.INFO)
+
+        # PyOGRIO (alternative GeoPackage writer)
+        logging.getLogger('pyogrio').setLevel(logging.INFO)
+
+        # GDAL/OGR
+        logging.getLogger('osgeo').setLevel(logging.WARNING)
+
+        # Other verbose libraries
+        logging.getLogger('geopandas').setLevel(logging.INFO)
+        logging.getLogger('shapely').setLevel(logging.WARNING)
 
         self.main_logger = logging.getLogger(__name__)
 
@@ -259,10 +295,11 @@ class MaritimeWorkflow:
         output_dir: Path,
         log_dir: Path,
         console_level: str = "INFO",
+        file_level: str = "INFO",
         dry_run: bool = False
     ):
         # Setup logging
-        self.logger_manager = WorkflowLogger(log_dir, console_level)
+        self.logger_manager = WorkflowLogger(log_dir, console_level, file_level)
         self.logger = self.logger_manager.info
         self.logger_debug = self.logger_manager.debug
         self.logger_error = self.logger_manager.error
@@ -930,6 +967,7 @@ Examples:
         output_dir=args.output_dir,
         log_dir=log_dir,
         console_level=args.log_level,
+        file_level=args.log_level,  # Use same level for file as console
         dry_run=args.dry_run
     )
 

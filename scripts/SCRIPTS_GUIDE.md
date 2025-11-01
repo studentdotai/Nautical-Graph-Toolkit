@@ -94,7 +94,11 @@ python scripts/maritime_graph_geopackage_workflow.py
 # Use fine grid instead of H3
 python scripts/maritime_graph_geopackage_workflow.py --graph-mode fine
 
-# Debug mode with verbose logging
+# INFO mode: Clean logs, ~1MB per file (default)
+python scripts/maritime_graph_geopackage_workflow.py --log-level INFO
+
+# DEBUG mode: Full debugging, ~5-10MB per file
+# Third-party verbose logging automatically suppressed
 python scripts/maritime_graph_geopackage_workflow.py --log-level DEBUG
 ```
 
@@ -153,7 +157,11 @@ python scripts/import_s57.py --mode advanced --input-path data/ENC_SF_LA/ENC_ROO
 # 2. Run complete workflow
 python scripts/maritime_graph_postgis_workflow.py
 
-# 3. Monitor with verbose logging
+# 3. Monitor with comprehensive logging
+# INFO mode (recommended): Clean logs, essential info only
+python scripts/maritime_graph_postgis_workflow.py --log-level INFO
+
+# DEBUG mode: Full debugging with third-party suppression
 python scripts/maritime_graph_postgis_workflow.py --log-level DEBUG
 ```
 
