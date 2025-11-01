@@ -557,7 +557,15 @@ class MaritimeWorkflow:
                     fg.save_graph_to_gpkg(G, output_file)
                     self.logger(f"✓ Saved to GeoPackage")
 
-                if cfg['save_postgis']:
+                if cfg['save_postgis_optimized']:
+                    fg.save_graph_to_postgis_optimized(
+                        graph=G,
+                        table_prefix=fine_graph_name,
+                        drop_existing=cfg['drop_existing'],
+                        chunk_size=cfg['postgis_chunk_size']
+                    )
+                    self.logger(f"✓ Saved to PostGIS (optimized)")
+                elif cfg['save_postgis']:
                     fg.save_graph_to_postgis(
                         graph=G,
                         table_prefix=fine_graph_name,
