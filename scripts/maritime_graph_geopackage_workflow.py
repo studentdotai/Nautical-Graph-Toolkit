@@ -936,6 +936,8 @@ Examples:
     # Apply CLI overrides
     if args.graph_mode:
         workflow.config.override('fine_graph.mode', args.graph_mode)
+        # Reconstruct graph names after mode change
+        workflow.config._construct_graph_names()
 
     if args.skip_base:
         workflow.config.override('workflow.run_base_graph', False)
