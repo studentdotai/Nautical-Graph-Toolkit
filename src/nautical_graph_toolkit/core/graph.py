@@ -5472,14 +5472,36 @@ class Weights:
                     enrichment_summary[target_column] = 0
                     conn.rollback()
 
-        # Log summary
-        total_enrichments = sum(enrichment_summary.values())
-        logger.info(f"=== PostGIS Feature Enrichment Complete ===")
-        logger.info(f"Total edge updates: {total_enrichments:,}")
-        logger.info(f"Columns enriched: {len([k for k, v in enrichment_summary.items() if v > 0])}")
-        for col, count in sorted(enrichment_summary.items()):
-            if count > 0:
-                logger.info(f"  {col}: {count:,} edges")
+            # Log summary with unique edge counts
+            # Query database for actual non-NULL counts per column
+            unique_enrichment_summary = {}
+            for target_column in enrichment_summary.keys():
+                if enrichment_summary[target_column] > 0:  # Only query columns that were enriched
+                    try:
+                        count_sql = text(f"""
+                            SELECT COUNT(*)
+                            FROM "{schema_name}"."{edges_table}"
+                            WHERE {target_column} IS NOT NULL
+                        """)
+                        unique_count = conn.execute(count_sql).scalar()
+                        unique_enrichment_summary[target_column] = unique_count
+                    except Exception as e:
+                        logger.error(f"Failed to count unique edges for {target_column}: {e}")
+                        unique_enrichment_summary[target_column] = 0
+                else:
+                    unique_enrichment_summary[target_column] = 0
+
+            total_enrichments = sum(enrichment_summary.values())
+            total_unique_edges = sum(unique_enrichment_summary.values())
+
+            logger.info(f"=== PostGIS Feature Enrichment Complete ===")
+            logger.info(f"Total UPDATE operations: {total_enrichments:,}")
+            logger.info(f"Unique edges enriched: {total_unique_edges:,}")
+            logger.info(f"Columns enriched: {len([k for k, v in unique_enrichment_summary.items() if v > 0])}")
+            for col, count in sorted(unique_enrichment_summary.items()):
+                if count > 0:
+                    accumulated = enrichment_summary[col]
+                    logger.info(f"  {col}: {count:,} unique edges ({accumulated:,} updates)")
 
         # Propagate features to reverse edges if directed graph
         if is_directed:
@@ -6622,6 +6644,27 @@ class Weights:
                 if cleanup_errors > 0:
                     logger.warning(f"Failed to clean up {cleanup_errors} worker database files - may need manual cleanup")
 
+            # Query database for actual non-NULL counts per column
+            unique_enrichment_summary = {}
+            edges_table = 'edges'
+            for target_column in enrichment_summary.keys():
+                if enrichment_summary[target_column] > 0:  # Only query columns that were enriched
+                    try:
+                        count_sql = f"""
+                            SELECT COUNT(*)
+                            FROM {edges_table}
+                            WHERE {target_column} IS NOT NULL
+                        """
+                        cursor = conn_graph.cursor()
+                        unique_count = cursor.execute(count_sql).fetchone()[0]
+                        unique_enrichment_summary[target_column] = unique_count
+                        cursor.close()
+                    except Exception as e:
+                        logger.error(f"Failed to count unique edges for {target_column}: {e}")
+                        unique_enrichment_summary[target_column] = 0
+                else:
+                    unique_enrichment_summary[target_column] = 0
+
             # Restore default PRAGMAs
             try:
                 conn_graph.execute("PRAGMA journal_mode = DELETE;")
@@ -6633,11 +6676,18 @@ class Weights:
         total_time = time.perf_counter() - start_time
         total_enrichments = sum(v for v in enrichment_summary.values() if isinstance(v, int))
         avg_throughput = total_enrichments / total_time if total_time > 0 else 0
+        total_unique_edges = sum(unique_enrichment_summary.values())
 
         logger.info(f"=== GPKG Feature Enrichment Summary (V3) ===")
-        logger.info(f"Total edge updates: {total_enrichments:,}")
+        logger.info(f"Total UPDATE operations: {total_enrichments:,}")
+        logger.info(f"Unique edges enriched: {total_unique_edges:,}")
         logger.info(f"Total time: {total_time:.1f}s")
         logger.info(f"Average throughput: {avg_throughput:.0f} edges/sec")
+        logger.info(f"Columns enriched: {len([k for k, v in unique_enrichment_summary.items() if v > 0])}")
+        for col, count in sorted(unique_enrichment_summary.items()):
+            if count > 0:
+                accumulated = enrichment_summary[col]
+                logger.info(f"  {col}: {count:,} unique edges ({accumulated:,} updates)")
 
         return enrichment_summary
 
