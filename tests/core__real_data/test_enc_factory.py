@@ -33,12 +33,12 @@ from dotenv import load_dotenv
 project_root = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from src.maritime_module.core.s57_data import (
+from nautical_graph_toolkit.core.s57_data import (
     S57Advanced,
     S57AdvancedConfig,
     ENCDataFactory
 )
-from src.maritime_module.utils.db_utils import PostGISConnector
+from nautical_graph_toolkit.utils.db_utils import PostGISConnector
 
 # Load environment variables
 load_dotenv(project_root / ".env")

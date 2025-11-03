@@ -3,7 +3,7 @@ import shutil
 from pathlib import Path
 
 try:
-    from src.maritime_module.core import S57Converter
+    from nautical_graph_toolkit.core import S57Converter
 except ImportError:
     print("ERROR: Could not import S57Converter. Make sure the script is in the project root.")
 

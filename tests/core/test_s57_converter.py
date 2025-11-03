@@ -8,7 +8,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from src.maritime_module.core.s57_converter import S57Converter
+from nautical_graph_toolkit.core.s57_converter import S57Converter
 
 # Mock the gdal module so we don't need a real installation to run tests
 gdal_mock = MagicMock()

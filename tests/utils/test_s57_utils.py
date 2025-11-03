@@ -1,7 +1,7 @@
 
 import unittest
 import pandas as pd
-from maritime_module.utils.s57_utils import S57Utils
+from nautical_graph_toolkit.utils.s57_utils import S57Utils
 
 class TestS57Utils(unittest.TestCase):
     """Unit tests for the S57Utils class."""
