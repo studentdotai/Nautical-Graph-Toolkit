@@ -74,7 +74,7 @@ fine_graph:
   #   - Undirected graph: {mode}_graph_{name_suffix}    (e.g., "h3_graph_20")
   #   - Weighted graph: {mode}_graph_wt_{name_suffix}   (e.g., "h3_graph_wt_20")
   mode: "fine"                      # Options: "fine" (regular grid) or "h3" (hexagonal)
-  name_suffix: "20"               # Suffix for graph table/file names
+  name_suffix: "pg_10_v2"               # Suffix for graph table/file names
 
   # Route buffer configuration
   load_base_route: true           # Load pre-computed base route from step 1
