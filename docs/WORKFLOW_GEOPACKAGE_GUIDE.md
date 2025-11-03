@@ -466,33 +466,79 @@ docs/notebooks/output/benchmark_graph_weighted_directed_gpkg.csv
 
 ### Typical Execution Times (Los Angeles - San Francisco)
 
-**Latest Performance Metrics (2025-10-29):** Final weighted directed graph with 43,425 nodes and 341,188 edges
+**Latest Performance Metrics (2025-11-03):** Comprehensive benchmark across three graph modes (47 S-57 ENCs)
 
-| Step | Time | Notes |
-|------|------|-------|
-| Base Graph | 2.0 min (117.5s) | Coarse 0.3 NM grid, 43,425 nodes |
-| Fine Graph | 0.4 min (21.1s) | High-resolution fine grid creation with land/sea grid layers |
-| Weighting | 10.3 min (615.3s) | Edge enrichment, static/directional/dynamic weights conversion to 341,188 directed edges |
-| Pathfinding | 1.4 min (85.1s) | Graph load (83.8s) + A* route calculation (~0.3s) on final 341,188 edge graph |
-| **Total** | **14.0 min (839.0s)** | Full pipeline end-to-end |
+| Graph Mode | Nodes | Edges | Step 1: Base | Step 2: Fine/H3 | Step 3: Weighting | Step 4: Pathfinding | **Total** |
+|-----------|-------|-------|--------------|-----------------|-------------------|---------------------|-----------|
+| **FINE 0.2nm** | 43,425 | 341,188 | 98.3s (1.6min) | 12.4s (0.2min) | 684.3s (11.4min) | 70.3s (1.2min) | **865.2s (14.4min)** |
+| **FINE 0.1nm** | 173,877 | 1,377,240 | 98.8s (1.6min) | 35.7s (0.6min) | 2,703.2s (45.1min) | 279.4s (4.7min) | **3,117.1s (52.0min)** |
+| **H3 Hexagonal** | 768,037 | 4,597,614 | 96.3s (1.6min) | 276.2s (4.6min) | 9,586.0s (159.8min) | 842.3s (14.0min) | **10,800.9s (180.0min)** |
+
+### Performance Breakdown Analysis
+
+**Time Distribution by Step:**
+
+| Step | FINE 0.2nm | FINE 0.1nm | H3 Hexagonal | Insight |
+|------|-----------|-----------|--------------|---------|
+| Base Graph | 11.4% | 3.2% | 0.9% | Minimal impact, runs once |
+| Fine/H3 Graph | 1.4% | 1.1% | 2.6% | Quick for FINE, slower for H3 |
+| **Weighting** | **79.1%** | **86.7%** | **88.8%** | **PRIMARY BOTTLENECK** |
+| Pathfinding | 8.1% | 9.0% | 7.8% | Graph loading dominates |
+
+**Key Insights:**
+- ⚠️ **Weighting bottleneck:** Accounts for 79-89% of total execution time
+- 📈 **Superlinear scaling:** 4× more nodes → 3.6× total time (0.1nm vs 0.2nm)
+- 📈 **Hexagonal overhead:** 12.5× total time for H3 vs FINE 0.2nm (similar detail levels)
+- 💾 **I/O constraint:** GeoPackage file operations dominate in weighting step
+- ⚡ **Best practice:** FINE 0.2nm offers optimal speed/detail balance for most use cases
+
+### Comparison vs PostGIS Backend
+
+| Metric | GeoPackage | PostGIS | PostGIS Advantage |
+|--------|-----------|---------|-------------------|
+| **FINE 0.2nm Total** | 865s (14.4min) | 439s (7.3min) | **2.0× faster** |
+| **FINE 0.1nm Total** | 3,117s (52.0min) | 1,277s (21.3min) | **2.4× faster** |
+| **H3 Hex Total** | 10,801s (180.0min) | 6,393s (106.6min) | **1.7× faster** |
+| **Weighting (0.2nm)** | 684s | 161s | **4.2× faster** |
+| **Weighting (0.1nm)** | 2,703s | 762s | **3.5× faster** |
+| **Weighting (H3)** | 9,586s | 4,916s | **2.0× faster** |
+
+**PostGIS Performance Advantages:**
+- Server-based spatial indexing optimized for large datasets
+- Database-side geometry operations avoid Python/file I/O overhead
+- Concurrent query optimization for edge enrichment
+- Better memory management for multi-million edge graphs
+
+**When to Use GeoPackage:**
+- ✅ Single-user workflows without server infrastructure
+- ✅ Portable/offline deployments (USB drives, cloud sharing)
+- ✅ Moderate datasets (≤500K nodes)
+- ✅ File-based sharing and version control
+- ✅ Quick setup without PostgreSQL installation
+
+**When PostGIS is Better:**
+- Production environments with >500K node graphs
+- Multi-user concurrent access scenarios
+- Time-critical workflows where weighting speed matters
+- Large-scale deployments (1M+ nodes)
 
 ### Weighting Performance Breakdown
 
-**Real Metrics (2025-10-29):** Processing 43,425 nodes and 170,594 undirected edges → 341,188 final directed edges
+**Real Metrics (FINE 0.1nm - 173,877 nodes → 1,377,240 edges):**
 
 | Component | Time | % of Total Workflow | Description |
 |-----------|------|-------------------|-------------|
-| Weighting (Step 3) | 10.3 min (615.3s) | 73.3% | Edge enrichment, static/directional/dynamic weights on 341,188 directed edges |
-| Graph Loading (Step 4) | 1.4 min (83.8s) | 10.0% | Nodes load (4.9s), edges load (33.2s), processing (45.7s) |
-| Base Graph Creation | 2.0 min (117.5s) | 14.0% | Grid generation and initial graph structure (43,425 nodes) |
-| Fine Graph Creation | 0.4 min (21.1s) | 2.5% | High-resolution fine grid with land/sea layers |
-| Route Calculation | ~0.3s | 0.04% | A* pathfinding (302 nodes, 61.77 NM distance) |
+| Weighting (Step 3) | 45.1 min (2,703s) | 86.7% | Edge enrichment, static/directional/dynamic weights |
+| Graph Loading (Step 4) | 4.5 min (270s) | 9.0% | Nodes load + edges load + processing |
+| Base Graph Creation | 1.6 min (99s) | 3.2% | Grid generation, initial graph structure |
+| Fine Graph Creation | 0.6 min (36s) | 1.1% | High-resolution fine grid with land/sea layers |
+| Route Calculation | ~9s | 0.3% | A* pathfinding (302 nodes, 61.77 NM) |
 
-**Optimization:** If weighting is too slow, consider:
-- Using `--skip-weighting` to skip (requires pre-weighted graph from previous run)
-- Reducing fine grid spacing to have fewer edges to enrich
-- Using fine grid mode instead of H3 (fewer hexagons = fewer edges)
-- Slicing buffer to smaller geographic area
+**Optimization Strategies:**
+- Use `--skip-weighting` if graph already weighted (requires pre-weighted graph from previous run)
+- Reduce fine grid spacing to have fewer edges to enrich
+- Use FINE grid mode instead of H3 (fewer hexagons = fewer edges)
+- Enable geographic slicing to reduce buffer area
 
 ### Advantages of GeoPackage Backend
 

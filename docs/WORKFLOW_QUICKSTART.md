@@ -823,12 +823,57 @@ Project Root/
 
 ## Performance Expectations
 
-| Step | Time | Notes |
-|------|------|-------|
-| Base Graph | 3-5 min | Coarse grid, ~160K nodes |
-| H3 Graph | 3-5 min | ~900K hexagons |
-| Weighting | 15-30 min | Enrichment + weights |
-| Pathfinding | 2-3 min | Final route calculation |
-| **Total** | **25-45 min** | Full pipeline |
+**Real-World Benchmarks (2025-11-03)** - SF Bay to LA Route (47 ENCs)
 
-Use `--skip-base --skip-fine` to resume from weighting step (~20 min).
+### Total Processing Time Comparison
+
+![Performance Comparison](../assets/Total%20processing.svg)
+
+### Quick Reference Guide
+
+| Backend | Graph Mode | Total Time | Nodes | Best For |
+|---------|-----------|-----------|-------|----------|
+| **PostGIS** | FINE 0.2nm | **7.3 min** | 46K | ⚡ Fastest - prototyping |
+| **PostGIS** | FINE 0.1nm | **21.3 min** | 184K | ⭐ **RECOMMENDED** - production |
+| **PostGIS** | H3 Hexagonal | **106.6 min** | 894K | 🔬 Research - max detail |
+| **GeoPackage** | FINE 0.2nm | **14.4 min** | 43K | 📦 Portable - offline use |
+| **GeoPackage** | FINE 0.1nm | **52.0 min** | 173K | 📦 Portable - detailed |
+| **GeoPackage** | H3 Hexagonal | **180.0 min** | 768K | 📦 Portable - research |
+
+**Performance Highlights:**
+- 🚀 PostGIS is **2.0-2.4× faster** than GeoPackage
+- ⚠️ Weighting step accounts for **37-89%** of total time
+- 📈 Graphs scale superlinearly: 4× nodes → 3.6× time
+
+<details>
+<summary>📊 View Detailed Step Timings</summary>
+
+### Performance Breakdown by Pipeline Step
+
+| Backend | Mode | Step 1: Base | Step 2: Fine/H3 | Step 3: Weighting | Step 4: Pathfinding |
+|---------|------|--------------|-----------------|-------------------|---------------------|
+| PostGIS | FINE 0.2nm | 202s (3.4min) | 28s (0.5min) | 161s (2.7min) | 48s (0.8min) |
+| PostGIS | FINE 0.1nm | 193s (3.2min) | 101s (1.7min) | 762s (12.7min) | 221s (3.7min) |
+| PostGIS | H3 Hex | 194s (3.2min) | 468s (7.8min) | 4,916s (81.9min) | 815s (13.6min) |
+| GeoPackage | FINE 0.2nm | 98s (1.6min) | 12s (0.2min) | 684s (11.4min) | 70s (1.2min) |
+| GeoPackage | FINE 0.1nm | 99s (1.6min) | 36s (0.6min) | 2,703s (45.1min) | 279s (4.7min) |
+| GeoPackage | H3 Hex | 96s (1.6min) | 276s (4.6min) | 9,586s (159.8min) | 842s (14.0min) |
+
+### Bottleneck Analysis
+
+**Weighting Step % of Total Time:**
+- PostGIS FINE 0.2nm: **36.7%**
+- PostGIS FINE 0.1nm: **59.7%**
+- PostGIS H3 Hex: **76.9%**
+- GeoPackage FINE 0.2nm: **79.1%**
+- GeoPackage FINE 0.1nm: **86.7%**
+- GeoPackage H3 Hex: **88.8%**
+
+**Key Insight:** Weighting becomes increasingly dominant as graph size grows. PostGIS handles this 2-4× more efficiently through database-side spatial operations.
+
+</details>
+
+**Optimization Tips:**
+- 💡 Use `--skip-base --skip-fine` to resume from weighting step (saves 5-10 min)
+- ⚡ For iteration: FINE 0.2nm mode offers best speed/detail balance
+- 🚀 For production: PostGIS + FINE 0.1nm recommended (21.3 min, detailed routes)

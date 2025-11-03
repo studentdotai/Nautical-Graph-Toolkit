@@ -388,40 +388,117 @@ docs/notebooks/output/benchmark_graph_weighted_directed.csv
 
 ### Typical Execution Times (Los Angeles - San Francisco)
 
-| Step | Time | Notes |
-|------|------|-------|
-| Base Graph | 3-5 min | Coarse 0.3 NM grid, ~160K nodes |
-| Fine H3 Graph | 3-5 min | ~900K hexagons, 156s total |
-| Weighting | 15-30 min | Enrichment, static/directional/dynamic weights |
-| Pathfinding | 2-3 min | Graph load + route calculation |
-| **Total** | **25-45 min** | Full pipeline |
+**Latest Performance Metrics (2025-11-03):** Comprehensive benchmark across three graph modes (47 S-57 ENCs)
 
-### Factors Affecting Performance
+| Graph Mode | Nodes | Edges | Step 1: Base | Step 2: Fine/H3 | Step 3: Weighting | Step 4: Pathfinding | **Total** |
+|-----------|-------|-------|--------------|-----------------|-------------------|---------------------|-----------|
+| **FINE 0.2nm** | 46,071 | 361,192 | 201.8s (3.4min) | 27.7s (0.5min) | 160.9s (2.7min) | 48.1s (0.8min) | **438.6s (7.3min)** |
+| **FINE 0.1nm** | 184,637 | 1,460,324 | 192.9s (3.2min) | 100.5s (1.7min) | 762.1s (12.7min) | 221.3s (3.7min) | **1,276.9s (21.3min)** |
+| **H3 Hexagonal** | 894,220 | 5,347,212 | 194.0s (3.2min) | 468.2s (7.8min) | 4,916.0s (81.9min) | 814.9s (13.6min) | **6,393.0s (106.6min)** |
 
-1. **Graph Resolution**
-   - H3 mode: Slower due to hexagonal generation (~3-4x longer)
-   - Fine mode: Faster with smaller spacing penalty
+### Performance Breakdown Analysis
 
-2. **Buffer/Area Size**
-   - Larger buffers = more ENCs = longer processing
-   - Slicing buffer reduces area significantly
+**Time Distribution by Step:**
 
-3. **Database Performance**
-   - PostGIS query speed depends on indexes and hardware
-   - Network latency if database is remote
+| Step | FINE 0.2nm | FINE 0.1nm | H3 Hexagonal | Insight |
+|------|-----------|-----------|--------------|---------|
+| Base Graph | 46.0% | 15.1% | 3.0% | DB connection overhead for small graphs |
+| Fine/H3 Graph | 6.3% | 7.9% | 7.3% | H3 hexagon generation overhead |
+| **Weighting** | **36.7%** | **59.7%** | **76.9%** | **PRIMARY BOTTLENECK** |
+| Pathfinding | 11.0% | 17.3% | 12.7% | Graph loading + A* route |
 
-4. **Feature Enrichment**
-   - Directional weights: 6-7 minutes
-   - Static weights: 4-5 minutes
-   - Dynamic weights: 3-4 minutes
+**Key Insights:**
+- 🚀 **Database-side operations:** PostGIS spatial indexing provides 2.0-4.2× speedup vs GeoPackage
+- 📊 **Weighting efficiency:** Database-side spatial queries dramatically reduce enrichment time
+- ⚡ **Best for production:** Optimal performance for large-scale deployments (>500K nodes)
+- 🎯 **Recommended mode:** FINE 0.1nm provides best balance (21.3 min, detailed routes)
+- 📈 **Scaling:** Weighting scales superlinearly (4× nodes → 4.7× weighting time)
+
+### PostGIS Performance Advantages
+
+| Operation | PostGIS | GeoPackage | Advantage | Why PostGIS Wins |
+|-----------|---------|------------|-----------|------------------|
+| **Weighting (0.2nm)** | 161s (2.7min) | 684s (11.4min) | **4.2× faster** | R-tree spatial indexing |
+| **Weighting (0.1nm)** | 762s (12.7min) | 2,703s (45.1min) | **3.5× faster** | DB-side geometry ops |
+| **Weighting (H3)** | 4,916s (81.9min) | 9,586s (159.8min) | **2.0× faster** | Query optimization |
+| **Total (0.2nm)** | 439s (7.3min) | 865s (14.4min) | **2.0× faster** | Overall efficiency |
+| **Total (0.1nm)** | 1,277s (21.3min) | 3,117s (52.0min) | **2.4× faster** | Scales better |
+| **Total (H3)** | 6,393s (106.6min) | 10,801s (180.0min) | **1.7× faster** | Large graph handling |
+
+**Why PostGIS Outperforms GeoPackage:**
+- **Server-based spatial indexing:** R-tree indexes optimized for large datasets
+- **Database-side operations:** Geometry operations avoid Python/file I/O overhead
+- **Concurrent queries:** Parallel edge enrichment processing
+- **Memory management:** Better handling of multi-million edge graphs
+- **Query optimization:** PostgreSQL query planner optimizes complex spatial joins
+
+### Recommended Configurations
+
+| Use Case | Graph Mode | Time | Nodes | When to Use |
+|----------|-----------|------|-------|-------------|
+| **Quick Testing** | FINE 0.2nm | 7.3 min | 46K | Rapid prototyping, proof of concept, CI/CD |
+| **Production** ⭐ | FINE 0.1nm | 21.3 min | 184K | **Optimal detail for vessel routing** |
+| **Research** | H3 Hexagonal | 106.6 min | 894K | Multi-resolution analysis, academic studies |
+
+**Mode Selection Guide:**
+- **FINE 0.2nm:** Best for rapid iteration, testing workflow changes, demonstrations
+- **FINE 0.1nm:** Production sweet spot - detailed enough for safe routing, fast enough for regular updates
+- **H3 Hexagonal:** When you need multi-resolution capabilities or uniform cell sizes for analysis
+
+### Performance Scaling Analysis
+
+**Time per Million Nodes:**
+- FINE 0.2nm: 9.54 ms/node (smallest graph, less efficient)
+- FINE 0.1nm: 6.92 ms/node (**most efficient**)
+- H3 Hexagonal: 7.15 ms/node (good efficiency at scale)
+
+**Weighting Step Scaling:**
+- FINE 0.2nm → 0.1nm: 4× nodes → 4.7× weighting time
+- FINE 0.1nm → H3: 4.8× nodes → 6.4× weighting time
+- **Conclusion:** Superlinear scaling, but PostGIS handles it efficiently
+
+### When to Use PostGIS vs GeoPackage
+
+**Choose PostGIS when:**
+- ✅ Production deployment with server infrastructure
+- ✅ Multi-user environment (concurrent route calculations)
+- ✅ Large datasets (>500K nodes, frequent updates)
+- ✅ Time-critical workflows (weighting speed matters)
+- ✅ Professional deployment (reliability, scalability)
+
+**Choose GeoPackage when:**
+- ✅ Single-user or testing environment
+- ✅ Portable/offline operation required
+- ✅ No server infrastructure available
+- ✅ Moderate dataset size (<500K nodes)
+- ✅ File-based sharing needs (USB, cloud storage)
+
+### Weighting Performance Breakdown
+
+**Real Metrics (FINE 0.1nm - 184,637 nodes → 1,460,324 edges):**
+
+| Component | Time | % of Total Workflow | Description |
+|-----------|------|-------------------|-------------|
+| Weighting (Step 3) | 12.7 min (762s) | 59.7% | Edge enrichment, static/directional/dynamic weights |
+| Pathfinding (Step 4) | 3.7 min (221s) | 17.3% | Graph loading + A* route calculation |
+| Base Graph (Step 1) | 3.2 min (193s) | 15.1% | Grid generation, initial graph structure |
+| Fine Graph (Step 2) | 1.7 min (101s) | 7.9% | High-resolution grid creation |
+| Route Calculation | ~1s | 0.1% | A* pathfinding (negligible) |
+
+**Optimization Strategies:**
+- Use `--skip-base` to resume from fine graph (saves ~3.2 min)
+- Use `--skip-base --skip-fine` to resume from weighting (saves ~5 min)
+- FINE 0.2nm mode if weighting time is critical constraint
+- Database tuning: Ensure PostGIS spatial indexes exist on all geometry columns
 
 ### Performance Tips
 
-- **First run**: Base graph creation is expensive but runs once
-- **Skip base graph**: Resume from fine graph with `--skip-base` (saves 5-10 min)
-- **Fine grid mode**: Use when H3 is too slow
-- **Smaller area**: Slice buffer to specific region for testing
-- **Database tuning**: Ensure PostGIS spatial indexes exist
+- **First run:** Base graph creation is expensive but runs once
+- **Resume workflow:** Use `--skip-base` to skip existing base graph (saves 3-5 min)
+- **Incremental updates:** Use S57Updater to refresh only changed ENCs
+- **Fine grid mode:** Use FINE instead of H3 when speed matters (4-6× faster Fine step)
+- **Database tuning:** Verify spatial indexes: `SELECT * FROM pg_indexes WHERE tablename LIKE '%graph%';`
+- **Smaller area:** Use slice buffer to reduce geographic scope for testing
 
 ## Troubleshooting
 
