@@ -293,6 +293,30 @@ Comprehensive real-world performance analysis from production testing (Nov 2025)
 
 ---
 
+## 🗺️ Roadmap
+
+We have a comprehensive public roadmap that outlines our development journey from foundation to production-ready QGIS integration.
+
+**Current Status**: v0.1.0 Released ✅
+
+**Near-term Goals** (v0.2.0 - Foundation & Polish):
+- PyPI distribution for easy installation
+- Security audit and comprehensive API documentation
+- Docker/Kubernetes deployment support
+- CI/CD pipeline with >80% test coverage
+
+**Long-term Vision**:
+- **QGIS 4.0 Plugin Integration** (2026) - Native QGIS plugin for maritime route planning
+- **Advanced Pathfinding** - Time-dependent routing with tidal currents
+- **ML-Powered Optimization** - Traffic prediction and route optimization models
+- **GPU Acceleration** - CUDA-based graph processing (research track)
+
+**Development Note**: This is a part-time project developed between sea contracts. Timelines are flexible and availability-dependent. Community contributions welcome starting with v0.2.0!
+
+➡️ **[View the Full Project Roadmap](docs/ROADMAP.md)** for detailed version plans, dependencies, and contribution opportunities.
+
+---
+
 ### Performance Tips & Best Practices
 
 - 💡 **Resume workflows:** Use `--skip-base --skip-fine` to skip already-created graphs (saves 5-10 min)
