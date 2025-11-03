@@ -1,1 +1,0 @@
-CAUTION: Bathymetry data within this Quality of data area are estimated using non-traditional survey methods from satellite or airborne platforms. Their vertical accuracy is +/- X.X meters. Due to the novel application of these methods, hazards and inaccuracies may still exist. Special caution should be exercised by vessels navigating in the vicinity.

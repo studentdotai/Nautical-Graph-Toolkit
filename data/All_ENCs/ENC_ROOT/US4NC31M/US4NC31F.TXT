@@ -1,2 +1,0 @@
-SOUNDING DATUM
-The plane of reference for depth measurements in the Atlantic Ocean is Mean Lower Low Water (MLLW). In the sounds and rivers shown on this chart, except near the inlets, the periodic tide has a mean range of less than 0.1524 meter /½ foot. In these areas, the plane of reference for depth measurements is Low Water Datum (LWD), which is determined by subtracting 0.1524 meter /½ foot from observed Mean Sea Level (MSL).

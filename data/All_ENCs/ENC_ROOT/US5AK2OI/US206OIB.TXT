@@ -1,2 +1,0 @@
-WARNING - BATHYMETRY FROM SMALLER SCALES
-Hydrography is from smaller scale sources. Positions of all depths are approximate. Depths between soundings can only be inferred.

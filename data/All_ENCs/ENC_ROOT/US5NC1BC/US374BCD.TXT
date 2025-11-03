@@ -1,9 +1,0 @@
-INTRACOASTAL WATERWAY
-Project Depths: 3.6 meters/12 feet Norfolk, VA to Fort Pierce FL; 3.0 meters/10 feet Fort Pierce, FL to Miami FL; 2.1 meters/7 feet Miami, FL to Cross Bank, Florida Bay.
-
-Consult the U.S. Army Corps of Engineers for controlling depths and U.S. Coast Guard Local Notice to Mariners for other navigation hazards or restrictions.
-Uncharted shoals may exist in areas which have not been recently surveyed. Please report shoals and obstructions https://www.nauticalcharts.noaa.gov/customer-service/assist/.
-
-The general location of the Waterway is indicated by a recommended track line. Mariners are advised to follow the aids to navigation and avoid charted shoals and obstructions. Mileage distances shown along the Waterway are in Statute Miles, southward from Norfolk, VA, and are indicated.
-
-One Statute Mile equals 0.87 Nautical Miles. Courses are TRUE and must be CORRECTED for any variation and compass deviation.

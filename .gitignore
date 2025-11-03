@@ -38,3 +38,11 @@ docs/notebooks/output/
 
 # WSL2/Windows metadata files
 *:Zone.Identifier
+
+# JetBrains IDE (PyCharm, IntelliJ)
+.idea/
+
+# Data files - only keep compressed archives
+data/*
+!data/*.7z
+!data/.gitkeep
