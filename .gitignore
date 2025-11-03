@@ -35,3 +35,6 @@ venv/
 
 # Output directories from your scripts
 docs/notebooks/output/
+
+# WSL2/Windows metadata files
+*:Zone.Identifier
