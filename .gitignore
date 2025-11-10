@@ -46,3 +46,6 @@ docs/notebooks/output/
 data/*
 !data/*.7z
 !data/.gitkeep
+/bin/
+/etc/
+/share/

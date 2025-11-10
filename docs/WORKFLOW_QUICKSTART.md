@@ -899,6 +899,10 @@ Project Root/
 
 </details>
 
+**Note on Performance Variance:** Benchmark times represent optimal conditions with dedicated system resources. 
+     Observed variance: ±20-35% when running concurrent workflows or with background processes. 
+     For production planning, use upper bound estimates.
+
 **Optimization Tips:**
 - 💡 Use `--skip-base --skip-fine` to resume from weighting step (saves 5-10 min)
 - ⚡ For iteration: FINE 0.2nm mode offers best speed/detail balance

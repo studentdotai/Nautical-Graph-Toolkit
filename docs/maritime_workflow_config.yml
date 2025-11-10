@@ -73,8 +73,8 @@ fine_graph:
   # NOTE: Graph table names are automatically constructed from these values:
   #   - Undirected graph: {mode}_graph_{name_suffix}    (e.g., "h3_graph_20")
   #   - Weighted graph: {mode}_graph_wt_{name_suffix}   (e.g., "h3_graph_wt_20")
-  mode: "fine"                      # Options: "fine" (regular grid) or "h3" (hexagonal)
-  name_suffix: "pg_10_v2"               # Suffix for graph table/file names
+  mode: "h3"                      # Options: "fine" (regular grid) or "h3" (hexagonal)
+  name_suffix: "gpkg_6_11"               # Suffix for graph table/file names
 
   # Route buffer configuration
   load_base_route: true           # Load pre-computed base route from step 1
@@ -91,7 +91,7 @@ fine_graph:
 
   # Fine grid specific parameters (when mode: "fine")
   # Regular rectangular grid for high-precision routing
-  fine_spacing_nm: 0.1            # Node spacing in NM (smaller = denser graph)
+  fine_spacing_nm: 0.2            # Node spacing in NM (smaller = denser graph)
   fine_max_edge_factor: 3.0       # Max edge length multiplier
   fine_bridge_components: true    # Bridge disconnected components
 

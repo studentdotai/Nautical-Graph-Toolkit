@@ -212,7 +212,8 @@ Comprehensive real-world performance analysis from production testing (Nov 2025)
 | PostGIS | FINE 0.2nm | 46,071 | 361,192 | 202s (3.4min) | 28s (0.5min) | 161s (2.7min) | 48s (0.8min) | **439s (7.3min)** |
 | GeoPackage | FINE 0.2nm | 43,425 | 341,188 | 98s (1.6min) | 12s (0.2min) | 684s (11.4min) | 70s (1.2min) | **865s (14.4min)** |
 
-**Test Configuration:** WSL2 Ubuntu, SSD storage, 47 S-57 ENCs covering SF Bay to Los Angeles
+ **Test Configuration:** WSL2 Ubuntu, SSD storage, 47 S-57 ENCs covering SF Bay to Los Angeles. 
+ Performance may vary ±20-35% based on system state, concurrent operations, and I/O load.
 
 ---
 
@@ -331,7 +332,7 @@ We have a comprehensive public roadmap that outlines our development journey fro
 - **[Quick Start Workflow](docs/WORKFLOW_QUICKSTART.md)** - 5-minute introduction
 - **[PostGIS Guide](docs/WORKFLOW_POSTGIS_GUIDE.md)** - Production-scale setup
 - **[GeoPackage Guide](docs/WORKFLOW_GEOPACKAGE_GUIDE.md)** - Portable single-file setup
-- **[Jupyter Notebooks](docs/notebooks/)** - 15+ interactive examples and tutorials
+- **[Jupyter Notebooks](docs/notebooks/)** - 12 interactive examples and tutorials
 
 ## 🏗️ Architecture
 
@@ -541,7 +542,14 @@ AGPL-3.0 means:
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please:
+**Note:** This project is currently in active early development (v0.1.0). We will begin accepting community contributions starting with **v0.2.0** as the codebase stabilizes and comprehensive contribution guidelines are established. See the [Roadmap](#-roadmap) for timeline details.
+
+In the meantime, you can:
+- Report bugs or request features on [GitHub Issues](https://github.com/studentdotai/Nautical-Graph-Toolkit/issues)
+- Star the repository to show support
+- Share feedback and suggestions through issues
+
+**When contributions open (v0.2.0+), the workflow will be:**
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
