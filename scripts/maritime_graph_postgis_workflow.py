@@ -26,26 +26,26 @@ CONFIGURATION FILES:
     Graph parameters: src/nautical_graph_toolkit/data/graph_config.yml
 
 Usage:
-    python docs/maritime_graph_postgis_workflow.py [options]
+    python scripts/maritime_graph_postgis_workflow.py [options]
 
 Examples:
     # Full pipeline with defaults
-    python docs/maritime_graph_postgis_workflow.py
+    python scripts/maritime_graph_postgis_workflow.py
 
     # Skip base graph (already created)
-    python docs/maritime_graph_postgis_workflow.py --skip-base
+    python scripts/maritime_graph_postgis_workflow.py --skip-base
 
     # Use fine grid instead of H3
-    python docs/maritime_graph_postgis_workflow.py --graph-mode fine
+    python scripts/maritime_graph_postgis_workflow.py --graph-mode fine
 
     # Custom vessel draft
-    python docs/maritime_graph_postgis_workflow.py --vessel-draft 10.5
+    python scripts/maritime_graph_postgis_workflow.py --vessel-draft 10.5
 
     # Dry run (validate config only)
-    python docs/maritime_graph_postgis_workflow.py --dry-run
+    python scripts/maritime_graph_postgis_workflow.py --dry-run
 
     # Debug mode with verbose logging
-    python docs/maritime_graph_postgis_workflow.py --log-level DEBUG
+    python scripts/maritime_graph_postgis_workflow.py --log-level DEBUG
 """
 
 import os
@@ -892,18 +892,18 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python maritime_graph_workflow.py
-  python maritime_graph_workflow.py --skip-base
-  python maritime_graph_workflow.py --graph-mode fine
-  python maritime_graph_workflow.py --vessel-draft 10.5
-  python maritime_graph_workflow.py --dry-run
+  python scripts/maritime_graph_postgis_workflow.py
+  python scripts/maritime_graph_postgis_workflow.py --skip-base
+  python scripts/maritime_graph_postgis_workflow.py --graph-mode fine
+  python scripts/maritime_graph_postgis_workflow.py --vessel-draft 10.5
+  python scripts/maritime_graph_postgis_workflow.py --dry-run
         """
     )
 
     parser.add_argument(
         '--config',
         type=Path,
-        default=Path(__file__).parent / 'maritime_workflow_config.yml',
+        default=Path(__file__).parent.parent / 'docs' / 'maritime_workflow_config.yml',
         help='Path to workflow configuration YAML file (universal, backend-agnostic)'
     )
 
