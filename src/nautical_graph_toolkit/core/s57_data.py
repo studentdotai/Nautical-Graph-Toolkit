@@ -3205,18 +3205,19 @@ class ENCDataFactory:
 
         return unified_gdf
 
-    def get_enc_summary(self, check_noaa: bool = False) -> pd.DataFrame:
+    def get_enc_summary(self, check_noaa: bool = False, force_noaa_refresh: bool = False) -> pd.DataFrame:
         """
         Retrieves the ENC summary and returns it as a standardized DataFrame.
 
         Args:
-            check_noaa (bool): Whether to check against the live NOAA database.
+            check_noaa (bool): Whether to check against the NOAA database (uses cached data by default).
+            force_noaa_refresh (bool): If True, refreshes NOAA data from live source instead of using cache.
 
         Returns:
             pd.DataFrame: A DataFrame with a unified schema.
         """
         logger.info("Factory: Getting ENC summary...")
-        df = self.manager.get_enc_summary(check_noaa)
+        df = self.manager.get_enc_summary(check_noaa, force_noaa_refresh)
 
         # Unify column names (e.g., GPKG uses uppercase)
         df.columns = [col.lower() for col in df.columns]
@@ -3449,7 +3450,11 @@ class PostGISManager:
         """
         logger.info(f"Fetching layer summary for schema '{self.schema}'...")
         inspector = inspect(self.engine)
-        table_names = inspector.get_table_names(schema=self.schema)
+        all_table_names = inspector.get_table_names(schema=self.schema)
+
+        # Filter out S-57 metadata tables (not feature layers)
+        s57_metadata_tables = {'dsid', 'dssi', 'dspm', 'frid', 'fspt', 'vrid'}
+        table_names = [t for t in all_table_names if t.lower() not in s57_metadata_tables]
 
         s57_utils = S57Utils()
         summary_data = []
@@ -3543,13 +3548,14 @@ class PostGISManager:
         gdf = gpd.read_postgis(sql, self.engine, params={'enc_names': tuple(enc_names)}, geom_col='wkb_geometry')
         return gdf.sort_values(by='dsid_dsnm').reset_index(drop=True)
 
-    def get_enc_summary(self, check_noaa: bool = False) -> pd.DataFrame:
+    def get_enc_summary(self, check_noaa: bool = False, force_noaa_refresh: bool = False) -> pd.DataFrame:
         """
         Provides a summary of all ENCs in the database.
-        Optionally checks against the live NOAA database to flag outdated charts.
+        Optionally checks against the NOAA database to flag outdated charts.
 
         Args:
-            check_noaa (bool): If True, fetches data from NOAA to check for outdated ENCs.
+            check_noaa (bool): If True, fetches data from NOAA to check for outdated ENCs (uses cached data by default).
+            force_noaa_refresh (bool): If True, refreshes NOAA data from live source instead of using cache.
 
         Returns:
             pd.DataFrame: A DataFrame with ENC summary. If check_noaa is True, it
@@ -3564,8 +3570,8 @@ class PostGISManager:
 
         logger.info("Checking against NOAA database for latest versions...")
         try:
-            noaa_db = NoaaDatabase() # Corrected from NoaaDB
-            noaa_df = noaa_db.get_dataframe(force_refresh=False) # Use cached data if available
+            noaa_db = NoaaDatabase()
+            noaa_df = noaa_db.get_dataframe(force_refresh=force_noaa_refresh)
 
             # Clean local ENC names to match NOAA format (e.g., remove .000)
             df['ENC_Name_Clean'] = df['ENC_Name'].str.split('.').str[0]
@@ -4318,9 +4324,15 @@ class SpatiaLiteManager:
         inspector = inspect(self.engine)
         all_tables = inspector.get_table_names()
 
-        # Filter out system/metadata tables
+        # Filter out system/metadata tables and S-57 metadata tables (not feature layers)
         system_tables = {'spatial_ref_sys', 'geometry_columns', 'sqlite_sequence'}
-        table_names = [t for t in all_tables if t not in system_tables and not t.startswith('rtree_')]
+        s57_metadata_tables = {'dsid', 'dssi', 'dspm', 'frid', 'fspt', 'vrid'}
+        table_names = [
+            t for t in all_tables
+            if t not in system_tables
+            and not t.startswith('rtree_')
+            and t.lower() not in s57_metadata_tables
+        ]
 
         s57_utils = S57Utils()
         summary_data = []
@@ -4426,13 +4438,14 @@ class SpatiaLiteManager:
         final_gdf = pd.concat(all_gdfs, ignore_index=True)
         return final_gdf.sort_values(by='dsid_dsnm').reset_index(drop=True)
 
-    def get_enc_summary(self, check_noaa: bool = False) -> pd.DataFrame:
+    def get_enc_summary(self, check_noaa: bool = False, force_noaa_refresh: bool = False) -> pd.DataFrame:
         """
         Provides a summary of all ENCs in the database.
-        Optionally checks against the live NOAA database to flag outdated charts.
+        Optionally checks against the NOAA database to flag outdated charts.
 
         Args:
-            check_noaa (bool): If True, fetches data from NOAA to check for outdated ENCs.
+            check_noaa (bool): If True, fetches data from NOAA to check for outdated ENCs (uses cached data by default).
+            force_noaa_refresh (bool): If True, refreshes NOAA data from live source instead of using cache.
 
         Returns:
             pd.DataFrame: A DataFrame with ENC summary. If check_noaa is True, it
@@ -4454,7 +4467,7 @@ class SpatiaLiteManager:
         logger.info("Checking against NOAA database for latest versions...")
         try:
             noaa_db = NoaaDatabase() # Corrected from NoaaDB
-            noaa_df = noaa_db.get_dataframe(force_refresh=False)
+            noaa_df = noaa_db.get_dataframe(force_refresh=force_noaa_refresh)
 
             # Clean local ENC names to match NOAA format
             df['ENC_Name_Clean'] = df['ENC_Name'].str.split('.').str[0]
@@ -4969,8 +4982,14 @@ class GPKGManager:
         inspector = inspect(self.engine)
         all_tables = inspector.get_table_names()
 
-        # Filter out GPKG system tables
-        table_names = [t for t in all_tables if not t.startswith('gpkg_') and not t.startswith('rtree_')]
+        # Filter out GPKG system tables and S-57 metadata tables (not feature layers)
+        s57_metadata_tables = {'dsid', 'dssi', 'dspm', 'frid', 'fspt', 'vrid'}
+        table_names = [
+            t for t in all_tables
+            if not t.startswith('gpkg_')
+            and not t.startswith('rtree_')
+            and t.lower() not in s57_metadata_tables
+        ]
 
         s57_utils = S57Utils()
         summary_data = []
@@ -5065,13 +5084,14 @@ class GPKGManager:
                 crs="EPSG:4326"
             )
 
-    def get_enc_summary(self, check_noaa: bool = False) -> pd.DataFrame:
+    def get_enc_summary(self, check_noaa: bool = False, force_noaa_refresh: bool = False) -> pd.DataFrame:
         """
         Provides a summary of all ENCs in the GeoPackage.
-        Optionally checks against the live NOAA database to flag outdated charts.
+        Optionally checks against the NOAA database to flag outdated charts.
 
         Args:
-            check_noaa (bool): If True, fetches data from NOAA to check for outdated ENCs.
+            check_noaa (bool): If True, fetches data from NOAA to check for outdated ENCs (uses cached data by default).
+            force_noaa_refresh (bool): If True, refreshes NOAA data from live source instead of using cache.
 
         Returns:
             pd.DataFrame: A DataFrame with ENC summary. If check_noaa is True, it
@@ -5094,7 +5114,7 @@ class GPKGManager:
         logger.info("Checking against NOAA database for latest versions...")
         try:
             noaa_db = NoaaDatabase() # Corrected from NoaaDB
-            noaa_df = noaa_db.get_dataframe(force_refresh=False)
+            noaa_df = noaa_db.get_dataframe(force_refresh=force_noaa_refresh)
 
             # Clean local ENC names to match NOAA format
             df['ENC_Name_Clean'] = df['ENC_Name'].str.split('.').str[0]

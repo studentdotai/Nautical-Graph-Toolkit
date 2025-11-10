@@ -35,6 +35,43 @@ class Buffer:
         return nautical_miles / 60.0
 
     @staticmethod
+    def _degrees_to_nm(degrees: float, latitude: float = None) -> float:
+        """
+        Converts decimal degrees to nautical miles.
+
+        This conversion accounts for the fact that the distance represented by
+        one degree of longitude varies with latitude (cos(latitude)), while
+        one degree of latitude is consistently ~60 nautical miles.
+
+        Args:
+            degrees (float): The distance in decimal degrees.
+            latitude (float, optional): The latitude at which to calculate the conversion.
+                                       If provided, gives more accurate results for
+                                       longitude distances. If None, uses the standard
+                                       approximation of 60 NM per degree.
+
+        Returns:
+            float: The distance in nautical miles.
+
+        Notes:
+            - 1 degree of latitude ≈ 60 nautical miles (constant)
+            - 1 degree of longitude = 60 * cos(latitude) nautical miles (varies)
+            - If latitude is not provided, assumes 60 NM per degree (equator approximation)
+        """
+        import math
+
+        if latitude is None:
+            # Simple approximation: 1 degree ≈ 60 NM
+            return degrees * 60.0
+        else:
+            # More accurate: account for latitude compression
+            # Convert latitude to radians for cos calculation
+            lat_radians = math.radians(latitude)
+            # At a given latitude, 1 degree of longitude = 60 * cos(lat) NM
+            # For general distance (assuming mostly longitudinal), use cos correction
+            return degrees * 60.0 * math.cos(lat_radians)
+
+    @staticmethod
     def create_buffer(geometry: BaseGeometry, distance_nm: float) -> BaseGeometry:
         """
         Creates a buffer around a given geometry.

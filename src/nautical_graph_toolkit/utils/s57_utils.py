@@ -342,13 +342,21 @@ class NoaaDatabase:
         Args:
             force_refresh (bool): If True, bypasses the cache and re-scrapes the data.
         """
+        from datetime import datetime
+        import os
 
         # Check for a cached file first
         cache_file = self._data_dir / self._cache_filename
         if not force_refresh and cache_file.exists():
             try:
                 self.df = pd.read_csv(cache_file, index_col='Num')
-                logger.info(f"Loaded cached NOAA ENC data from {cache_file}")
+
+                # Get cache file modification time and log it
+                file_stat = os.stat(cache_file)
+                mtime = datetime.fromtimestamp(file_stat.st_mtime)
+                mtime_str = mtime.strftime('%Y-%m-%d %H:%M:%S')
+
+                logger.info(f"Loaded cached NOAA ENC data from {cache_file} (last updated: {mtime_str})")
                 return self.df
             except Exception as e:
                 logger.warning(f"Could not load cached NOAA data from {cache_file}: {e}. Re-scraping.")
@@ -356,7 +364,7 @@ class NoaaDatabase:
 
         if self.df is None or force_refresh:
             if force_refresh:
-                logger.info("Forcing a refresh of NOAA ENC data.")
+                logger.info("Forcing a refresh of NOAA ENC data from live source.")
             self._scrape_enc_data()
         return self.df
 

@@ -283,7 +283,7 @@ class PlotlyChart:
 					trace.visible = True
 
 	@staticmethod
-	def create_base_map(title: str ="Global map", mapbox_token: str  = "MAP_BOX_PUBLIC_TOKEN",
+	def create_base_map(title: str ="Global map", mapbox_token: str = None,
 	                    layout_flex: bool = True,
 	                    height_px: int = 1080,
 	                    width_px: int = 1920,
@@ -294,7 +294,7 @@ class PlotlyChart:
 
         Args:
             title: Title of the map
-            mapbox_token: Mapbox token for street map access
+            mapbox_token: Mapbox token for custom style (optional, uses free OpenStreetMap if None)
             layout_flex: Whether to use flexible layout or fixed dimensions
             height_px: Height in pixels (for fixed layout)
             width_px: Width in pixels (for fixed layout)
@@ -316,23 +316,50 @@ class PlotlyChart:
 		else:
 			layout_size =  dict(height=height_px, width=width_px)
 
+		# Validate Mapbox token for custom style
+		# Use custom Mapbox style only if token is provided and valid
+		use_custom_mapbox = (
+			mapbox_token is not None
+			and mapbox_token != ""
+			and mapbox_token != "MAP_BOX_PUBLIC_TOKEN"
+		)
 
 		figure = go.Figure()
 		# Configure based on plot type
 		if plot_type.lower() == "mapbox":
-			figure.update_layout(
-				layout_size,
-				height=height_px,
-				mapbox=dict(
+			# Determine which basemap style to use
+			if use_custom_mapbox:
+				# Use custom Mapbox style with authentication
+				mapbox_config = dict(
 					style='mapbox://styles/vikont/cm4yf9ahl005d01sfanlib2f6',  # Vector tile style
-					accesstoken = mapbox_token,
+					accesstoken=mapbox_token,
 					center=dict(
 						lat=0,
 						lon=0
 					),
 					zoom=2.0,
-					bearing = 0,
-				),
+					bearing=0,
+				)
+			else:
+				# Fallback to free OpenStreetMap basemap (no token required)
+				logger.warning(
+					"MAPBOX_TOKEN not provided or invalid. Using free OpenStreetMap basemap. "
+					"For custom Mapbox styles, provide a valid MAPBOX_TOKEN in your .env file."
+				)
+				mapbox_config = dict(
+					style='open-street-map',  # Free basemap, no authentication required
+					center=dict(
+						lat=0,
+						lon=0
+					),
+					zoom=2.0,
+					bearing=0,
+				)
+
+			figure.update_layout(
+				layout_size,
+				height=height_px,
+				mapbox=mapbox_config,
 				title_text = title,
 				title_x=0.5,
 				template='plotly_white',
