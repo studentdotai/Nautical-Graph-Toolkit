@@ -1,0 +1,4 @@
+# Enforce consistent line endings for text files
+* text=auto eol=lf
+*.py text eol=lf
+*.md text eol=lf
