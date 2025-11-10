@@ -30,7 +30,7 @@ from pandas.testing import assert_frame_equal
 from dotenv import load_dotenv
 
 # Add project root to path for local imports
-project_root = Path(__file__).resolve().parent.parent.parent
+project_root = Path(__file__).resolve().parents[2]  # Two levels up: tests/core__real_data/test_enc_factory.py -> project_root
 sys.path.insert(0, str(project_root))
 
 from nautical_graph_toolkit.core.s57_data import (

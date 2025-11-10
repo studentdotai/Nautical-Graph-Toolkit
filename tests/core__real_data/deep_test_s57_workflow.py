@@ -53,7 +53,7 @@ import psycopg2
 from osgeo import gdal
 
 # Add project root to path for imports
-project_root = Path(__file__).parent.parent
+project_root = Path(__file__).resolve().parents[2]  # Two levels up: tests/core__real_data/deep_test_s57_workflow.py -> project_root
 sys.path.insert(0, str(project_root))
 
 from nautical_graph_toolkit.core.s57_data import S57Advanced, S57Updater, S57AdvancedConfig
