@@ -470,6 +470,24 @@ pytest -v --cov=nautical_graph_toolkit
 
 Test data for S-57 files is included in `tests/data/ENC_ROOT/`
 
+### Pre-Generated Examples & Validation Datasets
+
+Want to validate your installation or skip lengthy data processing? We provide a comprehensive repository of pre-generated graphs and source databases:
+
+- **🔗 [ENC-Graph-test-files Repository](https://u.pcloud.link/publink/show?code=kZVUYM5Zm87H47h2G1XBANXHwhIfcJA681Oy)** (14.5 GB, 16 files)
+  - Ready-to-use ENC databases: `enc_west.gpkg` (209 MB), `us_enc_all.gpkg` (7 GB)
+  - 12 pre-generated maritime graphs with multiple backends and resolutions
+  - Both PostGIS and GeoPackage examples
+  - Weighted and non-weighted graph variants
+
+**Use cases:**
+- ✅ Validate your outputs against known-good references
+- ✅ Skip hours of computation for testing/development
+- ✅ Learn from production-quality examples
+- ✅ Benchmark performance against reference implementations
+
+See [data/DATA_GUIDE.md](data/DATA_GUIDE.md#-pre-generated-examples--large-datasets-pcloud-repository) for detailed file descriptions and download instructions.
+
 ## 📁 Project Structure
 
 ```

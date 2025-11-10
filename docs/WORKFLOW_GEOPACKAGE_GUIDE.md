@@ -187,42 +187,42 @@ Typically no changes needed, but can be customized for specialized use cases.
 
 #### Full Pipeline (All Steps)
 ```bash
-python docs/maritime_graph_geopackage_workflow.py
+python scripts/maritime_graph_geopackage_workflow.py
 ```
 
 #### Skip Base Graph (Already Created)
 ```bash
-python docs/maritime_graph_geopackage_workflow.py --skip-base
+python scripts/maritime_graph_geopackage_workflow.py --skip-base
 ```
 
 #### Use Fine Grid Instead of H3
 ```bash
-python docs/maritime_graph_geopackage_workflow.py --graph-mode fine
+python scripts/maritime_graph_geopackage_workflow.py --graph-mode fine
 ```
 
 #### Custom Configuration File
 ```bash
-python docs/maritime_graph_geopackage_workflow.py --config custom_workflow_config.yml
+python scripts/maritime_graph_geopackage_workflow.py --config custom_workflow_config.yml
 ```
 
 #### Override Vessel Draft
 ```bash
-python docs/maritime_graph_geopackage_workflow.py --vessel-draft 10.5
+python scripts/maritime_graph_geopackage_workflow.py --vessel-draft 10.5
 ```
 
 #### Dry Run (Validate Only, No Execution)
 ```bash
-python docs/maritime_graph_geopackage_workflow.py --dry-run
+python scripts/maritime_graph_geopackage_workflow.py --dry-run
 ```
 
 #### Debug Logging (Verbose Console Output)
 ```bash
 # INFO mode (default): Clean logs, ~1MB per log file
-python docs/maritime_graph_geopackage_workflow.py --log-level INFO
+python scripts/maritime_graph_geopackage_workflow.py --log-level INFO
 
 # DEBUG mode: Comprehensive debugging, ~5-10MB per log file
 # Third-party verbose logging (Fiona, GDAL) automatically suppressed
-python docs/maritime_graph_geopackage_workflow.py --log-level DEBUG
+python scripts/maritime_graph_geopackage_workflow.py --log-level DEBUG
 ```
 
 **Note:** Log files now include:
@@ -249,7 +249,7 @@ python docs/maritime_graph_geopackage_workflow.py --log-level DEBUG
 
 ### Scenario 1: Full Pipeline (Default)
 ```bash
-python docs/maritime_graph_geopackage_workflow.py
+python scripts/maritime_graph_geopackage_workflow.py
 
 # Expected time: ~14.5 minutes (actual: 872.3s)
 # Breakdown: Base (127s) + Fine (23s) + Weighting (461s) + Pathfinding (262s)
@@ -264,7 +264,7 @@ python docs/maritime_graph_geopackage_workflow.py
 
 ### Scenario 2: Resume from Fine Graph (Skip Base)
 ```bash
-python docs/maritime_graph_geopackage_workflow.py --skip-base
+python scripts/maritime_graph_geopackage_workflow.py --skip-base
 
 # Use when base graph already exists in GeoPackage
 # Expected time: 2-2.5 hours (saves ~5 min from base graph step)
@@ -273,7 +273,7 @@ python docs/maritime_graph_geopackage_workflow.py --skip-base
 
 ### Scenario 3: Fine Grid Mode (Regular Grid, Faster)
 ```bash
-python docs/maritime_graph_geopackage_workflow.py --graph-mode fine
+python scripts/maritime_graph_geopackage_workflow.py --graph-mode fine
 
 # Creates regular rectangular grid instead of hexagonal (fewer edges)
 # Faster processing due to fewer edges to enrich
@@ -283,7 +283,7 @@ python docs/maritime_graph_geopackage_workflow.py --graph-mode fine
 
 ### Scenario 4: Custom Vessel Specifications
 ```bash
-python docs/maritime_graph_geopackage_workflow.py \
+python scripts/maritime_graph_geopackage_workflow.py \
   --vessel-draft 12.0 \
   --skip-base
 
@@ -294,7 +294,7 @@ python docs/maritime_graph_geopackage_workflow.py \
 
 ### Scenario 5: Fastest Testing (Skip Weighting)
 ```bash
-python docs/maritime_graph_geopackage_workflow.py --skip-weighting
+python scripts/maritime_graph_geopackage_workflow.py --skip-weighting
 
 # Create graphs only (skip time-consuming weighting)
 # Enables quick testing of graph generation
@@ -306,13 +306,13 @@ python docs/maritime_graph_geopackage_workflow.py --skip-weighting
 ### Scenario 6: Debug & Testing
 ```bash
 # Validate configuration
-python docs/maritime_graph_geopackage_workflow.py --dry-run
+python scripts/maritime_graph_geopackage_workflow.py --dry-run
 
 # Run with verbose logging
-python docs/maritime_graph_geopackage_workflow.py --log-level DEBUG
+python scripts/maritime_graph_geopackage_workflow.py --log-level DEBUG
 
 # Run only weighting and pathfinding steps
-python docs/maritime_graph_geopackage_workflow.py --skip-base --skip-fine
+python scripts/maritime_graph_geopackage_workflow.py --skip-base --skip-fine
 ```
 
 ### Scenario 7: Reduced Memory Usage (Slice Buffer)
@@ -324,7 +324,7 @@ python docs/maritime_graph_geopackage_workflow.py --skip-base --skip-fine
 #   slice_west_degree: -123.5
 #   slice_east_degree: -122.0
 
-python docs/maritime_graph_geopackage_workflow.py
+python scripts/maritime_graph_geopackage_workflow.py
 
 # Restricts processing to specific geographic area
 # Reduces memory consumption significantly
@@ -650,7 +650,7 @@ Error: database disk image is malformed / database is locked
 
 1. **Run dry-run first:**
    ```bash
-   python docs/maritime_graph_geopackage_workflow.py --dry-run
+   python scripts/maritime_graph_geopackage_workflow.py --dry-run
    ```
 
 2. **Check logs:**
@@ -665,7 +665,7 @@ Error: database disk image is malformed / database is locked
 
 4. **Test with verbose logging:**
    ```bash
-   python docs/maritime_graph_geopackage_workflow.py --log-level DEBUG
+   python scripts/maritime_graph_geopackage_workflow.py --log-level DEBUG
    ```
 
 5. **Check intermediate outputs:**
@@ -707,10 +707,10 @@ The workflow can resume from any intermediate step:
 
 ```bash
 # Create only weighted graph (skip graph creation)
-python docs/maritime_graph_geopackage_workflow.py --skip-base --skip-fine
+python scripts/maritime_graph_geopackage_workflow.py --skip-base --skip-fine
 
 # Recalculate weights (graph already exists)
-python docs/maritime_graph_geopackage_workflow.py --skip-base --skip-fine
+python scripts/maritime_graph_geopackage_workflow.py --skip-base --skip-fine
 ```
 
 ### Using Custom Ports
@@ -818,7 +818,7 @@ Compare across runs:
 
 ```bash
 # Append new results
-python docs/maritime_graph_geopackage_workflow.py
+python scripts/maritime_graph_geopackage_workflow.py
 
 # Analyze performance trends
 python -c "
@@ -904,7 +904,7 @@ TOTAL WORKFLOW TIME:                    872.3s (14.5 min)
 ## Support & Documentation
 
 ### Related Files
-- **Script**: `docs/maritime_graph_geopackage_workflow.py`
+- **Script**: `scripts/maritime_graph_geopackage_workflow.py`
 - **Configuration**: `docs/maritime_workflow_config.yml`
 - **Graph Config**: `src/nautical_graph_toolkit/data/graph_config.yml`
 - **Setup Guide**: `docs/SETUP.md`

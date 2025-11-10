@@ -285,6 +285,19 @@ After importing S-57 data, your backend must contain the following layers:
    # Verification steps will be added
    ```
 
+### Alternative: Download Pre-Imported Data
+
+**Skip the import process** by downloading pre-processed ENC databases:
+
+- **enc_west.gpkg** (209 MB) - Western US Coast coverage
+- **us_enc_all.gpkg** (6.97 GB) - All US coastal waters
+
+**Download**: [ENC-Graph-test-files Repository](https://u.pcloud.link/publink/show?code=kZVUYM5Zm87H47h2G1XBANXHwhIfcJA681Oy)
+
+Place downloaded files in your chosen location and configure your notebooks or scripts to use them directly. See [data/DATA_GUIDE.md](../data/DATA_GUIDE.md#-pre-generated-examples--large-datasets-pcloud-repository) for complete details.
+
+**Time Saved**: ~40-60 minutes (no S-57 import processing)
+
 ---
 
 ## Verification

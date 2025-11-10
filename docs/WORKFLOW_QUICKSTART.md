@@ -165,6 +165,32 @@ ogrinfo docs/notebooks/output/enc_charts.gpkg lndare -summary | grep "Feature Co
 ls -lh docs/notebooks/output/enc_charts.gpkg
 ```
 
+### Skip Import: Use Pre-Processed Databases
+
+**Alternative to lengthy import**: If you want to skip the data import step entirely (which can take 40-60 minutes), download pre-processed ENC databases from our pCloud repository:
+
+**🔗 [ENC-Graph-test-files Repository](https://u.pcloud.link/publink/show?code=kZVUYM5Zm87H47h2G1XBANXHwhIfcJA681Oy)**
+
+**Quick Start Option:**
+1. Download `enc_west.gpkg` (209 MB) - Western US Coast coverage
+2. Place in `data/` directory or your output location
+3. Configure workflow to use it (update `maritime_workflow_config.yml` if needed)
+4. Proceed directly to workflow execution (skip import step!)
+
+```bash
+# Download enc_west.gpkg from pCloud → place in data/ directory
+
+# Verify database is readable
+ogrinfo data/enc_west.gpkg | head -20
+
+# Now run workflow directly - no import needed!
+python scripts/maritime_graph_geopackage_workflow.py
+```
+
+**Time Saved**: ~40-60 minutes (no S-57 import processing)
+
+For more pre-processed options including pre-generated graphs, see [data/DATA_GUIDE.md](../data/DATA_GUIDE.md#-pre-generated-examples--large-datasets-pcloud-repository).
+
 ---
 
 ## Quick Start (5 minutes)
@@ -175,7 +201,7 @@ ls -lh docs/notebooks/output/enc_charts.gpkg
 
 #### 1. Verify Configuration
 ```bash
-python docs/maritime_graph_postgis_workflow.py --dry-run
+python scripts/maritime_graph_postgis_workflow.py --dry-run
 ```
 
 Expected output:
@@ -186,7 +212,7 @@ Dry run mode - configuration validated, exiting
 
 #### 2. Run Full Pipeline
 ```bash
-python docs/maritime_graph_postgis_workflow.py
+python scripts/maritime_graph_postgis_workflow.py
 ```
 
 **Estimated time: 45-60 minutes**
@@ -214,12 +240,12 @@ cat docs/notebooks/output/benchmark_graph_*.csv
 
 #### 1. Verify Configuration
 ```bash
-python docs/maritime_graph_geopackage_workflow.py --dry-run
+python scripts/maritime_graph_geopackage_workflow.py --dry-run
 ```
 
 #### 2. Run Full Pipeline
 ```bash
-python docs/maritime_graph_geopackage_workflow.py
+python scripts/maritime_graph_geopackage_workflow.py
 ```
 
 **Estimated time: 14-20 minutes** (faster than PostGIS for file-based operations)
@@ -301,10 +327,10 @@ weighting:
 #### Step 4: Run Workflow
 ```bash
 # Dry run first (validate setup)
-python docs/maritime_graph_postgis_workflow.py --dry-run
+python scripts/maritime_graph_postgis_workflow.py --dry-run
 
 # Full workflow
-python docs/maritime_graph_postgis_workflow.py
+python scripts/maritime_graph_postgis_workflow.py
 
 # Expected output
 # Base Graph Creation: 127.4s (2.1 min)
@@ -367,7 +393,7 @@ Same as PostGIS (uses same YAML file)
 #### Step 4: Run Workflow
 ```bash
 # Workflow uses GeoPackage automatically
-python docs/maritime_graph_geopackage_workflow.py
+python scripts/maritime_graph_geopackage_workflow.py
 
 # Expected output (faster than PostGIS)
 # Base Graph Creation: 117.5s (2.0 min)
@@ -413,10 +439,10 @@ python scripts/import_s57.py \
 #### Step 2: Regenerate Graphs
 ```bash
 # Regenerate all graphs with updated data
-python docs/maritime_graph_postgis_workflow.py
+python scripts/maritime_graph_postgis_workflow.py
 
 # For GeoPackage: graphs reload updated data automatically
-python docs/maritime_graph_geopackage_workflow.py
+python scripts/maritime_graph_geopackage_workflow.py
 ```
 
 #### Step 3: Compare Routes
@@ -453,15 +479,15 @@ cat docs/notebooks/output/detailed_route_7.5m_draft.geojson
 ```bash
 # ✓ CORRECT: PostGIS → PostGIS
 python scripts/import_s57.py ... --output-format postgis --schema us_enc_all
-python docs/maritime_graph_postgis_workflow.py
+python scripts/maritime_graph_postgis_workflow.py
 
 # ✓ CORRECT: GeoPackage → GeoPackage
 python scripts/import_s57.py ... --output-format gpkg ... enc_west.gpkg
-python docs/maritime_graph_geopackage_workflow.py
+python scripts/maritime_graph_geopackage_workflow.py
 
 # ✗ WRONG: Different backends (workflow won't find data)
 python scripts/import_s57.py ... --output-format postgis
-python docs/maritime_graph_geopackage_workflow.py  # Fails - no GeoPackage data!
+python scripts/maritime_graph_geopackage_workflow.py  # Fails - no GeoPackage data!
 ```
 
 ---
@@ -471,19 +497,19 @@ python docs/maritime_graph_geopackage_workflow.py  # Fails - no GeoPackage data!
 ### Skip Steps (Resume Workflow)
 ```bash
 # Skip base graph (already exists)
-.venv/bin/python docs/maritime_graph_postgis_workflow.py --skip-base
+.venv/bin/python scripts/maritime_graph_postgis_workflow.py --skip-base
 
 # Skip fine graph too
-.venv/bin/python docs/maritime_graph_postgis_workflow.py --skip-base --skip-fine
+.venv/bin/python scripts/maritime_graph_postgis_workflow.py --skip-base --skip-fine
 
 # Only run weighting and pathfinding
-.venv/bin/python docs/maritime_graph_postgis_workflow.py --skip-base --skip-fine
+.venv/bin/python scripts/maritime_graph_postgis_workflow.py --skip-base --skip-fine
 ```
 
 ### Use Different Graph Mode
 ```bash
 # Use fine grid (regular grid) instead of H3 (hexagonal)
-.venv/bin/python docs/maritime_graph_postgis_workflow.py --graph-mode fine
+.venv/bin/python scripts/maritime_graph_postgis_workflow.py --graph-mode fine
 
 # Fine grid is faster but less uniform
 # Expected time: ~15-25 minutes (vs 25-35 for H3)
@@ -492,7 +518,7 @@ python docs/maritime_graph_geopackage_workflow.py  # Fails - no GeoPackage data!
 ### Custom Vessel Parameters
 ```bash
 # Different vessel draft (affects routing)
-.venv/bin/python docs/maritime_graph_postgis_workflow.py --vessel-draft 10.5
+.venv/bin/python scripts/maritime_graph_postgis_workflow.py --vessel-draft 10.5
 
 # Override vessel in config file too for persistence
 ```
@@ -500,10 +526,10 @@ python docs/maritime_graph_geopackage_workflow.py  # Fails - no GeoPackage data!
 ### Debug Mode
 ```bash
 # INFO mode (default): Clean logs, ~1MB per file
-.venv/bin/python docs/maritime_graph_postgis_workflow.py --log-level INFO
+.venv/bin/python scripts/maritime_graph_postgis_workflow.py --log-level INFO
 
 # DEBUG mode: Comprehensive debugging, ~5-10MB per file
-.venv/bin/python docs/maritime_graph_postgis_workflow.py --log-level DEBUG
+.venv/bin/python scripts/maritime_graph_postgis_workflow.py --log-level DEBUG
 
 # View detailed log file (automatically rotates at 50MB/500MB)
 tail -f docs/logs/maritime_workflow_*.log
@@ -624,10 +650,10 @@ ProgrammingError: schema "us_enc_all" does not exist
 3. Verify correct backend:
    ```bash
    # If you imported to PostGIS, use PostGIS workflow
-   python docs/maritime_graph_postgis_workflow.py
+   python scripts/maritime_graph_postgis_workflow.py
 
    # If you imported to GeoPackage, use GeoPackage workflow
-   python docs/maritime_graph_geopackage_workflow.py
+   python scripts/maritime_graph_geopackage_workflow.py
    ```
 
 ---
@@ -713,7 +739,7 @@ python -c "from src.nautical_graph_toolkit.utils.port_utils import PortData; p =
 #### Memory Issues During Workflow
 ```bash
 # Use fine grid mode (more memory-efficient)
-python docs/maritime_graph_postgis_workflow.py --graph-mode fine --skip-base
+python scripts/maritime_graph_postgis_workflow.py --graph-mode fine --skip-base
 
 # Or reduce buffer size in config
 # fine_graph.buffer_size_nm: 12.0  # Reduced from 24.0
@@ -731,7 +757,7 @@ Graph creation fails with different results than before update
 2. Base graph can sometimes be reused (check performance)
 3. Re-run full workflow:
    ```bash
-   python docs/maritime_graph_postgis_workflow.py
+   python scripts/maritime_graph_postgis_workflow.py
    ```
 
 ---
@@ -751,10 +777,10 @@ schema "us_enc_all" does not exist
 ```bash
 # Verify which backend you used for import
 # If PostGIS: use PostGIS workflow
-python docs/maritime_graph_postgis_workflow.py
+python scripts/maritime_graph_postgis_workflow.py
 
 # If GeoPackage: use GeoPackage workflow
-python docs/maritime_graph_geopackage_workflow.py
+python scripts/maritime_graph_geopackage_workflow.py
 
 # If unsure, check what exists:
 psql -d ENC_db -c "SELECT schema_name FROM information_schema.schemata LIKE 'us_enc%';"
