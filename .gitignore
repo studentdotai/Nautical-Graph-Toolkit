@@ -49,3 +49,4 @@ data/*
 /bin/
 /etc/
 /share/
+/.idea/
