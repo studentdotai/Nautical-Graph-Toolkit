@@ -2,6 +2,8 @@
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-blue)](https://www.python.org/downloads/)
+[![GitHub Release](https://img.shields.io/github/v/release/studentdotai/Nautical-Graph-Toolkit)](https://github.com/studentdotai/Nautical-Graph-Toolkit/releases)
+[![Changelog](https://img.shields.io/badge/changelog-keep%20a%20changelog-blue)](CHANGELOG.md)
 
 A comprehensive maritime analysis toolkit for converting NOAA S-57 Electronic Navigational Charts (ENC) into analysis-ready geospatial formats, generating intelligent maritime routing networks, and performing advanced vessel route optimization.
 
@@ -535,7 +537,7 @@ AGPL-3.0 means:
 ## 🙏 Acknowledgments
 
 - **NOAA ENC Data**: Electronic Navigational Charts from the National Oceanic and Atmospheric Administration
-- **World Port Index**: Port coordinates and information from NOAA
+- **World Port Index**: Port coordinates and information from the National Geospatial-Intelligence Agency (NGA)
 - **GDAL/OGR**: Open-source geospatial data library
 - **NetworkX**: Network analysis and graph algorithms
 - **PostGIS**: Spatial database extension for PostgreSQL
@@ -562,6 +564,7 @@ For major changes, please open an issue first to discuss proposed changes.
 ## 💬 Support
 
 - **Issues**: Report bugs or request features on [GitHub Issues](https://github.com/studentdotai/Nautical-Graph-Toolkit/issues)
+- **Changelog**: See [CHANGELOG.md](CHANGELOG.md) for release notes and version history
 - **Documentation**: See [docs/](docs/) for detailed guides
 - **Notebooks**: Check [docs/notebooks/](docs/notebooks/) for examples
 
