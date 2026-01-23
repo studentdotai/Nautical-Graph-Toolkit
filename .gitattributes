@@ -2,3 +2,8 @@
 * text=auto eol=lf
 *.py text eol=lf
 *.md text eol=lf
+
+# Exclude development tools from git archive (GitHub releases)
+.claude export-ignore
+dev export-ignore
+CLAUDE.md export-ignore

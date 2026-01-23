@@ -25,6 +25,9 @@ wheels/
 .installed.cfg
 *.egg
 
+# Backup files from old workflow migrations
+*.bak
+
 # Virtual Environments
 .env
 venv/
@@ -51,3 +54,39 @@ data/*
 /share/
 /.idea/
 /pyvenv.cfg
+
+# Test outputs and artifacts
+tests/core__real_data/test_output/
+*.gpkg
+*.sqlite
+test_output/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ============================================
+# Developer Personal State (Dev Environment)
+# ============================================
+# These files track individual developer progress and should not be shared
+# Project rules and templates remain tracked for consistency
+
+# Personal progress tracking (individual work logs)
+dev/progress/
+
+# Personal task tracking (active and completed tasks)
+dev/tasks/active/
+dev/tasks/completed/
+dev/tasks/TASK_INDEX.md
+
+# Personal todo lists (individual planning)
+dev/todo/TODO.md
+dev/todo/BACKLOG.md
+dev/todo/PRIORITIES.md
+
+# Backup directories created during migration
+dev_backup_*/
+
+# Exception: Keep templates and rules tracked (shared project standards)
+!dev/templates/
+!dev/rules/
+!dev/*.md

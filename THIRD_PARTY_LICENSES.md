@@ -9,7 +9,7 @@ This document acknowledges the open-source software used in the Nautical Graph T
 
 The Nautical Graph Toolkit is built on a foundation of excellent open-source libraries. All third-party dependencies are compatible with the AGPL v3 license under which this project is released. This document provides attribution and license information for all major dependencies.
 
-**Note:** Version numbers reflect the constraints specified in `pyproject.toml`. Exact pinned versions can be found in `uv.lock`.
+**Note:** Version numbers reflect constraints from requirements.in. Exact pinned versions are in requirements.txt.
 
 ---
 
@@ -309,7 +309,7 @@ The Nautical Graph Toolkit is released under the **GNU Affero General Public Lic
 
 ## Complete Dependency Reference
 
-### Direct Dependencies (from pyproject.toml)
+### Direct Dependencies (from requirements.in)
 
 | Package | Version | License | Purpose |
 |---|---|---|---|
@@ -372,11 +372,11 @@ Additional packages automatically installed as dependencies of the above:
 
 When adding or updating dependencies:
 
-1. Update `pyproject.toml` with the new dependency and version constraint
-2. Run `uv sync` to update `uv.lock` with pinned versions
+1. Update `requirements.in` with the new dependency and version constraint
+2. Run `uv pip compile requirements.in -o requirements.txt` to update pinned versions
 3. Update this file with:
    - New package entries under the appropriate license section
-   - Version constraints from `pyproject.toml`
+   - Version constraints from `requirements.in`
    - Purpose and usage in the project
    - Copyright and homepage information
 

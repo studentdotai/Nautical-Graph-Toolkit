@@ -33,7 +33,7 @@ python scripts/import_s57.py --mode advanced --input-path data/ENC_SF_LA/ENC_ROO
 
 # Convert to PostGIS
 python scripts/import_s57.py --mode advanced --input-path data/ENC_SF_LA/ENC_ROOT \
-  --output-format postgis --schema us_enc_all --verify
+  --output-format postgis --schema enc_west --verify
 ```
 
 **Related Guide:** See `docs/WORKFLOW_S57_IMPORT_GUIDE.md` for comprehensive documentation.
@@ -116,7 +116,7 @@ python scripts/maritime_graph_geopackage_workflow.py --log-level DEBUG
 
 ### Scenario 2: "I have S-57 data in PostGIS and want complete maritime routing workflow"
 → **Use `maritime_graph_postgis_workflow.py`**
-- Assumes S-57 data already loaded in PostGIS schema (us_enc_all or custom)
+- Assumes S-57 data already loaded in PostGIS schema (enc_west or custom)
 - Handles all steps: graph creation, weighting, routing
 - Best for production and large datasets
 - Example: `python scripts/maritime_graph_postgis_workflow.py`
@@ -132,7 +132,7 @@ python scripts/maritime_graph_geopackage_workflow.py --log-level DEBUG
 → **Use `import_s57.py` with update mode**
 - Updates existing database/GeoPackage incrementally
 - Transactional (all-or-nothing)
-- Example: `python scripts/import_s57.py --mode update --update-source data/ENC_ROOT_UPDATE --output-format postgis --schema us_enc_all --force-update`
+- Example: `python scripts/import_s57.py --mode update --update-source data/ENC_ROOT_UPDATE --output-format postgis --schema enc_west --force-update`
 
 ---
 
@@ -152,7 +152,7 @@ python scripts/maritime_graph_geopackage_workflow.py --dry-run
 ```bash
 # 1. Convert all ENC data to PostGIS
 python scripts/import_s57.py --mode advanced --input-path data/ENC_SF_LA/ENC_ROOT \
-  --output-format postgis --schema us_enc_all --verify --verbose
+  --output-format postgis --schema enc_west --verify --verbose
 
 # 2. Run complete workflow
 python scripts/maritime_graph_postgis_workflow.py
@@ -205,14 +205,16 @@ python scripts/import_s57.py --mode advanced --input-path data/ENC_ROOT \
 
 ### Prerequisites
 - Python 3.11+
-- GDAL 3.11.3 (pinned version)
-- Dependencies: `pip install -e .` or `uv sync`
-- For PostGIS: PostgreSQL with PostGIS extension + .env credentials
+- GDAL (pinned version - see [SETUP.md](../docs/SETUP.md) for exact version)
+- Dependencies: `pip install -e .` or Conda+uv setup
+- For PostGIS: PostgreSQL 16+ with PostGIS extension + .env credentials
 
 ### Basic Setup
 ```bash
 # Install project and dependencies
-uv sync
+mamba env update -f environment.yml --prune
+uv pip compile requirements.in -o requirements.txt
+uv pip install --no-deps -r requirements.txt
 
 # Set database credentials (if using PostGIS)
 cp .env.example .env
@@ -232,11 +234,13 @@ cp .env.example .env
 - `--mode` - Conversion mode: base, advanced, update
 - `--output-format` - Backend: postgis, gpkg, spatialite
 - `--verify` - Run post-conversion verification
+- `--force-update` - Force clean install instead of incremental update
 - `--benchmark-output` - Export performance metrics to CSV
 - `--schema` - Custom schema/database name
 
 ### Workflow Scripts Specific:
 - `--config` - Custom configuration YAML file
+- `--data-dir` - Override ENC data directory (default: data/)
 - `--skip-base` / `--skip-fine` / `--skip-weighting` / `--skip-pathfinding` - Skip steps
 - `--graph-mode` - Graph type: fine (grid) or h3 (hexagonal)
 - `--vessel-draft` - Override vessel draft in meters
@@ -276,7 +280,7 @@ For comprehensive guides, see:
 
 ---
 
-**Last Updated:** 2025-10-30
+**Last Updated:** 2026-01-20
 **Scripts Version:** Production-ready (tested)
 **Python:** 3.11+
-**GDAL:** 3.11.3
+**GDAL:** See [SETUP.md](../docs/SETUP.md) for exact pinned version

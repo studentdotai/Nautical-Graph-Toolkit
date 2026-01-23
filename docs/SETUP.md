@@ -1,10 +1,10 @@
-# Maritime Module Setup Guide
+# Nautical Graph Toolkit Setup Guide
 
-This guide explains how to set up S-57 Electronic Navigational Chart (ENC) data for use with the Maritime Module notebooks.
+This guide explains how to set up S-57 Electronic Navigational Chart (ENC) data for use with the Nautical Graph Toolkit notebooks.
 
 ## Overview
 
-The Maritime Module supports three backend options for storing and querying S-57 ENC data:
+The Nautical Graph Toolkit (formerly Maritime Module) supports three backend options for storing and querying S-57 ENC data:
 
 1. **PostGIS** - PostgreSQL database with spatial extensions (recommended for large datasets and server deployment)
 2. **GeoPackage** - Portable single-file database format (.gpkg)
@@ -34,11 +34,11 @@ The Maritime Module supports three backend options for storing and querying S-57
 
 ### Required Software
 
-- Python 3.8 or higher
-- GDAL 3.11.3 (exact version pinned)
+- Python 3.11 or higher
+- GDAL 3.10.3 (exact version pinned)
 - **SQLite with RTREE support** (see "SQLite RTREE Requirement" below)
 - For PostGIS backend:
-  - PostgreSQL 12+ with PostGIS extension
+  - PostgreSQL 16+ with PostGIS extension
   - psycopg2 Python package
 
 ### SQLite RTREE Requirement
@@ -133,7 +133,7 @@ pip install pysqlite3-binary
    ```
 
 **Required Schema Structure:**
-- Main schema: `us_enc_all` (or your custom schema name)
+- Main schema: `enc_west` (or your custom schema name)
 - Required layers: See "Required Layers" section below
 
 ---
@@ -154,7 +154,7 @@ pip install pysqlite3-binary
 - Cross-platform compatibility (Windows, Linux, macOS)
 
 **Prerequisites:**
-- GDAL 3.11.3 with GeoPackage driver
+- GDAL 3.10.3 with GeoPackage driver
 - Write permissions to output directory
 - Sufficient disk space (estimate: ~1.5-2x raw ENC file size)
 - pyogrio or fiona Python package for I/O
@@ -172,7 +172,7 @@ pip install pysqlite3-binary
    ```
 
 **File Location:**
-- Default: `docs/notebooks/output/us_enc_all.gpkg`
+- Default: `data/enc_west.gpkg`
 - Customizable via notebook configuration
 
 ---
@@ -193,7 +193,7 @@ pip install pysqlite3-binary
 - SQL spatial query support
 
 **Prerequisites:**
-- GDAL 3.11.3 with SQLite/SpatiaLite driver
+- GDAL 3.10.3 with SQLite/SpatiaLite driver
 - Write permissions to output directory
 - Sufficient disk space (estimate: ~1.5-2x raw ENC file size)
 - pyspatialite or sqlite3 Python package
@@ -212,7 +212,7 @@ pip install pysqlite3-binary
    ```
 
 **File Location:**
-- Default: `docs/notebooks/output/us_enc_all.sqlite`
+- Default: `data/enc_west.sqlite`
 - Customizable via notebook configuration
 
 ---
@@ -275,10 +275,9 @@ After importing S-57 data, your backend must contain the following layers:
    └── ...
    ```
 
-2. **Run the appropriate import notebook**
-   - For PostGIS: `docs/notebooks/import_s57_to_postgis.ipynb`
-   - For GeoPackage: `docs/notebooks/import_s57_to_geopackage.ipynb`
-   - For SpatiaLite: `docs/notebooks/import_s57_to_spatialite.ipynb`
+2. **Run the import notebook**
+   - Run `docs/notebooks/import_s57.ipynb` for any backend (PostGIS, GeoPackage, or SpatiaLite)
+   - Configure the notebook to select your desired backend
 
 3. **Verify the import**
    ```python
@@ -324,7 +323,7 @@ After setup, verify your backend contains the required data:
 
 ```bash
 # PostGIS Configuration
-DB_NAME=ENC_db
+DB_NAME=enc_db
 DB_USER=your_username
 DB_PASSWORD=your_password
 DB_HOST=localhost
@@ -360,8 +359,8 @@ The graph configuration file defines which layers to use for navigation:
 ### Fine Graph Creation Notebooks
 
 **Required for:**
-- `graph_fine_GPKG_v2.ipynb`
-- `graph_fine_PostGIS_v2.ipynb` (future)
+- `graph_fine_GeoPackage_v2.ipynb`
+- `graph_fine_PostGIS_v2.ipynb`
 
 **Data Requirements:**
 - All basic graph requirements

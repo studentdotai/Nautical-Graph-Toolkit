@@ -335,8 +335,11 @@ class MaritimeWorkflow:
             }
 
             self.db_params = db_params
-            self.factory = ENCDataFactory(source=db_params, schema="us_enc_all")
+            # Use enc_schema from config file (defaults to 'enc_west' if not specified)
+            enc_schema = self.config.get('database.enc_schema', 'enc_west')
+            self.factory = ENCDataFactory(source=db_params, schema=enc_schema)
             self.logger(f"Database: {db_params['dbname']} @ {db_params['host']}:{db_params['port']}")
+            self.logger(f"ENC schema: {enc_schema}")
         except Exception as e:
             self.logger_error(f"Failed to initialize database: {e}")
             raise
@@ -735,11 +738,12 @@ class MaritimeWorkflow:
                 feature_layers = weights_manager.get_feature_layers_from_classifier()
                 enrichment_cfg = cfg.get('enrichment', {})
 
+                enc_schema = self.config.get('database.enc_schema', 'enc_west')
                 weights_manager.enrich_edges_with_features_postgis(
                     enc_names=enc_list,
                     schema_name=self.config.get('database.graph_schema', 'graph'),
                     graph_name=target_graph,
-                    enc_schema=self.config.get('database.enc_schema', 'us_enc_all'),
+                    enc_schema=enc_schema,
                     feature_layers=feature_layers,
                     is_directed=True,
                     include_sources=enrichment_cfg.get('include_sources', False),
@@ -752,11 +756,12 @@ class MaritimeWorkflow:
                 self.logger("Applying static weights...")
                 config = weights_manager._load_config()
 
+                enc_schema = self.config.get('database.enc_schema', 'enc_west')
                 weights_manager.apply_static_weights_postgis(
                     graph_name=target_graph,
                     enc_names=enc_list,
                     schema_name=self.config.get('database.graph_schema', 'graph'),
-                    enc_schema=self.config.get('database.enc_schema', 'us_enc_all'),
+                    enc_schema=enc_schema,
                     static_layers=config['weight_settings']['static_layers'],
                     usage_bands=cfg.get('static_weights_usage_bands', [3, 4, 5])
                 )

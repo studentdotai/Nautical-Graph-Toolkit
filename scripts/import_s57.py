@@ -44,8 +44,7 @@ import pandas as pd
 
 # Add src to path for local development
 project_root = Path(__file__).parent.parent
-if str(project_root / "src") not in sys.path:
-    sys.path.insert(0, str(project_root / "src"))
+
 
 # Project imports
 from nautical_graph_toolkit.core.s57_data import (
@@ -115,6 +114,15 @@ def validate_environment(logger: logging.Logger) -> bool:
     try:
         from osgeo import gdal
         logger.info(f"✓ GDAL version: {gdal.__version__} ({gdal.VersionInfo('RELEASE_NAME')})")
+        
+        # List drivers if verbose logging is enabled
+        if logger.isEnabledFor(logging.DEBUG):
+            driver_count = gdal.GetDriverCount()
+            logger.debug(f"  Installed Drivers ({driver_count}):")
+            for i in range(driver_count):
+                driver = gdal.GetDriver(i)
+                logger.debug(f"    - {driver.ShortName}: {driver.LongName}")
+                
     except ImportError:
         logger.error("✗ GDAL not available - S-57 processing requires GDAL")
         return False

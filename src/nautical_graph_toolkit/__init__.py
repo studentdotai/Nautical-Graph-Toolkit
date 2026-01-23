@@ -8,20 +8,17 @@ route optimization.
 
 Installation
 ------------
-Install via pip from GitHub:
-    pip install git+https://github.com/studentdotai/Nautical-Graph-Toolkit.git
+⚠️ This package requires Conda/Mamba for installation. Pure pip installation is not supported.
 
-Or from local directory:
+Install from local directory:
     pip install -e .
+
+For complete installation instructions, see INSTALL.md in the repository root.
 
 GDAL Configuration
 ------------------
-This package requires GDAL 3.11.3. Install via:
-  - pip (automatic wheel): gdal==3.11.3
-  - System package manager (fallback):
-    * Ubuntu/Debian: apt-get install gdal-bin python3-gdal
-    * macOS: brew install gdal
-    * Windows: Use OSGeo4W installer
+This package requires GDAL 3.10.3 (installed via Conda). Install via:
+  - Conda (recommended): mamba env create -f environment.yml
 
 See https://github.com/studentdotai/Nautical-Graph-Toolkit for detailed guides.
 """
@@ -42,13 +39,14 @@ _all_exports = [
 
 # Try to import core converters
 try:
-    from nautical_graph_toolkit.core.s57_converter import (
-        S57Converter,
+    from nautical_graph_toolkit.core.s57_data import (
         S57Base,
+        S57AdvancedConfig,
         S57Advanced,
         S57Updater,
+        ENCDataFactory,
     )
-    _all_exports.extend(["S57Converter", "S57Base", "S57Advanced", "S57Updater"])
+    _all_exports.extend(["S57Base", "S57AdvancedConfig", "S57Advanced", "S57Updater", "ENCDataFactory"])
 except (ImportError, SyntaxError):
     pass
 
