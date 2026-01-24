@@ -213,8 +213,10 @@ python scripts/import_s57.py --mode advanced --input-path data/ENC_ROOT \
 ```bash
 # Install project and dependencies
 mamba env update -f environment.yml --prune
-uv pip compile requirements.in -o requirements.txt
+pip install uv
+uv pip compile requirements.in -o requirements.txt  # Optional: skip to use tested snapshot
 uv pip install --no-deps -r requirements.txt
+uv pip install -e .
 
 # Set database credentials (if using PostGIS)
 cp .env.example .env

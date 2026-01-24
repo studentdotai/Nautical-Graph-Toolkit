@@ -65,7 +65,10 @@ This toolkit transforms raw S-57 chart data into production-ready geospatial dat
 
 **Prerequisites**:
 - Miniforge (includes mamba) or Conda with mamba installed
+  - Download: https://github.com/conda-forge/miniforge/releases
 - Python 3.11+ (automatically installed via environment.yml)
+- Git installed
+  - Windows: https://git-scm.com/download/win
 
 #### Clone and Install
 
@@ -83,7 +86,11 @@ mamba activate nautical
 
 **Step 3: Compile and install Python dependencies**
 ```bash
-# Compile Python dependencies (generates requirements.txt)
+# Install uv (fast Python package manager)
+pip install uv
+
+# Compile Python dependencies (optional - skip to use tested snapshot)
+# Run this only if you need updated dependency versions
 uv pip compile requirements.in -o requirements.txt
 
 # Safety check (verify no Conda packages being overwritten)
@@ -91,6 +98,9 @@ uv pip install --no-deps -r requirements.txt --dry-run
 
 # Install Python packages
 uv pip install --no-deps -r requirements.txt
+
+# Install Nautical Graph Toolkit in editable mode
+uv pip install -e .
 ```
 
 **Step 4: Verify installation**
@@ -117,16 +127,28 @@ If you encounter GDAL issues, see [INSTALL.md](INSTALL.md) for troubleshooting.
 
 #### PostGIS Database Setup (Optional, for production workflows)
 
-For large-scale deployments (1000+ ENCs), PostGIS provides better performance. See [INSTALL.md Section 4](INSTALL.md#4-docker-postgis-setup) for complete Docker Compose configuration.
+For large-scale deployments (1000+ ENCs), PostGIS provides better performance.
 
-**Quick start with Docker:**
+**Choose your platform:**
 ```bash
-# Create docker-compose.yml (see INSTALL.md for full optimized config)
+# Download the appropriate docker-compose file
+# Linux
+cp docker-compose.linux.yml docker-compose.yml
+
+# macOS ARM (M1/M4)
+cp docker-compose.macos-arm.yml docker-compose.yml
+
+# Windows
+cp docker-compose.windows.yml docker-compose.yml
+
+# Start database
 docker-compose up -d
 
 # Verify connection
 python -c "from sqlalchemy import create_engine; engine = create_engine('postgresql://postgres:postgres@localhost:5433/enc_db'); print('✓ PostGIS connected')"
 ```
+
+See [INSTALL.md Section 4](INSTALL.md#4-docker-postgis-setup) for complete platform-specific configuration and troubleshooting.
 
 ### 5-Minute Example: Build a Route Graph
 
@@ -448,7 +470,7 @@ noaa.download_updates(updates, destination="/data/encs")
 - **Geospatial**: GeoPandas 1.1+, Shapely 2.0+, Fiona 1.10+, GeoAlchemy2 0.18+
 - **Data Processing**: Pandas 2.3+, ruamel.yaml 0.18+
 - **Routing & Graphs**: NetworkX 3.5+, H3 4.3+ (hexagonal grids)
-- **Database**: SQLAlchemy 2.0+, psycopg2-binary 2.9+, pysqlite3-binary 0.5+
+- **Database**: SQLAlchemy 2.0+, psycopg2-binary 2.9+, Conda sqlite (RTREE support)
 - **Data Validation**: Pydantic 2.11+
 - **Visualization**: Plotly 6.3+, IPykernel 6.30+ (Jupyter support)
 - **Web Scraping**: BeautifulSoup4 4.13+, requests 2.32+

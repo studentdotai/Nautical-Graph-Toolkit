@@ -40,14 +40,21 @@ mamba env create -f environment.yml
 # 3. Activate environment
 mamba activate nautical
 
-# 4. Compile Python dependencies
+# 4. Install uv (fast Python package manager)
+pip install uv
+
+# 5. Compile Python dependencies (optional - skip to use tested snapshot)
+#    Run this step only if you need updated dependency versions
 uv pip compile requirements.in -o requirements.txt
 
-# 5. Safety check (verify no Conda packages being overwritten)
+# 6. Safety check (verify no Conda packages being overwritten)
 uv pip install --no-deps -r requirements.txt --dry-run
 
-# 6. Install Python packages
+# 7. Install Python packages
 uv pip install --no-deps -r requirements.txt
+
+# 8. Install Nautical Graph Toolkit in editable mode
+uv pip install -e .
 ```
 
 ### Verify Installation
@@ -79,9 +86,10 @@ For users who want the full PostGIS workflow (database-based analysis, better pe
 ### Installation Steps
 
 ```bash
-# 1-6: Same as Quick Install above (create environment, install packages)
+# 1-8: Same as Quick Install above (create environment, install packages)
+# Note: Step 5 (compile) is optional - skip to use tested requirements.txt snapshot
 
-# 7. Set up Docker PostGIS (see Section 4 for detailed configuration)
+# 9. Set up Docker PostGIS (see Section 4 for detailed configuration)
 docker-compose up -d
 
 # 8. Verify PostGIS connection
@@ -136,56 +144,39 @@ conda install mamba -n base -c conda-forge
 
 ## 4. Docker PostGIS Setup
 
-### Why Docker PostGIS?
+### Platform-Specific Docker Compose Files
 
-- **Reproducible**: Consistent geospatial database across systems
-- **No system pollution**: Isolated from local installations
-- **Pre-configured**: Optimized for 20GB+ spatial datasets
-- **Port isolation**: Uses port 5433 to avoid conflicts with local PostgreSQL
+This project provides platform-specific docker-compose configurations for optimal performance:
 
-### Configuration
+| Platform | File | Docker Image | Notes |
+|----------|------|--------------|-------|
+| **Linux** | `docker-compose.linux.yml` | `postgis/postgis:16-3.4` | Standard official image |
+| **macOS ARM (M1/M4)** | `docker-compose.macos-arm.yml` | `kartoza/postgis:16-3.4--v2024.03.17` | ARM-native, no Rosetta |
+| **Windows** | `docker-compose.windows.yml` | `postgis/postgis:16-3.4` | Standard official image |
 
-Create `docker-compose.yml` in project root:
+### Quick Start
 
-```yaml
-version: '3.8'
+1. **Download the appropriate docker-compose file for your platform:**
+   ```bash
+   # Linux
+   cp docker-compose.linux.yml docker-compose.yml
 
-services:
-  db:
-    image: postgis/postgis:16-3.4
-    container_name: postgis_nautical
-    restart: always
-    # ⚡ CRITICAL: Increases shared memory to prevent crashes during heavy spatial joins
-    shm_size: 4gb
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: enc_db
-    ports:
-      - "5433:5432"  # Maps host port 5433 to container port 5432
-    volumes:
-      - postgis_data:/var/lib/postgresql/data
+   # macOS ARM (M1/M4)
+   cp docker-compose.macos-arm.yml docker-compose.yml
 
-    # 🚀 OPTIMIZATION: Overrides default config for 20GB datasets on ~16GB RAM systems
-    command: >
-      postgres
-      -c shared_buffers=4GB
-      -c work_mem=128MB
-      -c maintenance_work_mem=1GB
-      -c effective_cache_size=12GB
-      -c random_page_cost=1.1
-      -c max_worker_processes=8
-      -c max_parallel_workers_per_gather=4
+   # Windows
+   cp docker-compose.windows.yml docker-compose.yml
+   ```
 
-volumes:
-  postgis_data:
-```
+2. **Start the database:**
+   ```bash
+   docker-compose up -d
+   ```
 
-### Start Database
-
-```bash
-docker-compose up -d
-```
+3. **Verify connection:**
+   ```bash
+   docker exec -it postgis_nautical psql -U postgres -d enc_db -c "SELECT PostGIS_Version();"
+   ```
 
 ### Connection Details
 
@@ -196,6 +187,24 @@ Use these credentials in DBeaver, QGIS, or Python code:
 - **Database**: `enc_db`
 - **User**: `postgres`
 - **Password**: `postgres`
+
+### Platform-Specific Notes
+
+#### macOS ARM (M1/M4)
+- **Image**: Uses Kartoza's ARM-native PostGIS image (no Rosetta emulation required)
+- **Platform directive**: Prevents Docker from using x86_64 emulation
+- **Performance**: All parameters set via environment variables (Kartoza requirement)
+- **Connection**: Works seamlessly with port 5433
+
+#### Linux
+- **Image**: Official PostGIS image from postgis/postgis
+- **Performance**: Command-line tuning for optimal spatial query performance
+- **Compatibility**: Tested on Linux AMD64 systems
+
+#### Windows
+- **Image**: Official PostGIS image with AMD64 platform targeting
+- **Docker Desktop**: Requires Docker Desktop for Windows with WSL2 backend
+- **Compatibility**: Tested on Windows 11
 
 ### Why These Optimizations?
 
@@ -318,23 +327,44 @@ mamba env create -f environment.yml
 
 ### Issue: "no such module: rtree" in SQLite operations
 
-**Cause:** Missing `pysqlite3-binary` or wrong SQLite module loaded.
+**Cause:** Conda's `sqlite` package is not installed or environment is not properly configured.
 
 **Diagnosis:**
 ```bash
-python -c "import pysqlite3; print(pysqlite3.sqlite_version)"
+# Check if SQLite is available from Conda
+conda list | grep sqlite
+
+# Verify rtree support in Python
+python -c "import sqlite3; conn = sqlite3.connect(':memory:'); conn.execute('CREATE VIRTUAL TABLE test USING rtree(id, minx, maxx)'); print('✓ RTREE support available')"
 ```
 
 **Solution:**
 ```bash
-# Reinstall pysqlite3-binary
-uv pip install --no-deps --force-reinstall pysqlite3-binary>=0.5.4
+# Reinstall Conda environment to ensure sqlite is included
+mamba env update -f environment.yml --prune
+
+# Reactivate environment
+mamba activate nautical
 ```
 
+**Why this happens:**
+- GeoPackage and SpatiaLite backends require SQLite with RTREE support
+- Conda's `sqlite` package provides RTREE-enabled SQLite on all platforms (Linux, macOS ARM/Intel, Windows)
+- The `sqlite` package is now included in `environment.yml`
+
 **Verification:**
-```python
-import sys
-sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')  # Should not error
+```bash
+# Verify sqlite is installed from Conda
+mamba list | grep sqlite
+# Expected: sqlite 3.x.x
+
+# Verify rtree support works
+python -c "
+import sqlite3
+conn = sqlite3.connect(':memory:')
+conn.execute('CREATE VIRTUAL TABLE test USING rtree(id, minx, maxx, miny, maxy)')
+print('✓ RTREE support is available')
+"
 ```
 
 ---
@@ -417,9 +447,9 @@ python -c "import nautical_graph_toolkit; print(f'✓ Nautical Graph Toolkit {na
 python -c "from osgeo import gdal; driver = gdal.GetDriverByName('S57'); print('✓ S-57 driver available' if driver else '✗ S-57 driver missing')"
 # Expected: ✓ S-57 driver available
 
-# Test 5: pysqlite3 with rtree support
-python -c "import pysqlite3; print(f'✓ pysqlite3 {pysqlite3.sqlite_version}')"
-# Expected: ✓ pysqlite3 3.x.x
+# Test 5: SQLite with RTREE support
+python -c "import sqlite3; conn = sqlite3.connect(':memory:'); conn.execute('CREATE VIRTUAL TABLE test USING rtree(id, minx, maxx)'); print('✓ SQLite with RTREE support available')"
+# Expected: ✓ SQLite with RTREE support available
 ```
 
 ### Detailed Version Check
@@ -445,15 +475,15 @@ for driver_name in drivers:
     status = "✓" if driver else "✗"
     print(f"{status} {driver_name} driver available")
 
-# Check pysqlite3 rtree support
+# Check SQLite rtree support
 try:
-    import pysqlite3
-    conn = pysqlite3.connect(':memory:')
+    import sqlite3
+    conn = sqlite3.connect(':memory:')
     cursor = conn.cursor()
-    cursor.execute("SELECT load_extension('mod_spatialite')")
-    print("✓ pysqlite3 with rtree support")
+    cursor.execute("CREATE VIRTUAL TABLE test USING rtree(id, minx, maxx)")
+    print("✓ SQLite with RTREE support")
 except Exception as e:
-    print(f"⚠ pysqlite3 issue: {e}")
+    print(f"⚠ SQLite RTREE issue: {e}")
 finally:
     if 'conn' in locals():
         conn.close()

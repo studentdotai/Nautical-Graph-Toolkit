@@ -46,20 +46,17 @@ The Nautical Graph Toolkit (formerly Maritime Module) supports three backend opt
 **Critical:** GeoPackage and SpatiaLite backends require SQLite with RTREE (R-tree spatial indexing) support for spatial queries.
 
 **Automatic Solution:**
-This project includes `pysqlite3-binary` as a dependency, which provides SQLite with RTREE support enabled. No additional configuration is needed.
+This project includes `sqlite` in `environment.yml`, which provides SQLite with RTREE support enabled on all platforms.
 
 **How it works:**
-- The code automatically uses `pysqlite3` (with RTREE) if available
-- Falls back to system `sqlite3` if `pysqlite3` is not installed
-- `pysqlite3-binary` is included in `pyproject.toml` dependencies
+- Conda's `sqlite` package provides RTREE-enabled SQLite library
+- Python's built-in `sqlite3` module uses the Conda SQLite library when the Conda environment is activated
+- The `sqlite` package is included in `environment.yml` for cross-platform compatibility
 
 **Verification:**
 To verify RTREE support is available:
 ```python
-try:
-    import pysqlite3 as sqlite3
-except ImportError:
-    import sqlite3
+import sqlite3
 
 conn = sqlite3.connect(':memory:')
 conn.execute('CREATE VIRTUAL TABLE test USING rtree(id, minx, maxx, miny, maxy)')
@@ -67,14 +64,20 @@ print("✓ RTREE support is available")
 conn.close()
 ```
 
-**Manual Installation (if needed):**
+**If RTREE is not available:**
 ```bash
-# Using uv (recommended)
-uv add pysqlite3-binary
-
-# Using pip
-pip install pysqlite3-binary
+# Reinstall Conda environment to ensure sqlite is included
+mamba env update -f environment.yml --prune
+mamba activate nautical
 ```
+
+**Platform Compatibility:**
+- **Linux**: ✅ Tested (AMD64)
+- **macOS ARM (M1/M4)**: ✅ Tested
+- **macOS Intel**: ⏸️ Expected to work (not tested, same as Linux AMD64)
+- **Windows 11**: ✅ Tested
+
+**Note:** `pysqlite3-binary` package has compatibility issues on macOS ARM and Windows. Conda's `sqlite` package is used instead for consistent cross-platform support.
 
 **Why RTREE is required:**
 - SpatiaLite uses RTREE for spatial indexing (10-100x performance improvement)
@@ -112,25 +115,39 @@ pip install pysqlite3-binary
 
 **Setup Steps:**
 
-1. **Install PostgreSQL and PostGIS**
+1. **Select Platform-Specific Docker Compose Configuration**
    ```bash
-   # Installation instructions will be added from import_s57 notebook
+   # Linux
+   cp docker-compose.linux.yml docker-compose.yml
+
+   # macOS ARM (M1/M4)
+   cp docker-compose.macos-arm.yml docker-compose.yml
+
+   # Windows
+   cp docker-compose.windows.yml docker-compose.yml
    ```
 
-2. **Create Database**
+2. **Start Docker PostGIS Database**
    ```bash
-   # Database creation commands will be added
+   docker-compose up -d
    ```
 
-3. **Configure Environment Variables**
+3. **Verify Connection**
+   ```bash
+   docker exec -it postgis_nautical psql -U postgres -d enc_db -c "SELECT PostGIS_Version();"
+   ```
+
+4. **Configure Environment Variables**
    ```bash
    # .env file configuration will be added
    ```
 
-4. **Import S-57 Data**
+5. **Import S-57 Data**
    ```bash
    # Import process will be documented from import_s57 notebook
    ```
+
+See [INSTALL.md Section 4](../INSTALL.md#4-docker-postgis-setup) for complete platform-specific configuration and troubleshooting.
 
 **Required Schema Structure:**
 - Main schema: `enc_west` (or your custom schema name)

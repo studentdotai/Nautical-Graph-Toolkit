@@ -47,8 +47,10 @@ def test_environment():
     """
     Module-scoped fixture that sets up test data sources once for all tests.
 
-    Creates PostGIS, GeoPackage, and SpatiaLite data sources from real S-57 files,
+    Creates PostGIS (if configured), GeoPackage, and SpatiaLite data sources from real S-57 files,
     configures test layers based on environment variables, and cleans up after tests.
+
+    PostGIS tests are skipped if database environment variables are not set.
 
     Yields:
         dict: Test environment configuration with paths, database params, and factories
@@ -56,6 +58,7 @@ def test_environment():
     Environment Variables:
     - TEST_LAYERS: Comma-separated list of layers to test (default: 'lndmrk')
     - TEST_ALL_LAYERS: Set to 'true' to test all available layers
+    - DB_NAME, DB_USER, DB_PASSWORD, DB_HOST, DB_PORT: Required for PostGIS tests
     """
     print("\n--- Setting up test environment for ENCDataFactory ---")
 
@@ -64,7 +67,7 @@ def test_environment():
     output_dir = project_root / 'tests' / 'core__real_data' / 'test_output' / 'temp_factory_output'
     output_dir.mkdir(exist_ok=True)
 
-    # PostGIS setup
+    # PostGIS setup - check if configured
     db_params = {
         'dbname': os.getenv('DB_NAME'),
         'user': os.getenv('DB_USER'),
@@ -74,6 +77,9 @@ def test_environment():
     }
     pg_schema = 'factory_test_schema'
 
+    # Check if PostGIS is properly configured
+    has_postgis = all(db_params.values()) and db_params['port'].isdigit()
+
     # File-based paths
     gpkg_path = output_dir / 'factory_test.gpkg'
     sqlite_path = output_dir / 'factory_test.sqlite'
@@ -81,17 +87,21 @@ def test_environment():
     # --- Create the data sources using S57Advanced ---
     config = S57AdvancedConfig(enable_debug_logging=False)
 
-    # 1. Create PostGIS source
-    print("Creating PostGIS data source...")
-    pg_converter = S57Advanced(
-        input_path=s57_data_dir,
-        output_dest=db_params,
-        output_format='postgis',
-        overwrite=True,
-        schema=pg_schema,
-        config=config
-    )
-    pg_converter.convert_to_layers()
+    # 1. Create PostGIS source (only if configured)
+    factory_pg = None
+    if has_postgis:
+        print("Creating PostGIS data source...")
+        pg_converter = S57Advanced(
+            input_path=s57_data_dir,
+            output_dest=db_params,
+            output_format='postgis',
+            overwrite=True,
+            schema=pg_schema,
+            config=config
+        )
+        pg_converter.convert_to_layers()
+    else:
+        print("PostGIS not configured - skipping PostGIS tests")
 
     # 2. Create GeoPackage source
     print("Creating GeoPackage data source...")
@@ -119,9 +129,12 @@ def test_environment():
     test_layers = _configure_test_layers(gpkg_path)
 
     # Initialize factories
-    factory_pg = ENCDataFactory(source=db_params, schema=pg_schema)
     factory_gpkg = ENCDataFactory(source=str(gpkg_path))
     factory_sqlite = ENCDataFactory(source=str(sqlite_path))
+
+    # Initialize PostGIS factory only if PostGIS was configured
+    if has_postgis:
+        factory_pg = ENCDataFactory(source=db_params, schema=pg_schema)
 
     print("--- Test setup complete ---")
 
@@ -136,7 +149,8 @@ def test_environment():
         'test_layers': test_layers,
         'factory_pg': factory_pg,
         'factory_gpkg': factory_gpkg,
-        'factory_sqlite': factory_sqlite
+        'factory_sqlite': factory_sqlite,
+        'has_postgis': has_postgis
     }
 
     yield env
@@ -148,14 +162,15 @@ def test_environment():
         shutil.rmtree(output_dir)
         print(f"Removed temporary directory: {output_dir}")
 
-    # Clean up PostGIS schema
-    try:
-        pg_connector = PostGISConnector(db_params)
-        pg_connector.connect()
-        pg_connector.drop_schema(pg_schema)
-        print(f"Dropped PostGIS schema: {pg_schema}")
-    except Exception as e:
-        print(f"Could not clean up PostGIS schema '{pg_schema}': {e}")
+    # Clean up PostGIS schema (only if PostGIS was configured)
+    if has_postgis:
+        try:
+            pg_connector = PostGISConnector(db_params)
+            pg_connector.connect()
+            pg_connector.drop_schema(pg_schema)
+            print(f"Dropped PostGIS schema: {pg_schema}")
+        except Exception as e:
+            print(f"Could not clean up PostGIS schema '{pg_schema}': {e}")
 
 
 def _configure_test_layers(gpkg_path):
@@ -266,11 +281,22 @@ def test_unanimous_output_across_formats(test_environment):
 def _test_single_layer(layer_name, factory_pg, factory_gpkg, factory_sqlite, test_results, all_layers):
     """
     Test a single layer across all data sources for consistency.
+
+    If PostGIS is not configured (factory_pg is None), only tests file-based formats.
     """
     try:
         # Fetch the layer from each factory
         print(f"    Fetching layer '{layer_name}' from all sources...")
-        gdf_pg = factory_pg.get_layer(layer_name)
+
+        # Fetch from PostGIS if available
+        gdf_pg = None
+        if factory_pg is not None:
+            try:
+                gdf_pg = factory_pg.get_layer(layer_name)
+            except Exception as e:
+                print(f"    ⚠️  PostGIS fetch failed (skipping): {e}")
+                gdf_pg = None
+
         gdf_gpkg = factory_gpkg.get_layer(layer_name)
         gdf_sqlite = factory_sqlite.get_layer(layer_name)
 

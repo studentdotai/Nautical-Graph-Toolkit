@@ -124,12 +124,12 @@ def convert_enc(input_path: Path, output_db: str, mode: str = "by_layer") -> Non
 
 ```python
 # GOOD - Explains WHY
-# Use pysqlite3 for rtree support in GeoPackage spatial queries
-import pysqlite3
+# Use Conda's sqlite for rtree support in GeoPackage spatial queries
+import sqlite3
 
 # BAD - Redundant, explains WHAT
-# Import pysqlite3
-import pysqlite3
+# Import sqlite3
+import sqlite3
 ```
 
 ## Type Hints

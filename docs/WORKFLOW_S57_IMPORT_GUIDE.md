@@ -67,8 +67,10 @@ cd ~/python_projects_wsl2/1_MaritimeModule_V1
 ### 2. Install Dependencies
 ```bash
 mamba env update -f environment.yml --prune
-uv pip compile requirements.in -o requirements.txt
+pip install uv
+uv pip compile requirements.in -o requirements.txt  # Optional: skip to use tested snapshot
 uv pip install --no-deps -r requirements.txt
+uv pip install -e .
 ```
 
 ### 3. Configure Database Credentials

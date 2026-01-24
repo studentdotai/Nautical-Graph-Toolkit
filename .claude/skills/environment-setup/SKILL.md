@@ -21,11 +21,17 @@ cd Nautical-Graph-Toolkit
 mamba env update -f environment.yml
 conda activate nautical
 
-# 3. Install Python dependencies
-uv pip compile requirements.in -o requirements.txt
+# 3. Install uv (fast Python package manager)
+pip install uv
+
+# 4. Install Python dependencies
+uv pip compile requirements.in -o requirements.txt  # Optional: skip to use tested snapshot
 uv pip install --no-deps -r requirements.txt
 
-# 4. Verify installation
+# 5. Install Nautical Graph Toolkit in editable mode
+uv pip install -e .
+
+# 6. Verify installation
 python -c "from osgeo import gdal; print(f'✓ GDAL {gdal.__version__}')"
 pytest tests/core/ -v
 ```
@@ -79,17 +85,23 @@ The `environment.yml` includes:
 - GDAL 3.10.3 (with all GEOS/PROJ dependencies)
 - Other binary dependencies
 
-#### Step 3: Install Python Dependencies
+#### Step 3: Install uv and Python Dependencies
 
 We use `uv` for fast, deterministic dependency resolution (preserves GDAL from Conda):
 
 ```bash
-# Compile requirements from requirements.in
+# Install uv (fast Python package manager)
+pip install uv
+
+# Compile requirements from requirements.in (optional: skip to use tested snapshot)
 uv pip compile requirements.in -o requirements.txt
 
 # Install without dependency resolution
 # (--no-deps preserves Conda's binary packages and prevents conflicts)
 uv pip install --no-deps -r requirements.txt
+
+# Install Nautical Graph Toolkit in editable mode
+uv pip install -e .
 ```
 
 **Why `uv`?** It's 10-100x faster than pip and prevents accidental GDAL reinstalls that break bindings.
@@ -97,6 +109,7 @@ uv pip install --no-deps -r requirements.txt
 **If `uv` is not available**, use pip as fallback:
 ```bash
 pip install -r requirements.txt
+pip install -e .
 ```
 
 #### Step 4: Verify Installation
@@ -318,13 +331,20 @@ source ~/.bashrc  # Restart shell or source config
 conda install -c conda-forge gdal=3.10.3 --force-reinstall
 ```
 
-### Issue: pysqlite3 rtree Support Missing
+### Issue: SQLite RTREE Support Missing
 
 **Symptom**: `"no such module: rtree"` error during GeoPackage operations
 
+**Cause**: Conda's `sqlite` package is not installed or environment not activated.
+
 **Solution**:
 ```bash
-pip install --force-reinstall pysqlite3-binary>=0.5.4
+# Verify sqlite is installed from Conda
+mamba list | grep sqlite
+
+# Reinstall environment if needed
+mamba env update -f environment.yml --prune
+mamba activate nautical
 ```
 
 ### Issue: PostgreSQL Connection Refused (Docker)
@@ -435,11 +455,14 @@ conda activate nautical
 # Update Conda packages (GDAL, system libraries)
 mamba env update -f environment.yml --prune
 
-# Recompile Python requirements
+# Recompile Python requirements (optional: skip to use tested snapshot)
 uv pip compile requirements.in -o requirements.txt
 
 # Install or upgrade Python dependencies
 uv pip install --no-deps -r requirements.txt --upgrade
+
+# Reinstall package in editable mode
+uv pip install -e .
 ```
 
 The `--prune` flag removes packages that are no longer in `environment.yml`, keeping your environment clean.

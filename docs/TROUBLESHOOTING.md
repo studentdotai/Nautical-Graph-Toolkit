@@ -34,27 +34,25 @@ sqlite3.OperationalError: no such module: rtree
 
 **Cause:**
 - GeoPackage and SpatiaLite backends require SQLite with RTREE support
-- Python's built-in sqlite3 may not have RTREE compiled in
+- Conda's `sqlite` package may not be installed or environment not activated
 - SpatiaLite uses RTREE for spatial indexing (10-100x performance improvement)
 
-**Solution (Automatic):**
-This project includes `pysqlite3-binary` which provides RTREE support automatically.
+**Solution:**
+This project uses Conda's `sqlite` package which provides RTREE support on all platforms (Linux, macOS ARM/Intel, Windows).
 
 1. **Verify installation:**
    ```bash
+   # Check if sqlite is installed from Conda
+   mamba list | grep sqlite
+
+   # If missing, reinstall environment
    mamba env update -f environment.yml --prune
-   uv pip compile requirements.in -o requirements.txt
-   uv pip install --no-deps -r requirements.txt
-   # or
-   pip install pysqlite3-binary
+   mamba activate nautical
    ```
 
 2. **Test RTREE availability:**
    ```python
-   try:
-       import pysqlite3 as sqlite3
-   except ImportError:
-       import sqlite3
+   import sqlite3
 
    conn = sqlite3.connect(':memory:')
    conn.execute('CREATE VIRTUAL TABLE test USING rtree(id, minx, maxx, miny, maxy)')
@@ -64,18 +62,21 @@ This project includes `pysqlite3-binary` which provides RTREE support automatica
 
 3. **If still failing:**
    ```bash
-   # Reinstall dependencies
-   mamba env update -f environment.yml --prune
-   uv pip compile requirements.in -o requirements.txt
-   uv pip install --no-deps --reinstall -r requirements.txt
-   # or
-   pip install --force-reinstall pysqlite3-binary
+   # Reinstall environment completely
+   mamba env remove -n nautical
+   mamba env create -f environment.yml
+   mamba activate nautical
    ```
 
 **Why this happens:**
-- `uv` and some Python distributions bundle SQLite without RTREE
-- `pysqlite3-binary` provides a pre-compiled SQLite with RTREE enabled
-- The code automatically uses `pysqlite3` if available, falls back to system `sqlite3`
+- Python's built-in sqlite3 may not have RTREE compiled in
+- Conda's `sqlite` package provides RTREE-enabled SQLite on all platforms
+- The `sqlite` package is included in `environment.yml` for cross-platform support
+
+**Platform notes:**
+- **Linux**: Works with Conda's sqlite
+- **macOS (ARM & Intel)**: Works with Conda's sqlite (pysqlite3-binary has compatibility issues)
+- **Windows**: Works with Conda's sqlite (pysqlite3-binary has compatibility issues)
 
 **Affected operations:**
 - `enrich_edges_with_features_gpkg()`
@@ -418,6 +419,61 @@ ProgrammingError: schema "enc_west" does not exist
    ```python
    pg_factory = ENCDataFactory(source=db_params, schema="enc_west")
    ```
+
+---
+
+## Testing Issues
+
+### Issue: pytest fails without PostGIS configured
+
+**Symptoms:**
+```bash
+ValueError: invalid literal for int() with base 10: 'None'
+# or
+postgresql+psycopg2://None:None@None:None/None
+```
+
+**Cause:**
+Integration tests in `tests/core__real_data/` require PostGIS environment variables to be set.
+
+**Solution 1: Run only unit tests (no PostGIS required)**
+```bash
+# Run only fast unit tests (no database required)
+pytest tests/core/ -v
+```
+
+**Solution 2: Skip PostGIS integration tests**
+The integration tests will automatically skip PostGIS tests if database environment variables are not set. You can run:
+```bash
+# Run all tests - PostGIS tests will be automatically skipped
+pytest -v
+
+# Run only file-based integration tests (GeoPackage, SpatiaLite)
+pytest tests/core__real_data/ -v
+```
+
+**Solution 3: Set up PostGIS for full integration test coverage**
+If you want to run the complete integration test suite including PostGIS:
+
+1. Set up PostGIS database (see [INSTALL.md Section 4](../INSTALL.md#4-docker-postgis-setup))
+2. Create a `.env` file with database credentials:
+   ```bash
+   DB_NAME=enc_db
+   DB_USER=postgres
+   DB_PASSWORD=postgres
+   DB_HOST=localhost
+   DB_PORT=5432
+   ```
+3. Run the full test suite:
+   ```bash
+   pytest -v
+   ```
+
+**What tests run without PostGIS:**
+- ✅ All unit tests in `tests/core/`
+- ✅ Integration tests using GeoPackage backend
+- ✅ Integration tests using SpatiaLite backend
+- ❌ PostGIS-specific integration tests (automatically skipped)
 
 ---
 

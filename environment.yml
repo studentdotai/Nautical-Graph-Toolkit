@@ -5,7 +5,12 @@ dependencies:
   # System-level GIS libraries with exact versions
   - gdal>=3.10,<3.11
   - libgdal>=3.10,<3.11
+  - sqlite  # Provides SQLite with RTREE support for GeoPackage operations
+
+  # Python Core
   - python=3.11      # Pin only major.minor
+
+  # Python Data/GIS Stack
   - geopandas>=1.1
   - pandas>=2.3
   - fiona>=1.10

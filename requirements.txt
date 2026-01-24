@@ -241,8 +241,6 @@ pygments==2.19.2
     #   jupyter-console
     #   nbconvert
     #   pytest
-pysqlite3-binary==0.5.4
-    # via -r requirements.in
 pytest==8.4.1
     # via
     #   -r requirements.in

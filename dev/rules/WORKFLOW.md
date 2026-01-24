@@ -13,8 +13,10 @@ cd Nautical-Graph-Toolkit
 
 # Install with Conda + uv (recommended for development)
 mamba env update -f environment.yml --prune
-uv pip compile requirements.in -o requirements.txt
+pip install uv
+uv pip compile requirements.in -o requirements.txt  # Optional: skip to use tested snapshot
 uv pip install --no-deps -r requirements.txt
+uv pip install -e .
 
 # Or install with pip
 pip install -e .
@@ -275,21 +277,18 @@ conda install -c conda-forge gdal=3.10.3
 pip install GDAL==3.10.3
 ```
 
-### pysqlite3 Issues
+### SQLite RTREE Issues
 
 ```bash
 # Verify rtree support
-python -c "import pysqlite3; print('rtree' in str(pysqlite3))"
+python -c "import sqlite3; conn = sqlite3.connect(':memory:'); conn.execute('CREATE VIRTUAL TABLE test USING rtree(id, minx, maxx)'); print('✓ RTREE available')"
 
-# If missing, reinstall
-pip install --force-reinstall pysqlite3-binary>=0.5.4
+# If missing, verify Conda environment
+mamba list | grep sqlite
 
-# Test spatial index
-python -c "
-import pysqlite3
-conn = pysqlite3.connect(':memory:')
-conn.execute('PRAGMA compile_options').fetchall()
-"
+# Reinstall environment if needed
+mamba env update -f environment.yml --prune
+mamba activate nautical
 ```
 
 ### PostGIS Connection Issues

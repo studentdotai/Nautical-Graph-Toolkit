@@ -43,14 +43,16 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Union, List, Dict, Any, Optional, Tuple
 
-# Import pysqlite3-binary first (has RTREE support)
-# Force it into sys.modules to prevent builtin sqlite3 from being used
+# Import sqlite3 with RTREE support
+# When Conda environment is activated, Python's built-in sqlite3 uses Conda's sqlite library
+# which includes RTREE support on all platforms (Linux, macOS ARM/Intel, Windows)
+# The pysqlite3 import is kept for backward compatibility but Conda's sqlite is recommended
 try:
     import pysqlite3
     sys.modules['sqlite3'] = pysqlite3  # Replace builtin in module cache
     sqlite3 = pysqlite3
 except ImportError:
-    import sqlite3  # Fallback to builtin if pysqlite3 not available
+    import sqlite3  # Fallback to builtin (uses Conda's sqlite when env is activated)
 
 import h3
 import networkx as nx

@@ -78,7 +78,7 @@ S-57 reference data and configuration:
 ### Critical Pinned Dependencies
 
 - **GDAL==3.10.3** (EXACT version pinned - breaking changes in other versions)
-- **pysqlite3-binary>=0.5.4** (rtree support for GeoPackage spatial indexing)
+- **sqlite** (from Conda - provides RTREE support for GeoPackage spatial indexing)
 - **Python 3.11+** required (3.12 supported)
 
 ### Core Dependencies
@@ -156,12 +156,14 @@ See `.claude/skills/gdal-s57-setup/SKILL.md` for detailed configuration guidance
 
 ### SQLite and Spatial Indexes
 
-The code uses `pysqlite3-binary` to access SQLite with rtree (spatial index) support:
+The code uses Conda's `sqlite` package which provides SQLite with rtree (spatial index) support:
 
 - **Why rtree is needed**: GeoPackage files use r-tree virtual tables for spatial indexing. Graph enrichment operations (`enrich_edges_with_features_gpkg_v3()`) query these indexes for high performance.
-- **Implementation**: Code at lines 48-53 of `src/nautical_graph_toolkit/core/graph.py` imports `pysqlite3` and injects it into `sys.modules`, replacing the built-in `sqlite3` module (which lacks rtree).
-- **Fallback**: If pysqlite3 import fails, code falls back to built-in sqlite3, but spatial index queries will fail with "no such module: rtree" errors.
-- **Installation**: `pysqlite3-binary>=0.5.4` is automatically installed via Conda+uv setup.
+- **Implementation**: Python's built-in `sqlite3` module uses the Conda SQLite library when the Conda environment is activated. The code at lines 48-53 of `src/nautical_graph_toolkit/core/graph.py` attempts to import `pysqlite3` for compatibility, but falls back to built-in `sqlite3`.
+- **Platform compatibility**: Conda's `sqlite` package works on all tested platforms (Linux AMD64, macOS ARM M1/M4, Windows 11). macOS Intel is expected to work but not tested.
+- **Installation**: `sqlite` is automatically installed via Conda environment setup (`environment.yml`).
+
+**Note:** The code still includes a `try/except ImportError` block for `pysqlite3` for backward compatibility, but Conda's `sqlite` package is the recommended solution for cross-platform RTREE support.
 
 ## Database Backend Patterns
 

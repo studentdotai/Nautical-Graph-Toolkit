@@ -281,7 +281,8 @@ This is the inaugural release of the Nautical Graph Toolkit, a comprehensive mar
 
 ##### Special Technical Features
 - **SQLite RTREE Spatial Index Support**:
-  - pysqlite3-binary integration for GeoPackage operations
+  - Conda `sqlite` package integration for GeoPackage operations
+  - Cross-platform RTREE support (Linux AMD64, macOS ARM M1/M4, Windows 11 tested)
   - Enables high-performance spatial queries on file-based databases
   - Critical for graph enrichment operations
   - Automatic fallback handling
@@ -319,7 +320,7 @@ This is the inaugural release of the Nautical Graph Toolkit, a comprehensive mar
 - **GDAL**: 3.11.3 (pinned for stability)
 - **Core Geospatial**: GeoPandas 1.1+, Shapely 2.0+, Fiona 1.10+
 - **Routing & Graphs**: NetworkX 3.5+, H3 4.3+
-- **Database**: SQLAlchemy 2.0+, psycopg2-binary 2.9+, pysqlite3-binary 0.5+, GeoAlchemy2 0.18+
+- **Database**: SQLAlchemy 2.0+, psycopg2-binary 2.9+, Conda sqlite (RTREE support), GeoAlchemy2 0.18+
 - **Data Validation**: Pydantic 2.11+
 - **Data Processing**: Pandas 2.3+, ruamel.yaml 0.18+
 - **Visualization**: Plotly 6.3+, IPykernel 6.30+

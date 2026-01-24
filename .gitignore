@@ -90,3 +90,4 @@ dev_backup_*/
 !dev/templates/
 !dev/rules/
 !dev/*.md
+.ai/

@@ -161,19 +161,20 @@ except ImportError:
     )
 ```
 
-### pysqlite3 Fallback
+### SQLite RTREE Support
 
-GeoPackage rtree queries require pysqlite3-binary. Code has fallback but will fail on spatial queries if missing:
+GeoPackage rtree queries require SQLite with RTREE support. Conda's `sqlite` package provides this on all platforms (Linux, macOS ARM/Intel, Windows):
 
 ```python
-try:
-    import pysqlite3
-    sys.modules["sqlite3"] = pysqlite3
-except ImportError:
-    # Falls back to built-in sqlite3
-    # Spatial index queries will fail with "no such module: rtree" error
-    logger.warning("pysqlite3 not available, rtree support may fail")
+# Conda's sqlite provides RTREE support when environment is activated
+import sqlite3
+
+# Verify RTREE is available
+conn = sqlite3.connect(':memory:')
+conn.execute('CREATE VIRTUAL TABLE test USING rtree(id, minx, maxx)')
 ```
+
+**Note:** The code still includes a `try/except ImportError` block for `pysqlite3` for backward compatibility, but Conda's `sqlite` is the recommended solution for cross-platform RTREE support.
 
 ### PostGIS Connection Errors
 

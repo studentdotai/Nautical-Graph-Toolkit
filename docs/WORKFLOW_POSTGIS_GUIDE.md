@@ -53,12 +53,27 @@ The workflow performs four major steps:
 Ensure PostGIS database is running and populated with S-57 data:
 
 ```bash
+# Select platform-specific docker-compose file
+# Linux
+cp docker-compose.linux.yml docker-compose.yml
+
+# macOS ARM (M1/M4)
+cp docker-compose.macos-arm.yml docker-compose.yml
+
+# Windows
+cp docker-compose.windows.yml docker-compose.yml
+
+# Start database
+docker-compose up -d
+
 # Check connection
 psql -h localhost -U postgres -d enc_db -c "SELECT version();"
 
 # Check S-57 schema exists
 psql -h localhost -U postgres -d enc_db -c "SELECT * FROM information_schema.schemata WHERE schema_name = 'enc_west';"
 ```
+
+See [INSTALL.md Section 4](../INSTALL.md#4-docker-postgis-setup) for complete platform-specific configuration and troubleshooting.
 
 ## Installation & Setup
 
@@ -70,8 +85,10 @@ cd ~/python_projects_wsl2/1_MaritimeModule_V1
 ### 2. Install Dependencies
 ```bash
 mamba env update -f environment.yml --prune
-uv pip compile requirements.in -o requirements.txt
+pip install uv
+uv pip compile requirements.in -o requirements.txt  # Optional: skip to use tested snapshot
 uv pip install --no-deps -r requirements.txt
+uv pip install -e .
 ```
 
 ### 3. Configure Database Credentials
