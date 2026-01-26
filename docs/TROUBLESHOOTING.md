@@ -6,18 +6,273 @@ This guide covers common issues you may encounter when working with the Nautical
 
 ## Table of Contents
 
-1. [SQLite RTREE Issues](#sqlite-rtree-issues) ⚠️ **Most Common**
-2. [GeoPackage File I/O Issues](#geopackage-file-io-issues)
-3. [Environment Setup Issues](#environment-setup-issues)
-4. [GDAL/PROJ Database Warnings](#gdal-proj-database-warnings)
-5. [Port Selection Issues](#port-selection-issues)
-6. [Database Connection Issues](#database-connection-issues)
-7. [Data Source Issues](#data-source-issues)
-8. [S57Updater: File-Based Backend Safety](#s57updater-file-based-backend-safety) ⚠️ **Important**
-9. [Graph Creation Issues](#graph-creation-issues)
-10. [Performance Issues](#performance-issues)
-11. [Visualization Issues](#visualization-issues)
-12. [Pathfinding Issues](#pathfinding-issues)
+1. [Windows PowerShell & Mamba Issues](#windows-powershell--mamba-issues) ⚠️ **Windows Users**
+   - PyCharm Conda Integration Error
+2. [SQLite RTREE Issues](#sqlite-rtree-issues) ⚠️ **Most Common**
+3. [GeoPackage File I/O Issues](#geopackage-file-io-issues)
+4. [Environment Setup Issues](#environment-setup-issues)
+5. [GDAL/PROJ Database Warnings](#gdal-proj-database-warnings)
+6. [Port Selection Issues](#port-selection-issues)
+7. [Database Connection Issues](#database-connection-issues)
+8. [Data Source Issues](#data-source-issues)
+9. [S57Updater: File-Based Backend Safety](#s57updater-file-based-backend-safety) ⚠️ **Important**
+10. [Graph Creation Issues](#graph-creation-issues)
+11. [Performance Issues](#performance-issues)
+12. [Visualization Issues](#visualization-issues)
+13. [Pathfinding Issues](#pathfinding-issues)
+
+---
+
+## Windows PowerShell & Mamba Issues
+
+### Issue: Mamba/Conda works in Command Prompt but fails in PowerShell
+
+**Platform:** Windows only
+
+**Symptoms:**
+- `mamba` commands work in Command Prompt (cmd.exe)
+- PowerShell shows: `The term 'mamba' is not recognized as the name of a cmdlet...`
+- Environment exists but `mamba activate` fails with prefix errors
+
+**Root Cause:**
+The Mamba/Conda installer initialized Command Prompt but did not write PowerShell startup scripts.
+
+---
+
+### Part 1: Fix "The term 'mamba' is not recognized"
+
+**Symptoms:**
+```
+mamba : The term 'mamba' is not recognized as the name of a cmdlet, function, script file,
+or operable program. Check the spelling of the name, or if a path was included, verify the
+path is correct and try again.
+```
+
+**The Fix:**
+
+1. Open **Command Prompt (cmd.exe)** (not PowerShell)
+2. Run the initialization command:
+
+   ```cmd
+   :: Option A: If mamba is already working in CMD
+   mamba shell init --shell powershell --root-prefix "C:\Users\<YourUser>\miniforge3"
+
+   :: Option B: Using the full path (replace <YourUser> with your username)
+   "C:\Users\<YourUser>\miniforge3\Library\bin\mamba.exe" shell init --shell powershell --root-prefix "C:\Users\<YourUser>\miniforge3"
+   ```
+
+3. **Close** the terminal and open a **new** PowerShell window
+
+---
+
+### Part 2: Fix "Running scripts is disabled on this system"
+
+**Symptoms:**
+```
+File C:\Users\<YourUser>\miniforge3\shell\condabin\conda-hook.ps1 cannot be loaded because
+running scripts is disabled on this system. For more information, see about_Execution_Policies
+at https:/go.microsoft.com/fwlink/?LinkID=135170.
+```
+
+**The Fix:**
+
+1. Open PowerShell as **Administrator** (Right-click > Run as Administrator)
+2. Run the following command:
+
+   ```powershell
+   Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+   ```
+
+3. Type `Y` and press Enter if prompted
+
+**Why this is safe:**
+- `RemoteSigned` allows local scripts (like Mamba's) to run
+- Only scripts downloaded from the internet need signing
+- This is the recommended policy for development work
+
+---
+
+### Part 3: Fix "Cannot activate, prefix does not exist"
+
+**Symptoms:**
+```
+critical libmamba Cannot activate, prefix does not exist at: 'C:\Users\...\miniforge3\envs\nautical'
+```
+
+**But `mamba env list` shows:**
+```
+# conda environments:
+nautical              *  C:\Users\<YourUser>\.local\share\mamba\envs\nautical
+```
+
+**Root Cause:**
+Mamba is looking for environments in the default folder (`miniforge3\envs`), but your environment is stored in a user directory (`.local\share\mamba\envs`).
+
+**The Fix:**
+
+Add the hidden directory to the configuration search path:
+
+```powershell
+# Using conda is often more reliable for config changes than mamba
+conda config --append envs_dirs C:\Users\<YourUser>\.local\share\mamba\envs
+
+# Verify activation works
+mamba activate nautical
+```
+
+**Alternative Fix (Manual Config Edit):**
+
+If the command above fails, edit the configuration file manually:
+
+1. Navigate to `C:\Users\<YourUser>\`
+2. Open `.condarc` with a text editor (Notepad/VS Code)
+3. Add the path under `envs_dirs`:
+
+   ```yaml
+   envs_dirs:
+     - C:\Users\<YourUser>\miniforge3\envs
+     - C:\Users\<YourUser>\.local\share\mamba\envs
+   ```
+
+4. Save and restart PowerShell
+
+---
+
+### Quick Verification Steps
+
+After applying the fixes above, verify everything works:
+
+```powershell
+# Test 1: Mamba is recognized
+mamba --version
+# Expected: mamba 1.x.x
+
+# Test 2: Environment can be listed
+mamba env list
+# Expected: Should show 'nautical' environment
+
+# Test 3: Environment can be activated
+mamba activate nautical
+# Expected: No error, prompt changes to (nautical)
+
+# Test 4: Python is available
+python --version
+# Expected: Python 3.11.x
+
+# Test 5: GDAL is installed
+python -c "from osgeo import gdal; print(f'GDAL {gdal.__version__}')"
+# Expected: GDAL 3.10.3
+```
+
+---
+
+### Cheat Sheet: CMD vs PowerShell
+
+| Command | CMD | PowerShell |
+|---------|-----|------------|
+| **Activate** | `mamba activate nautical` | `mamba activate nautical` |
+| **List envs** | `mamba env list` | `mamba env list` |
+| **Install** | `mamba install package` | `mamba install package` |
+| **Init shell** | Already done by installer | Run: `mamba shell init --shell powershell` |
+
+---
+
+### Common Windows-Specific Issues
+
+**Issue: Miniforge Prompt vs PowerShell**
+
+The Miniforge installer creates a "Miniforge Prompt" shortcut that pre-loads Conda/Mamba. However, you can use standard PowerShell with the fixes above.
+
+**Recommendation:**
+- Use **Miniforge Prompt** for quick setup (works out of the box)
+- Use **PowerShell** for development (requires shell init, but better integration with Windows tools)
+
+**Issue: Path too long errors**
+
+Windows has a 260 character path limit. If you encounter:
+
+```
+FileNotFoundError: [Errno 2] No such file or directory: 'C:\Users\...\very\long\path...'
+```
+
+**Solution:**
+Enable long path support in Windows 10/11:
+
+1. Run PowerShell as Administrator
+2. Execute:
+
+   ```powershell
+   New-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" -Name "LongPathsEnabled" -Value 1 -PropertyType DWORD -Force
+   ```
+
+3. Restart your computer
+
+---
+
+### Issue: PyCharm Conda integration error (Windows)
+
+**Platform:** Windows only
+
+**Symptoms:**
+- Error appears when launching PyCharm with Miniforge/Conda environment configured
+- `Loading personal and system profiles took 1635ms` followed by error
+- `FileNotFoundError: conda-hook.ps1` in temp directory (`_MEI160602`)
+- `CONDA_ROOT` environment variable points to temp directory instead of Miniforge installation
+- Base environment path points to temp directory
+
+**Example error:**
+```
+Loading personal and system profiles took 1635ms.
+
+# >>>>>>>>>>>>>>>>>>>>>> ERROR REPORT <<<<<<<<<<<<<<<<<<<<<<
+
+Traceback (most recent call last):
+  File "conda\exception_handler.py", line 18, in __call__
+  File "conda\cli\main.py", line 87, in main_sourced
+  File "conda\activate.py", line 238, in execute
+  File "conda\activate.py", line 220, in hook
+  File "pathlib.py", line 1027, in read_text
+  File "pathlib.py", line 1013, in open
+FileNotFoundError: [Errno 2] No such file or directory: 'C:\\Users\\<YourUser>\\AppData\\Local\\Temp\\_MEI160602\\conda\\shell\\condabin\\conda-hook.ps1'
+```
+
+**Root Cause:**
+PyCharm's Conda integration attempts to use Conda hooks, but the PowerShell initialization is incomplete or corrupted. The temp directory reference indicates PyCharm is using a bundled/extracted Conda executable instead of the full Miniforge installation.
+
+**The Fix:**
+
+1. **Open Miniforge Prompt** (or Command Prompt with Miniforge in PATH)
+
+2. **Run the PowerShell initialization:**
+   ```cmd
+   conda init powershell
+   ```
+
+3. **Close all terminals and PyCharm**
+
+4. **Restart PyCharm** - The error should no longer appear
+
+**Alternative Fix (if above doesn't work):**
+
+1. Open PowerShell as Administrator
+2. Re-initialize Conda:
+   ```powershell
+   conda init --reverse
+   conda init powershell
+   ```
+
+3. Restart PyCharm
+
+**Prevention:**
+
+To avoid this issue in the future:
+- Always use Miniforge Prompt (not standard PowerShell) when running `conda init`
+- Ensure Miniforge is properly installed with full PATH access
+- Avoid modifying Conda environment variables manually in PyCharm settings
+
+**See also:**
+- PyCharm documentation: [Configuring Conda](https://www.jetbrains.com/help/pycharm/conda.html)
+- Miniforge documentation: [Installation](https://github.com/conda-forge/miniforge)
 
 ---
 

@@ -70,6 +70,8 @@ This toolkit transforms raw S-57 chart data into production-ready geospatial dat
 - Git installed
   - Windows: https://git-scm.com/download/win
 
+**Note for Windows PowerShell users:** If you prefer PowerShell over Miniforge Prompt and encounter issues with `mamba` commands not being recognized, see [Windows PowerShell & Mamba Issues](docs/TROUBLESHOOTING.md#windows-powershell--mamba-issues) for the fix.
+
 #### Clone and Install
 
 **Step 1: Clone repository**
@@ -109,6 +111,8 @@ python -c "from nautical_graph_toolkit import S57Base; print('✓ Installation s
 ```
 
 See [INSTALL.md](INSTALL.md) for detailed troubleshooting and platform-specific guides.
+
+**⚠️ Windows Users:** If you encounter issues with Mamba/Conda commands in PowerShell (command not recognized, scripts disabled, etc.), see the [Windows PowerShell & Mamba Issues](docs/TROUBLESHOOTING.md#windows-powershell--mamba-issues) troubleshooting section.
 
 #### GDAL Installation
 
@@ -586,7 +590,7 @@ For major changes, please open an issue first to discuss proposed changes.
 
 ## 🌊 Support Vector Nautical: By Seamen, For Seamen
 
-**[<img src="https://opencollective.com/vectornautical/logo.txt?variant=cooperative" alt="Vector Nautical" width="40" align="middle">](https://opencollective.com/vectornautical) Support this project on [Open Collective](https://opencollective.com/vectornautical)**
+**[Vector Nautical](https://opencollective.com/vectornautical) Support this project on [Open Collective](https://opencollective.com/vectornautical)**
 
 ### The Mission
 

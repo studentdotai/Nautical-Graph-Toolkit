@@ -276,11 +276,17 @@ https://git-scm.com/download/win
 
 **Use Miniforge Prompt for all commands.**
 
+**⚠️ Windows PowerShell Users:** If you prefer to use PowerShell instead of Miniforge Prompt, or encounter issues with `mamba` commands not being recognized, see [Windows PowerShell & Mamba Issues](docs/TROUBLESHOOTING.md#windows-powershell--mamba-issues) in the troubleshooting guide.
+
 **Proceed with [Quick Install](#1-quick-install-geopackage-workflow) steps.**
 
 ---
 
 ## 6. Troubleshooting
+
+### Windows Users: PowerShell & Mamba Issues
+
+If you're on Windows and experiencing issues with Mamba/Conda commands in PowerShell (e.g., "mamba not recognized", "scripts disabled", or "prefix does not exist"), see the dedicated [Windows PowerShell & Mamba Issues](docs/TROUBLESHOOTING.md#windows-powershell--mamba-issues) section in the troubleshooting guide.
 
 ### Issue: "Package 'gdal' is not available from current channels"
 
