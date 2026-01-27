@@ -1,0 +1,27 @@
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    platform: linux/amd64
+    container_name: postgis_nautical
+    restart: always
+    shm_size: 4gb
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: enc_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgis_data:/var/lib/postgresql/data
+    command: >
+      postgres
+      -c shared_buffers=4GB
+      -c work_mem=128MB
+      -c maintenance_work_mem=1GB
+      -c effective_cache_size=12GB
+      -c random_page_cost=1.1
+      -c max_worker_processes=8
+      -c max_parallel_workers_per_gather=4
+
+volumes:
+  postgis_data:

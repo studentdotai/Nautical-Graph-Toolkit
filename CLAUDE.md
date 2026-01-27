@@ -2,138 +2,41 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Documentation and API Accuracy
+**Complete documentation has been moved to `/dev` directory for better organization.**
 
-Use Context7 MCP server to ensure accurate, up-to-date library documentation and code examples:
-- Add "use context7" to prompts when working with external libraries (GDAL, GeoPandas, SQLAlchemy, Pydantic, etc.)
-- Prioritize Context7's real-time documentation over potentially outdated training data
-- Verify API methods and parameters against current library versions
-- Use Context7 especially when implementing new features or debugging library-specific issues
+## Quick Reference
 
-## Project Overview
+- **Project Knowledge**: `/dev/rules/CLAUDE.md` - Architecture, dependencies, configuration
+- **Agent Guidelines**: `/dev/rules/AGENTS.md` - Behavior patterns, Context7 usage
+- **Code Standards**: `/dev/rules/CODE_STANDARDS.md` - Conventions, testing, security
+- **Workflows**: `/dev/rules/WORKFLOW.md` - Commands, setup, troubleshooting
+- **Skills**: `.claude/skills/` - 13 specialized skills (DEV/TEST/DB/GIS categories)
+- **Tasks & Planning**: `/dev/tasks/TASK_INDEX.md`, `/dev/todo/TODO.md`, `/dev/todo/PRIORITIES.md`
 
-This is a comprehensive maritime analysis toolkit for working with S-57 Electronic Navigational Chart (ENC) data. The project provides tools to convert S-57 charts to GIS formats (GeoPackage, PostGIS, SpatiaLite), update existing datasets, and analyze maritime data with integration to NOAA's live ENC database.
+## Essential Context
 
-## Core Architecture
+- **Project**: Nautical Graph Toolkit v0.1.0 - Maritime S-57 ENC to GIS conversion & routing
+- **Stack**: GDAL 3.10.3, Python 3.11+, PostGIS/GeoPackage/SpatiaLite backends
+- **License**: AGPL-3.0
+- **Always use Context7 MCP** for GDAL, GeoPandas, SQLAlchemy, Pydantic documentation
 
-The project follows a layered architecture:
+## First-Time Setup
 
-- **Core Layer** (`src/nautical_graph_toolkit/core/`): Main conversion and data processing classes
-  - `S57Converter`: High-performance bulk S-57 to GIS format conversion
-  - `S57Base`: Simple one-to-one ENC conversions using gdal.VectorTranslate
-  - `S57Advanced`: Optimized feature-level conversions with ENC source stamping, batch processing, and memory management
-  - `S57Updater`: Incremental, transactional updates for PostGIS
-  - `PostGISManager`: Database querying and analysis tools
-
-- **Utils Layer** (`src/nautical_graph_toolkit/utils/`): Support utilities and database connectors
-  - `S57Utils`: S-57 attribute/object class lookups and property conversion
-  - `NoaaDatabase`: Live NOAA ENC data scraping with Pydantic validation
-  - `DatabaseConnector`: Base class for database operations
-  - `PostGISConnector`/`FileDBConnector`: Database-specific connection handlers
-
-- **Data Layer** (`src/nautical_graph_toolkit/data/`): S-57 reference data (CSV files for attributes, object classes)
-
-## Development Commands
-
-### Environment Setup
+**New developers** - Initialize your personal dev environment:
 ```bash
-# Install dependencies (uses uv for package management)
-uv sync
-
-# Install in development mode
-pip install -e .
+/dev:setup  # or: bash dev/scripts/migrate_dev_environment.sh
 ```
 
-### Testing
+## Quick Commands
+
 ```bash
-# Run all tests
-pytest
-
-# Run specific test file
-pytest tests/core/test_s57_converter.py
-
-# Run tests with real S-57 data
-pytest tests/core__real_data/real_test_s57_converter.py
-
-# Run with verbose output
-pytest -v
+mamba env update -f environment.yml  # Update Conda env
+uv pip compile requirements.in -o requirements.txt
+uv pip install --no-deps -r requirements.txt  # Install PyPI deps
+pytest               # Run all tests
+pytest -v tests/core__real_data/  # Integration tests with real S-57 data
 ```
 
-### Code Quality
-```bash
-# Check for linting issues (if configured)
-ruff check
+## Full Documentation
 
-# Format code (if configured)
-ruff format
-```
-
-## Code Style Guidelines
-
-### Import Organization
-- Imports should be placed at the top of files
-- Avoid importing libraries inside functions
-- Group imports in standard order: standard library, third-party, local imports
-
-## Key Dependencies
-
-- **GDAL 3.11.3**: Core geospatial data processing (exact version pinned)
-- **GeoPandas/Fiona**: Geospatial data manipulation
-- **SQLAlchemy/psycopg2**: Database connectivity (PostGIS support)
-- **Pydantic**: Data validation for NOAA integration
-- **BeautifulSoup4/requests**: Web scraping for NOAA ENC data
-- **pysqlite3-binary**: SQLite with rtree spatial index support (required for GeoPackage graph enrichment operations)
-
-## Common Workflows
-
-### S-57 Conversion Modes
-The system supports two primary conversion strategies:
-
-1. **by_enc mode**: Each S-57 file becomes a separate output (file or database schema)
-2. **by_layer mode**: All S-57 files are merged with features grouped by layer type, each feature stamped with source ENC name (`dsid_dsnm`)
-
-### Database Integration
-- PostGIS integration includes automatic schema management and transactional updates
-- File-based outputs (GeoPackage, SpatiaLite) supported with automatic directory creation
-- Connection management through dedicated connector classes
-
-### NOAA Data Integration
-- Live web scraping of NOAA ENC database with caching
-- Pydantic-validated chart objects for type safety
-- Automated comparison of local vs NOAA versions to identify outdated charts
-
-## Important Configuration
-
-### SQLite and Spatial Indexes
-The code uses `pysqlite3-binary` to access SQLite with rtree (spatial index) support:
-- **Why rtree is needed**: GeoPackage files use r-tree virtual tables for spatial indexing. Graph enrichment operations (`enrich_edges_with_features_gpkg_v3()`) query these indexes for high performance.
-- **Implementation**: Code at lines 48-53 of `src/nautical_graph_toolkit/core/graph.py` imports `pysqlite3` and injects it into `sys.modules`, replacing the built-in `sqlite3` module (which lacks rtree).
-- **Fallback**: If pysqlite3 import fails, code falls back to built-in sqlite3, but spatial index queries will fail with "no such module: rtree" errors.
-- **Installation**: `pysqlite3-binary>=0.5.4` is automatically installed via `uv sync`.
-
-### GDAL S-57 Driver Settings
-The module automatically configures GDAL S-57 options:
-- `RETURN_PRIMITIVES=OFF`
-- `SPLIT_MULTIPOINT=ON`
-- `ADD_SOUNDG_DEPTH=ON`
-- `UPDATES=APPLY`
-- `LNAM_REFS=ON`
-- `RETURN_LINKAGES=ON`
-- `RECODE_BY_DSSI=ON`
-
-### Data Location
-S-57 reference data (attributes, object classes) is located in `src/nautical_graph_toolkit/data/` and loaded automatically by utility classes.
-
-## Testing Structure
-
-- `tests/core/`: Unit tests with mocked GDAL dependencies
-- `tests/core__real_data/`: Integration tests requiring actual S-57 files
-- Mock fixtures provided for GDAL operations in unit tests
-- Real S-57 test data located in `data/ENC_ROOT/` directory
-
-## File Patterns
-
-- S-57 base files: `*.000` (scanned recursively)
-- Output formats: `.gpkg`, `.sqlite`, PostGIS schemas
-- Test outputs: `tests/core__real_data/test_output/`
-- Jupyter notebooks: `docs/notebooks/` for analysis and examples
+See `/dev/README_DEV.md` for complete development hub overview.

@@ -45,7 +45,7 @@
   fine_settings:
     spacing_nm: 0.1
     max_edge_factor: 2.0
-    max_points_per_subdivision: 1000000
+    max_points_per_subdivision: 50000
     # usage_bands: [1,2,3,4,5,6]  # Can override default seaare bands if needed
 
   # --- H3 Graph Specific Settings ---

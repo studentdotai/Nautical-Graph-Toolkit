@@ -1,10 +1,10 @@
-# Maritime Module Setup Guide
+# Nautical Graph Toolkit Setup Guide
 
-This guide explains how to set up S-57 Electronic Navigational Chart (ENC) data for use with the Maritime Module notebooks.
+This guide explains how to set up S-57 Electronic Navigational Chart (ENC) data for use with the Nautical Graph Toolkit notebooks.
 
 ## Overview
 
-The Maritime Module supports three backend options for storing and querying S-57 ENC data:
+The Nautical Graph Toolkit (formerly Maritime Module) supports three backend options for storing and querying S-57 ENC data:
 
 1. **PostGIS** - PostgreSQL database with spatial extensions (recommended for large datasets and server deployment)
 2. **GeoPackage** - Portable single-file database format (.gpkg)
@@ -34,11 +34,11 @@ The Maritime Module supports three backend options for storing and querying S-57
 
 ### Required Software
 
-- Python 3.8 or higher
-- GDAL 3.11.3 (exact version pinned)
+- Python 3.11 or higher
+- GDAL 3.10.3 (exact version pinned)
 - **SQLite with RTREE support** (see "SQLite RTREE Requirement" below)
 - For PostGIS backend:
-  - PostgreSQL 12+ with PostGIS extension
+  - PostgreSQL 16+ with PostGIS extension
   - psycopg2 Python package
 
 ### SQLite RTREE Requirement
@@ -46,20 +46,17 @@ The Maritime Module supports three backend options for storing and querying S-57
 **Critical:** GeoPackage and SpatiaLite backends require SQLite with RTREE (R-tree spatial indexing) support for spatial queries.
 
 **Automatic Solution:**
-This project includes `pysqlite3-binary` as a dependency, which provides SQLite with RTREE support enabled. No additional configuration is needed.
+This project includes `sqlite` in `environment.yml`, which provides SQLite with RTREE support enabled on all platforms.
 
 **How it works:**
-- The code automatically uses `pysqlite3` (with RTREE) if available
-- Falls back to system `sqlite3` if `pysqlite3` is not installed
-- `pysqlite3-binary` is included in `pyproject.toml` dependencies
+- Conda's `sqlite` package provides RTREE-enabled SQLite library
+- Python's built-in `sqlite3` module uses the Conda SQLite library when the Conda environment is activated
+- The `sqlite` package is included in `environment.yml` for cross-platform compatibility
 
 **Verification:**
 To verify RTREE support is available:
 ```python
-try:
-    import pysqlite3 as sqlite3
-except ImportError:
-    import sqlite3
+import sqlite3
 
 conn = sqlite3.connect(':memory:')
 conn.execute('CREATE VIRTUAL TABLE test USING rtree(id, minx, maxx, miny, maxy)')
@@ -67,14 +64,20 @@ print("✓ RTREE support is available")
 conn.close()
 ```
 
-**Manual Installation (if needed):**
+**If RTREE is not available:**
 ```bash
-# Using uv (recommended)
-uv add pysqlite3-binary
-
-# Using pip
-pip install pysqlite3-binary
+# Reinstall Conda environment to ensure sqlite is included
+mamba env update -f environment.yml --prune
+mamba activate nautical
 ```
+
+**Platform Compatibility:**
+- **Linux**: ✅ Tested (AMD64)
+- **macOS ARM (M1/M4)**: ✅ Tested
+- **macOS Intel**: ⏸️ Expected to work (not tested, same as Linux AMD64)
+- **Windows 11**: ✅ Tested
+
+**Note:** `pysqlite3-binary` package has compatibility issues on macOS ARM and Windows. Conda's `sqlite` package is used instead for consistent cross-platform support.
 
 **Why RTREE is required:**
 - SpatiaLite uses RTREE for spatial indexing (10-100x performance improvement)
@@ -112,28 +115,42 @@ pip install pysqlite3-binary
 
 **Setup Steps:**
 
-1. **Install PostgreSQL and PostGIS**
+1. **Select Platform-Specific Docker Compose Configuration**
    ```bash
-   # Installation instructions will be added from import_s57 notebook
+   # Linux
+   cp docker-compose.linux.yml docker-compose.yml
+
+   # macOS ARM (M1/M4)
+   cp docker-compose.macos-arm.yml docker-compose.yml
+
+   # Windows
+   cp docker-compose.windows.yml docker-compose.yml
    ```
 
-2. **Create Database**
+2. **Start Docker PostGIS Database**
    ```bash
-   # Database creation commands will be added
+   docker-compose up -d
    ```
 
-3. **Configure Environment Variables**
+3. **Verify Connection**
+   ```bash
+   docker exec -it postgis_nautical psql -U postgres -d enc_db -c "SELECT PostGIS_Version();"
+   ```
+
+4. **Configure Environment Variables**
    ```bash
    # .env file configuration will be added
    ```
 
-4. **Import S-57 Data**
+5. **Import S-57 Data**
    ```bash
    # Import process will be documented from import_s57 notebook
    ```
 
+See [INSTALL.md Section 4](../INSTALL.md#4-docker-postgis-setup) for complete platform-specific configuration and troubleshooting.
+
 **Required Schema Structure:**
-- Main schema: `us_enc_all` (or your custom schema name)
+- Main schema: `enc_west` (or your custom schema name)
 - Required layers: See "Required Layers" section below
 
 ---
@@ -154,7 +171,7 @@ pip install pysqlite3-binary
 - Cross-platform compatibility (Windows, Linux, macOS)
 
 **Prerequisites:**
-- GDAL 3.11.3 with GeoPackage driver
+- GDAL 3.10.3 with GeoPackage driver
 - Write permissions to output directory
 - Sufficient disk space (estimate: ~1.5-2x raw ENC file size)
 - pyogrio or fiona Python package for I/O
@@ -172,7 +189,7 @@ pip install pysqlite3-binary
    ```
 
 **File Location:**
-- Default: `docs/notebooks/output/us_enc_all.gpkg`
+- Default: `data/enc_west.gpkg`
 - Customizable via notebook configuration
 
 ---
@@ -193,7 +210,7 @@ pip install pysqlite3-binary
 - SQL spatial query support
 
 **Prerequisites:**
-- GDAL 3.11.3 with SQLite/SpatiaLite driver
+- GDAL 3.10.3 with SQLite/SpatiaLite driver
 - Write permissions to output directory
 - Sufficient disk space (estimate: ~1.5-2x raw ENC file size)
 - pyspatialite or sqlite3 Python package
@@ -212,7 +229,7 @@ pip install pysqlite3-binary
    ```
 
 **File Location:**
-- Default: `docs/notebooks/output/us_enc_all.sqlite`
+- Default: `data/enc_west.sqlite`
 - Customizable via notebook configuration
 
 ---
@@ -275,10 +292,9 @@ After importing S-57 data, your backend must contain the following layers:
    └── ...
    ```
 
-2. **Run the appropriate import notebook**
-   - For PostGIS: `docs/notebooks/import_s57_to_postgis.ipynb`
-   - For GeoPackage: `docs/notebooks/import_s57_to_geopackage.ipynb`
-   - For SpatiaLite: `docs/notebooks/import_s57_to_spatialite.ipynb`
+2. **Run the import notebook**
+   - Run `docs/notebooks/import_s57.ipynb` for any backend (PostGIS, GeoPackage, or SpatiaLite)
+   - Configure the notebook to select your desired backend
 
 3. **Verify the import**
    ```python
@@ -316,6 +332,105 @@ After setup, verify your backend contains the required data:
 # Verification code will be added from import_s57 notebook
 ```
 
+### Python Interpreter Path Verification
+
+To verify your Python environment location (required for IDE configuration and Jupyter kernels):
+
+```bash
+# Activate environment first
+mamba activate nautical
+
+# Check Python executable path
+python -c "import sys; print(f'Python executable: {sys.executable}')"
+```
+
+**Expected output by platform:**
+- **Windows**: `C:\Users\<YourUser>\.local\share\mamba\envs\nautical\python.exe`
+- **Linux**: `/home/<user>/miniforge3/envs/nautical/bin/python`
+- **macOS**: `/Users/<user>/miniforge3/envs/nautical/bin/python`
+
+Note the path from this command - you'll need it for IDE configuration and creating Jupyter kernels.
+
+---
+
+## Jupyter Notebook Configuration (Optional)
+
+If you plan to use Jupyter notebooks for interactive analysis, follow these steps to set up a Jupyter kernel for the `nautical` environment.
+
+### Creating a Jupyter Kernel
+
+The Jupyter kernel allows notebooks to use your `nautical` environment directly:
+
+```bash
+# Activate environment
+mamba activate nautical
+
+# Create kernel (works on all platforms)
+python -m ipykernel install --user --name nautical --display-name "Nautical Toolkit"
+
+# Verify kernel installation
+jupyter kernelspec list
+```
+
+**Expected output:**
+```
+Available kernels:
+  nautical    C:\Users\<YourUser>\AppData\Roaming\jupyter\kernels\nautical    # Windows
+  nautical    ~/.local/share/jupyter/kernels/nautical                         # Linux/macOS
+  python3     ...
+```
+
+### Using the Kernel in Jupyter
+
+**Jupyter Notebook:**
+```bash
+mamba activate nautical
+jupyter notebook
+
+# In browser: Kernel → Change Kernel → Nautical Toolkit
+```
+
+**Jupyter Lab:**
+```bash
+mamba activate nautical
+jupyter lab
+
+# In browser: Select "Nautical Toolkit" when creating new notebooks
+```
+
+**VS Code:**
+1. Open a `.ipynb` file
+2. Click kernel selector (top-right corner)
+3. Select "Nautical Toolkit" from the list
+
+**PyCharm Professional:**
+1. Open a notebook or Python file
+2. Run → Edit Configurations → Jupyter Server (if using notebooks)
+3. Select "existing" → Choose "nautical" kernel
+
+### IDE Python Interpreter Configuration
+
+**PyCharm:**
+1. File → Settings → Project: Nautical-Graph-Toolkit → Python Interpreter
+2. Click gear icon → Add
+3. Select "Conda Environment" → "Existing"
+4. Paste the Python path from the verification command above (e.g., `C:\Users\<YourUser>\.local\share\mamba\envs\nautical\python.exe`)
+5. Apply → OK
+
+**VS Code:**
+1. Open Command Palette (Ctrl+Shift+P / Cmd+Shift+P on macOS)
+2. Type "Python: Select Interpreter"
+3. Click "Enter interpreter path..."
+4. Paste the Python path from the verification command above
+5. Press Enter
+
+### Troubleshooting Jupyter Kernel Issues
+
+If you encounter issues with Jupyter kernels, see [TROUBLESHOOTING.md - Jupyter Kernel Issues](./TROUBLESHOOTING.md#jupyter-kernel-issues) for comprehensive solutions including:
+- Kernel not found in Jupyter
+- IDE shows wrong Python version
+- Kernel dies immediately when starting
+
 ---
 
 ## Configuration Files
@@ -324,7 +439,7 @@ After setup, verify your backend contains the required data:
 
 ```bash
 # PostGIS Configuration
-DB_NAME=ENC_db
+DB_NAME=enc_db
 DB_USER=your_username
 DB_PASSWORD=your_password
 DB_HOST=localhost
@@ -360,8 +475,8 @@ The graph configuration file defines which layers to use for navigation:
 ### Fine Graph Creation Notebooks
 
 **Required for:**
-- `graph_fine_GPKG_v2.ipynb`
-- `graph_fine_PostGIS_v2.ipynb` (future)
+- `graph_fine_GeoPackage_v2.ipynb`
+- `graph_fine_PostGIS_v2.ipynb`
 
 **Data Requirements:**
 - All basic graph requirements

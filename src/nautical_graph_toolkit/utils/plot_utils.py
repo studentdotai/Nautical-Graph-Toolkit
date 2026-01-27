@@ -70,7 +70,7 @@ class PlotlyChart:
 
 	@staticmethod
 	def get_trace_by_name(fig, trace_name: str) -> Union[int, None]:
-		trace_list = self.get_trace_list(fig)
+		trace_list = PlotlyChart.get_trace_list(fig)
 		for idx, name in trace_list:
 			if name == trace_name:
 				logger.debug(f"Found trace with name '{trace_name}' at index {idx}")
@@ -80,7 +80,7 @@ class PlotlyChart:
 
 	@staticmethod
 	def get_trace_item_by_name(fig, trace_name: str, param_name: str):
-		trace_list = self.get_trace_list(fig)
+		trace_list = PlotlyChart.get_trace_list(fig)
 		for idx, name in trace_list:
 			if name == trace_name:
 				logger.debug(f"Found trace with name '{trace_name}' at index {idx}")
@@ -101,7 +101,7 @@ class PlotlyChart:
 		   fig: Plotly figure object
 		   trace_name: Name of the trace to be removed
 		"""
-		trace_index = self.get_trace_list(fig)
+		trace_index = PlotlyChart.get_trace_list(fig)
 		indices_to_remove = []
 
 		for idx, name in trace_index:

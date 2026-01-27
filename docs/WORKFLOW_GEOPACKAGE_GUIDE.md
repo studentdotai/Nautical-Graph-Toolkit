@@ -54,10 +54,10 @@ Ensure S-57 data is available in GeoPackage format:
 
 ```bash
 # Check if GeoPackage files exist
-ls -lh docs/notebooks/output/*.gpkg
+ls -lh output/*.gpkg
 
 # List layers in a GeoPackage (requires GDAL tools)
-ogrinfo docs/notebooks/output/us_enc_all.gpkg
+ogrinfo output/enc_west.gpkg
 ```
 
 ## Installation & Setup
@@ -69,12 +69,16 @@ cd ~/python_projects_wsl2/1_MaritimeModule_V1
 
 ### 2. Install Dependencies
 ```bash
-uv sync
+mamba env update -f environment.yml --prune
+pip install uv
+uv pip compile requirements.in -o requirements.txt  # Optional: skip to use tested snapshot
+uv pip install --no-deps -r requirements.txt
+uv pip install -e .
 ```
 
 ### 3. No Database Configuration Needed
 GeoPackage uses file-based storage - no server credentials required. Just ensure:
-- Output directory exists: `docs/notebooks/output/`
+- Output directory exists: `output/`
 - S-57 ENC data is available in GeoPackage format
 - (Optional) `.env` file may contain other tokens/config, not needed for GeoPackage workflow
 
@@ -332,7 +336,7 @@ python scripts/maritime_graph_geopackage_workflow.py
 
 ## Output Files
 
-### GeoPackage Files (Default Location: `docs/notebooks/output/`)
+### GeoPackage Files (Default Location: `output/`)
 
 #### Step 1: Base Graph
 ```
@@ -426,7 +430,7 @@ The `land_area_layer: "land_grid"` parameter is **essential** for optimization:
 
 ### Route Files
 ```
-docs/notebooks/output/detailed_route_7.5m_draft.geojson
+output/detailed_route_7.5m_draft.geojson
 ```
 
 - GeoJSON format with route segments
@@ -453,9 +457,9 @@ docs/logs/maritime_workflow_20251028_141053.log.3  # Rotated backup
 
 ### Benchmark Files
 ```
-docs/notebooks/output/benchmark_graph_base_gpkg.csv
-docs/notebooks/output/benchmark_graph_fine_gpkg.csv
-docs/notebooks/output/benchmark_graph_weighted_directed_gpkg.csv
+output/benchmark_graph_base_gpkg.csv
+output/benchmark_graph_fine_gpkg.csv
+output/benchmark_graph_weighted_directed_gpkg.csv
 ```
 
 - Performance metrics in CSV format
@@ -595,7 +599,7 @@ Error: Output directory not found
 
 #### 2. Missing ENC Data File
 ```
-Error: us_enc_all.gpkg not found
+Error: enc_west.gpkg not found
 ```
 
 **Solution:**
@@ -660,7 +664,7 @@ Error: database disk image is malformed / database is locked
 
 3. **Verify GeoPackage setup:**
    ```bash
-   ogrinfo docs/notebooks/output/us_enc_all.gpkg
+   ogrinfo output/enc_west.gpkg
    ```
 
 4. **Test with verbose logging:**
@@ -671,13 +675,13 @@ Error: database disk image is malformed / database is locked
 5. **Check intermediate outputs:**
    ```bash
    # List GeoPackage layers
-   ogrinfo docs/notebooks/output/base_graph.gpkg
+   ogrinfo output/base_graph.gpkg
 
    # Count nodes/edges
-   ogrinfo -sql "SELECT COUNT(*) FROM nodes" docs/notebooks/output/base_graph.gpkg
+   ogrinfo -sql "SELECT COUNT(*) FROM nodes" output/base_graph.gpkg
 
    # Verify land_grid exists (required for weighting)
-   ogrinfo -sql "SELECT COUNT(*) FROM land_grid" docs/notebooks/output/h3_graph_20.gpkg
+   ogrinfo -sql "SELECT COUNT(*) FROM land_grid" output/h3_graph_20.gpkg
    ```
 
 ## Advanced Topics
@@ -791,13 +795,13 @@ GeoPackage files are portable and can be shared:
 
 ```bash
 # Backup entire workflow
-tar -czf maritime_workflow_backup.tar.gz docs/notebooks/output/*.gpkg docs/logs/
+tar -czf maritime_workflow_backup.tar.gz output/*.gpkg docs/logs/
 
 # Share only weighted graph (most useful file)
-cp docs/notebooks/output/h3_graph_wt_20.gpkg /path/to/share/
+cp output/h3_graph_wt_20.gpkg /path/to/share/
 
 # Share all graphs
-cp docs/notebooks/output/base_graph.gpkg docs/notebooks/output/h3_graph_20.gpkg docs/notebooks/output/h3_graph_wt_20.gpkg /path/to/share/
+cp output/base_graph.gpkg output/h3_graph_20.gpkg output/h3_graph_wt_20.gpkg /path/to/share/
 
 # Restore on another machine
 tar -xzf maritime_workflow_backup.tar.gz
@@ -809,9 +813,9 @@ The script automatically generates benchmark CSVs:
 
 ```bash
 # View benchmarks
-cat docs/notebooks/output/benchmark_graph_base.csv
-cat docs/notebooks/output/benchmark_graph_fine.csv
-cat docs/notebooks/output/benchmark_graph_weighted_directed.csv
+cat output/benchmark_graph_base.csv
+cat output/benchmark_graph_fine.csv
+cat output/benchmark_graph_weighted_directed.csv
 ```
 
 Compare across runs:
@@ -823,7 +827,7 @@ python scripts/maritime_graph_geopackage_workflow.py
 # Analyze performance trends
 python -c "
 import pandas as pd
-df = pd.read_csv('docs/notebooks/output/benchmark_graph_fine.csv')
+df = pd.read_csv('output/benchmark_graph_fine.csv')
 print(df[['timestamp', 'node_count', 'edge_count', 'total_pipeline_sec']])
 "
 ```

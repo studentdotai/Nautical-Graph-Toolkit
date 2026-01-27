@@ -281,7 +281,8 @@ This is the inaugural release of the Nautical Graph Toolkit, a comprehensive mar
 
 ##### Special Technical Features
 - **SQLite RTREE Spatial Index Support**:
-  - pysqlite3-binary integration for GeoPackage operations
+  - Conda `sqlite` package integration for GeoPackage operations
+  - Cross-platform RTREE support (Linux AMD64, macOS ARM M1/M4, Windows 11 tested)
   - Enables high-performance spatial queries on file-based databases
   - Critical for graph enrichment operations
   - Automatic fallback handling
@@ -319,7 +320,7 @@ This is the inaugural release of the Nautical Graph Toolkit, a comprehensive mar
 - **GDAL**: 3.11.3 (pinned for stability)
 - **Core Geospatial**: GeoPandas 1.1+, Shapely 2.0+, Fiona 1.10+
 - **Routing & Graphs**: NetworkX 3.5+, H3 4.3+
-- **Database**: SQLAlchemy 2.0+, psycopg2-binary 2.9+, pysqlite3-binary 0.5+, GeoAlchemy2 0.18+
+- **Database**: SQLAlchemy 2.0+, psycopg2-binary 2.9+, Conda sqlite (RTREE support), GeoAlchemy2 0.18+
 - **Data Validation**: Pydantic 2.11+
 - **Data Processing**: Pandas 2.3+, ruamel.yaml 0.18+
 - **Visualization**: Plotly 6.3+, IPykernel 6.30+
@@ -334,6 +335,298 @@ This is the inaugural release of the Nautical Graph Toolkit, a comprehensive mar
   - NOAA ENC Charts (National Oceanic and Atmospheric Administration)
   - World Port Index (National Geospatial-Intelligence Agency - NGA)
 - **Third-Party**: GDAL/OGR, NetworkX, PostGIS, H3, Shapely, GeoPandas
+
+---
+
+## [0.1.1] - 2026-01-20
+
+### Production Polish & Documentation Standardization
+
+This patch release completes the production hardening initiative with critical bug fixes, performance optimizations, comprehensive documentation standardization, and production-grade tools.
+
+**Release Focus**: Fixing production issues (2026-01-07 to 2026-01-08), optimizing graph creation (2026-01-14 to 2026-01-16), enhancing development tooling (2026-01-09 to 2026-01-13), and standardizing all user-facing documentation (2026-01-20).
+
+#### Fixed
+
+##### Critical Bug Fixes (Production-Ready)
+
+###### Graph Edge Accumulation Bug (2026-01-08)
+- **Issue**: Graph files accumulated edges on repeated notebook runs (180K edges → 361K on second run)
+- **Root Cause**: `save_graph_to_gpkg()` used inconsistent write modes (nodes: overwrite, edges: append)
+- **Solution**: Added file deletion before saving to prevent data corruption
+- **Impact**: Notebooks can now be safely re-run with identical output
+- **File**: `src/nautical_graph_toolkit/core/graph.py:1358`
+
+###### Graph Bridging Component Connectivity (2026-01-16)
+- **Issue**: Disconnected graph components not properly bridged across subdivision boundaries
+  - 0.05NM spacing: 721,907 nodes with 10.3% loss (should be 803,784 with 0.08% loss)
+  - Grid size detection incorrect (detected 2x2, should be 4x4)
+  - Over-connection: Nodes exceeding 8 bridge edges
+  - Coordinate misalignment: ~0.008° offset between polygon and graph bounds
+- **Root Cause**:
+  - Thresholds based on `expected_points` but bridging sees `actual_nodes` (40-60% after land exclusion)
+  - Insufficient boundary tolerance to detect seam nodes
+  - Per-pair tracking allowed over-connection across multiple component pairs
+- **Solution**:
+  - Adjusted thresholds: >250K→4x4, >60K→3x3, >25K→2x2
+  - Increased `boundary_tolerance` from `spacing_deg * 2` to `spacing_deg * 6`
+  - Implemented global connection tracking instead of per-pair tracking
+- **Results**:
+  - 0.05NM node retention: 89.7% → 99.92% (+81,877 nodes)
+  - Boundary nodes detected: 3,626 → 6,937 (+91%)
+  - Bridge edges created: 8,091 → 14,664 (+81%)
+- **File**: `src/nautical_graph_toolkit/core/graph.py` - `_bridge_disconnected_components()` method
+
+##### Documentation Standardization (100+ fixes across 13 files)
+
+###### GDAL Version Standardization (8 corrections)
+- **Issue**: Multiple files referenced GDAL 3.11.3, but project pins GDAL 3.10.3
+- **Standardized To**: GDAL 3.10.3 (exact pinned version)
+- **Changes**:
+  - `README.md` (3 fixes): Installation and system requirements sections
+  - `INSTALL.md` (2 fixes): Error message and test expectation
+  - `SCRIPTS_GUIDE.md` (1 fix): General reference to SETUP.md for exact version
+  - Others: Follow centralized reference pattern
+
+###### Database & Schema Naming Standardization (30+ corrections)
+- **Issue**: Inconsistent naming (ENC_db vs enc_db, us_enc_all vs enc_west)
+- **Standardized To**:
+  - Database name: `enc_db` (lowercase)
+  - Standard dataset: `enc_west` (new standard schema)
+- **Files Updated**: 8 documentation files with comprehensive updates
+
+###### PostgreSQL Version Requirement Clarification (3 additions)
+- **Issue**: PostgreSQL version requirement unclear in some guides
+- **Standardized To**: PostgreSQL 16+ (minimum requirement)
+- **Files Updated**: DATABASE_BACKEND_GUIDE.md, SCRIPTS_GUIDE.md
+
+###### Environment Setup References (7 corrections)
+- **Issue**: Outdated .venv references in workflow documentation
+- **Standardized To**: Conda+uv hybrid workflow (current standard)
+- **Updated**: All environment setup examples and commands
+
+##### Notebook Production Issues (2026-01-07 to 2026-01-08)
+- Fixed missing `load_dotenv()` call in `port_utils.ipynb`
+- Removed "uv sync" references across 9 files (replaced with Conda+uv hybrid workflow)
+- Corrected 70 outdated path references (docs/notebooks/output/ → output/)
+- Added missing CLI documentation (--force-update, --data-dir)
+
+##### Notebook Conversion Skill Issues (2026-01-09)
+- Fixed broken syntax in README.md (Standard library modules list)
+- Completed incomplete heading in SKILL_DESCRIPTION.md ("Before Committing")
+- Fixed inconsistent command prefix (/nb-list → /dev:nb-list)
+- Renamed CHANGELOG.md → NB_CHANGELOG.md (eliminates project changelog confusion)
+
+#### Added
+
+##### Development Infrastructure & Documentation Hub (2026-01-01) - TASK-001
+**Purpose**: Help future contributors integrate easier with Claude Code, use similar standards, and improve project code and AI dev workflows.
+
+- **Complete /dev Directory Hub System**: Comprehensive knowledge base (~2,000 lines real content)
+  - **4 Rule Files** (~590 lines):
+    - `CLAUDE.md`: Project knowledge with architecture, dependencies, performance data
+    - `AGENTS.md`: Agent-specific behavior guidelines and collaboration patterns
+    - `CODE_STANDARDS.md`: Coding conventions, testing standards, security practices
+    - `WORKFLOW.md`: Development processes, commands, troubleshooting
+
+  - **11 Specialized Skills** (~920 lines) across 4 categories:
+    - **DEV**: Environment setup, dev-env-setup, Context7 usage, notebook-convert
+    - **TEST**: Integration tests, GDAL mocking
+    - **DB**: PostGIS setup, backend optimization
+    - **GIS**: GDAL S-57 config, S-57 import, graph routing
+
+  - **Planning & Tracking System** (~580 lines):
+    - **TODO System**: 7 active items, 12 backlog features
+    - **Task Management**: TASK_INDEX.md, task tracking structure
+    - **Progress Tracking**: DAILY_LOG.md, MILESTONES.md
+
+  - **Knowledge Organization**:
+    - Centralized project knowledge prevents fragmentation
+    - Consistent cross-referencing pattern across all docs
+    - Real, actionable content (not just templates)
+    - Equal partnership: serves both agent and developer
+
+- **Root CLAUDE.md Conversion**: Migrated documentation to /dev
+  - **Before**: 139-line root CLAUDE.md with scattered content
+  - **After**: 30-line pointer file with cross-references
+  - **Impact**: Better organization, easier to find information, cleaner root directory
+
+- **Integration Pattern for Future Contributors**:
+  - Clear examples of how to structure code documentation
+  - Reusable skill templates for common development tasks
+  - Guidelines for AI-assisted development workflows
+  - Standards for type hints, testing, and code organization
+
+##### Performance & Optimization (2026-01-14 to 2026-01-16)
+
+###### max_subdivision_factor Parameter (2026-01-14)
+- **Purpose**: Resolve PostgreSQL memory errors for very large graphs (1000K+ nodes)
+- **Implementation**: Added parameter to graph creation functions and all backend managers
+- **Default**: 4 (4×4 = 16 regions, balances memory and performance)
+- **Advanced Usage**: Set to 5 for 5×5 subdivision when memory errors occur (requires 32GB+ RAM)
+- **Documentation**: Added to TROUBLESHOOTING.md with memory error solutions
+- **Warning**: Users alerted when `max_subdivision_factor > 4`
+- **Files**: `graph.py` (3 functions), `s57_data.py` (3 manager classes), TROUBLESHOOTING.md
+
+###### Fine Graph Performance Benchmarks (2026-01-16)
+- **Added to TECHNICAL_SPECS.md**: Fine Graph Creation Performance by Spacing
+  - 0.05-0.2 NM spacing benchmarks (GeoPackage: ~103s, PostGIS: ~291s)
+  - H3 resolution benchmarks (6-11)
+  - Critical PostGIS optimization note: subdivision 47× faster than single SQL process
+- **Storage Requirements**: Documented actual file sizes (5.6GB → 195MB range)
+- **Cross-platform**: Documented AMD Strix Halo hardware specs for reproducibility
+
+##### Development Tooling Enhancements (2026-01-09 to 2026-01-13)
+
+###### Notebook Conversion Skill Enhancement (2026-01-10)
+- **Python Export**: `--to-python` flag for executable Python scripts
+- **Markdown Export**: `--to-markdown` flag for documentation-ready format
+- **Dependency Verification**: Pre-flight checks with helpful error messages
+- **Dual-strategy Fallback**: CLI nbconvert → Python API fallback
+- **Enhanced Cleanup**: Counts .ipynb, .py, and .md files
+- **CLI Usage Examples**: Comprehensive documentation added
+
+###### Notebook Sync Command (2026-01-10)
+- **Created**: `/dev:nb-sync` slash command for diff/merge operations
+- **Features**: Bidirectional merge with auto-detection from timestamps
+- **Support**: Format-agnostic design (.ipynb, .py, .md)
+- **Status Indicators**: ✓ Identical, ⚠️ Files differ, ⏭️ Skipping, ✗ Failed
+- **Documentation**: 90+ lines of comprehensive sync/merge documentation
+
+###### Notebook Utilities Module (2026-01-13)
+- **Created**: `src/nautical_graph_toolkit/utils/notebook_utils.py`
+- **BenchmarkLogger Class**: Automated performance tracking
+- **get_current_benchmark_summary()**: Returns formatted benchmark summary
+- **Metrics**: Timestamp, workflow, data source, nodes, edges, total time
+- **Documentation**: Comprehensive usage patterns and examples in NOTEBOOK_STANDARDS.md
+
+##### Notebook Standards (2026-01-12 to 2026-01-14)
+
+###### Standardized Title Cell Templates (2026-01-14)
+- **Applied to**: 13 Jupyter notebooks across the project
+- **Templates**: 4 types (Base Graph, Fine Graph, Weighted Graph, Import/Utility)
+- **Documentation**: Updated NOTEBOOK_STANDARDS.md with full template reference
+- **Impact**: Reduced title cell size (64 lines → 34 lines for PostGIS notebook)
+
+###### Documentation Hub Population (2026-01-01)
+- **Created**: Complete /dev directory structure with 22 files
+  - Rules: CLAUDE.md, AGENTS.md, CODE_STANDARDS.md, WORKFLOW.md
+  - Skills: 8 core skills (DEV, TEST, DB, GIS categories)
+  - Tasks: TASK_INDEX.md, completed task tracking
+  - Progress: DAILY_LOG.md, CHANGELOG.md, MILESTONES.md
+  - TODO: Prioritized backlog system
+- **Content**: ~2,000 lines of real, actionable content (not templates)
+- **Root CLAUDE.md**: Converted to 30-line pointer file with cross-references
+
+#### Changed
+
+##### Documentation Standardization (13 files total)
+- Standardized all documentation to reference exact GDAL version (3.10.3)
+- Updated all database naming examples to lowercase (enc_db)
+- Updated all schema/dataset examples to enc_west
+- Improved documentation navigation with explicit cross-references
+- Clarified PostgreSQL 16+ as minimum requirement across all guides
+- Established SETUP.md as primary reference for software prerequisites
+- Established WORKFLOW_QUICKSTART.md as centralized GDAL version reference
+- Established DATABASE_BACKEND_GUIDE.md as decision guide with workflow links
+
+##### Notebook Production Readiness
+- Standardized all 13 notebook title cells to consistent hybrid template
+- Updated notebook target line counts (40-60 for workflows, 15-40 for utilities)
+- Improved notebook documentation cross-references (link to external docs instead of duplicating)
+- Fixed environment variables loading (added missing load_dotenv calls)
+
+##### Skill & Command Standardization (2026-01-09)
+- Added YAML frontmatter to all 4 nb-* slash commands (nb-convert, nb-list, nb-check, nb-cleanup)
+- Updated Command Mapping section in SKILL_DESCRIPTION.md (now 5 commands total)
+- Replaced bash script sections with explicit LLM implementation notes
+
+##### Documentation Count Corrections (2026-01-22)
+- **Issue**: Documentation claimed 13 specialized skills, but actual count is 11
+- **Issue**: Documentation claimed 15 dev-specific commands, but actual count is 14
+- **Issue**: Documentation claimed 16 total slash commands, but actual count is 15 (14 dev + 1 add-to-changelog)
+- **Fixed**: Updated skill count (13→11) across 10 files
+- **Fixed**: Updated command counts (15→14 dev, 16→15 total) in MANIFEST.md, README_DEV.md, QUICK_REFERENCE.md
+- **Files Updated**: AGENTS.md, CODE_STANDARDS.md, WORKFLOW.md, NOTEBOOK_STANDARDS.md, CLAUDE.md (dev/rules/), MANIFEST.md, TASK_INDEX.md, README_DEV.md, GETTING_STARTED.md, QUICK_REFERENCE.md, CHANGELOG.md (this entry)
+- **Impact**: Documentation now accurately reflects 11 skills and 14 dev commands
+
+#### Deprecated
+
+- References to GDAL 3.11.3 (never actually used)
+- References to non-existent backend-specific notebooks
+- Vague GDAL version references (replaced with exact 3.10.3)
+- `.venv/bin/python` environment references (use Conda+uv workflow)
+- CHANGELOG.md in notebook-convert skill (renamed to NB_CHANGELOG.md)
+
+#### Performance Improvements
+
+- **PostGIS fine graph creation**: 1492s → 22s (**68× speedup**)
+- **Individual graph creation**: 1480s → 7.4s (200× faster)
+- **H3 workflow**: 360s (unchanged, no regression)
+- **PostGIS subdivision vs single SQL**: 47× faster with subdivision
+- **0.05NM spacing node retention**: 89.7% → 99.92%
+- **Bridge edge creation**: 8,091 → 14,664 edges (+81%)
+
+#### Testing & Validation
+
+- **Notebooks Tested**: 13/13 Jupyter notebooks verified production-ready
+- **Edge Accumulation Fix**: Verified across multiple notebook re-runs
+- **Graph Bridging**: Validated with 0.1NM and 0.05NM spacing configurations
+- **Backend Consistency**: Verified PostGIS, GeoPackage, SpatiaLite all maintain correctness
+
+#### Files Modified (Summary)
+
+**Core Code**:
+- `src/nautical_graph_toolkit/core/graph.py` (2 critical bug fixes, 1 parameter addition)
+- `src/nautical_graph_toolkit/utils/notebook_utils.py` (new BenchmarkLogger module)
+- `src/nautical_graph_toolkit/core/s57_data.py` (max_subdivision_factor parameter)
+
+**Documentation** (13 files, 100+ fixes):
+- `docs/SETUP.md`, `docs/TECHNICAL_SPECS.md`, `docs/TROUBLESHOOTING.md`
+- `docs/WEIGHTS_WORKFLOW_EXAMPLE.md`, `docs/DATABASE_BACKEND_GUIDE.md`
+- `docs/WORKFLOW_POSTGIS_GUIDE.md`, `docs/WORKFLOW_S57_IMPORT_GUIDE.md`
+- `docs/WORKFLOW_QUICKSTART.md`, `docs/WORKFLOW_GEOPACKAGE_GUIDE.md`
+- `scripts/SCRIPTS_GUIDE.md`, `data/DATA_GUIDE.md`, `INSTALL.md`, `README.md`
+
+**Development Tools**:
+- `.claude/skills/notebook-convert/nb_convert.py` (export & merge features)
+- `.claude/commands/dev/nb-sync.md` (new slash command)
+- `.claude/skills/notebook-convert/SKILL_DESCRIPTION.md` (comprehensive sync docs)
+- `dev/rules/NOTEBOOK_STANDARDS.md` (title cell templates, benchmarking)
+
+**Notebooks** (13 standardized):
+- `graph_PostGIS_v2.ipynb`, `graph_GeoPackage_v2.ipynb`, `graph_SpatiaLite_v2.ipynb`
+- `graph_fine_PostGIS_v2.ipynb`, `graph_fine_GeoPackage_v2.ipynb`
+- `graph_weighted_directed_postgis_v2.ipynb`, `graph_weighted_directed_GeoPackage_v2.ipynb`
+- `import_s57.ipynb`, `port_utils.ipynb`, `enc_factory.ipynb`
+- `layers_inspect_v2.ipynb`, `s57utils.ipynb`, `import_deeptest.ipynb`
+
+#### Quality Achievements
+
+✅ **Production-Ready**:
+- Fixed critical bugs affecting graph quality and data integrity
+- Verified notebooks production-ready across all backends
+- Comprehensive error handling and user guidance
+
+✅ **Documentation Excellence**:
+- Eliminated GDAL version inconsistencies (single source of truth)
+- Standardized database/schema naming throughout
+- Clear reference hierarchy prevents future confusion
+
+✅ **Performance Leadership**:
+- 68× speedup for PostGIS fine graph workflows
+- Optimized memory handling for large graphs
+- Benchmarks published in TECHNICAL_SPECS.md
+
+✅ **Developer Experience**:
+- Complete /dev directory hub for project knowledge
+- Automated notebook utilities and tools
+- Enhanced notebook conversion and sync capabilities
+
+✅ **Cross-Platform Ready**:
+- Verified on AMD Strix Halo (128GB unified memory)
+- Windows 11 benchmarks planned
+- Cross-platform documentation complete
 
 ---
 

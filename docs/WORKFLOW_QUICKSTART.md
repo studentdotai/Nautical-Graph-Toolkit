@@ -16,6 +16,23 @@ This unified quick-start guide covers all workflow types. Currently implemented:
 
 ---
 
+## Prerequisites: Software Requirements
+
+### GDAL Version Pinning
+
+This project requires **GDAL 3.10.3** (exact version) for S-57 ENC data processing. This version is pinned in:
+- `environment.yml` - For Conda environment
+- `requirements.txt` - For pip dependencies
+
+**Installation via Conda (Recommended):**
+```bash
+mamba env update -f environment.yml --prune
+```
+
+This ensures the correct GDAL version with all spatial driver support. Do not attempt manual pip installation of GDAL.
+
+---
+
 ## Prerequisites: Data Import Pipeline
 
 Before running any workflow, you must first convert S-57 ENC data to a GIS-ready format using **`import_s57.py`**. This creates the core database that feeds all maritime graphs.
@@ -35,7 +52,7 @@ Step 1: Data Import (import_s57.py)
   ├─ GeoPackage: File-based (portable, single file)
   └─ SpatiaLite: File-based (lightweight SQLite)
        ↓
-  Core Database Created (us_enc_all schema/file)
+  Core Database Created (enc_west schema/file)
   └─ Layers: seaare, lndare, fairwy, drgare, tsslpt, etc.
             + dsid_dsnm column (source ENC tracking)
 
@@ -57,7 +74,7 @@ python scripts/import_s57.py \
   --mode advanced \
   --input-path data/ENC_ROOT \
   --output-format postgis \
-  --schema us_enc_all \
+  --schema enc_west \
   --verify \
   --db-host 127.0.0.1 \
   --db-user postgres \
@@ -74,7 +91,7 @@ python scripts/import_s57.py \
 ```
 
 **What It Creates**:
-- Single schema/file (us_enc_all) with all ENCs merged by layer
+- Single schema/file (enc_west) with all ENCs merged by layer
 - ~20+ S-57 layers (seaare, lndare, soundg, fairwy, drgare, etc.)
 - Each feature has `dsid_dsnm` column indicating source ENC
 - Spatial indexes for fast querying
@@ -90,7 +107,7 @@ python scripts/import_s57.py \
   --mode update \
   --update-source data/ENC_ROOT_UPDATE \
   --output-format postgis \
-  --schema us_enc_all \
+  --schema enc_west \
   --db-host 127.0.0.1 \
   --db-user postgres
 
@@ -99,7 +116,7 @@ python scripts/import_s57.py \
   --mode update \
   --update-source data/ENC_ROOT_UPDATE \
   --output-format postgis \
-  --schema us_enc_all \
+  --schema enc_west \
   --force-update \
   --enc-filter US3CA52M US1GC09M  # Optional: specific ENCs
   --db-host 127.0.0.1 \
@@ -131,38 +148,38 @@ After import completes, verify the database before running workflows:
 **PostGIS Verification**:
 ```bash
 # Check schema exists
-psql -h localhost -U postgres -d ENC_db -c \
-  "SELECT * FROM information_schema.schemata WHERE schema_name = 'us_enc_all';"
+psql -h localhost -U postgres -d enc_db -c \
+  "SELECT * FROM information_schema.schemata WHERE schema_name = 'enc_west';"
 
 # Check key layers exist
-psql -h localhost -U postgres -d ENC_db -c \
+psql -h localhost -U postgres -d enc_db -c \
   "SELECT table_name FROM information_schema.tables
-   WHERE table_schema='us_enc_all' ORDER BY table_name;"
+   WHERE table_schema='enc_west' ORDER BY table_name;"
 
 # Verify layer has features
-psql -h localhost -U postgres -d ENC_db -c \
-  "SELECT 'seaare' as layer, COUNT(*) as feature_count FROM us_enc_all.seaare
+psql -h localhost -U postgres -d enc_db -c \
+  "SELECT 'seaare' as layer, COUNT(*) as feature_count FROM enc_west.seaare
    UNION ALL
-   SELECT 'lndare', COUNT(*) FROM us_enc_all.lndare
+   SELECT 'lndare', COUNT(*) FROM enc_west.lndare
    UNION ALL
-   SELECT 'soundg', COUNT(*) FROM us_enc_all.soundg;"
+   SELECT 'soundg', COUNT(*) FROM enc_west.soundg;"
 
 # Check source tracking column
-psql -h localhost -U postgres -d ENC_db -c \
-  "SELECT DISTINCT dsid_dsnm FROM us_enc_all.seaare LIMIT 5;"
+psql -h localhost -U postgres -d enc_db -c \
+  "SELECT DISTINCT dsid_dsnm FROM enc_west.seaare LIMIT 5;"
 ```
 
 **GeoPackage Verification**:
 ```bash
 # List layers in GeoPackage
-ogrinfo docs/notebooks/output/enc_charts.gpkg
+ogrinfo output/enc_charts.gpkg
 
 # Count features in key layers
-ogrinfo docs/notebooks/output/enc_charts.gpkg seaare -summary | grep "Feature Count"
-ogrinfo docs/notebooks/output/enc_charts.gpkg lndare -summary | grep "Feature Count"
+ogrinfo output/enc_charts.gpkg seaare -summary | grep "Feature Count"
+ogrinfo output/enc_charts.gpkg lndare -summary | grep "Feature Count"
 
 # Check file size
-ls -lh docs/notebooks/output/enc_charts.gpkg
+ls -lh output/enc_charts.gpkg
 ```
 
 ### Skip Import: Use Pre-Processed Databases
@@ -201,7 +218,7 @@ For more pre-processed options including pre-generated graphs, see [data/DATA_GU
 
 #### 1. Verify Configuration
 ```bash
-python scripts/maritime_graph_postgis_workflow.py --dry-run
+python scripts/maritime_graph_postgis_workflow.py --config docs/maritime_workflow_config.yml --dry-run
 ```
 
 Expected output:
@@ -212,7 +229,7 @@ Dry run mode - configuration validated, exiting
 
 #### 2. Run Full Pipeline
 ```bash
-python scripts/maritime_graph_postgis_workflow.py
+python scripts/maritime_graph_postgis_workflow.py --config docs/maritime_workflow_config.yml
 ```
 
 **Estimated time: 45-60 minutes**
@@ -230,22 +247,22 @@ The script will:
 tail -f docs/logs/maritime_workflow_*.log
 
 # List output files
-ls -lh docs/notebooks/output/
+ls -lh output/
 
 # Check benchmark results
-cat docs/notebooks/output/benchmark_graph_*.csv
+cat output/benchmark_graph_*.csv
 ```
 
 ### GeoPackage Workflow
 
 #### 1. Verify Configuration
 ```bash
-python scripts/maritime_graph_geopackage_workflow.py --dry-run
+python scripts/maritime_graph_geopackage_workflow.py --config docs/maritime_workflow_config.yml --dry-run
 ```
 
 #### 2. Run Full Pipeline
 ```bash
-python scripts/maritime_graph_geopackage_workflow.py
+python scripts/maritime_graph_geopackage_workflow.py --config docs/maritime_workflow_config.yml
 ```
 
 **Estimated time: 14-20 minutes** (faster than PostGIS for file-based operations)
@@ -253,10 +270,10 @@ python scripts/maritime_graph_geopackage_workflow.py
 #### 3. Check Results
 ```bash
 # List output files
-ls -lh docs/notebooks/output/
+ls -lh output/
 
 # View GeoPackage layers
-ogrinfo docs/notebooks/output/base_graph.gpkg
+ogrinfo output/base_graph.gpkg
 ```
 
 ---
@@ -274,7 +291,7 @@ python scripts/import_s57.py \
   --mode advanced \
   --input-path data/ENC_SF_LA/ENC_ROOT \
   --output-format postgis \
-  --schema us_enc_all \
+  --schema enc_west \
   --enable-parallel \
   --max-workers 4 \
   --verify \
@@ -283,7 +300,7 @@ python scripts/import_s57.py \
   --db-password <password>
 
 # Expected output
-# ✓ Connected to PostGIS: ENC_db@127.0.0.1:5432
+# ✓ Connected to PostGIS: enc_db@127.0.0.1:5432
 # ✓ Found 47 S-57 files
 # ✓ Conversion completed in 3245s
 # ✓ Feature update status verified
@@ -293,16 +310,16 @@ python scripts/import_s57.py \
 #### Step 2: Verify Import
 ```bash
 # Confirm schema and layers exist
-psql -h 127.0.0.1 -U postgres -d ENC_db -c \
+psql -h 127.0.0.1 -U postgres -d enc_db -c \
   "SELECT table_name FROM information_schema.tables
-   WHERE table_schema='us_enc_all' LIMIT 10;"
+   WHERE table_schema='enc_west' LIMIT 10;"
 
 # Expected: seaare, lndare, fairwy, drgare, tsslpt, soundg, etc.
 
 # Quick feature count
-psql -h 127.0.0.1 -U postgres -d ENC_db -c \
-  "SELECT 'seaare' as layer, COUNT(*) FROM us_enc_all.seaare
-   UNION ALL SELECT 'lndare', COUNT(*) FROM us_enc_all.lndare;"
+psql -h 127.0.0.1 -U postgres -d enc_db -c \
+  "SELECT 'seaare' as layer, COUNT(*) FROM enc_west.seaare
+   UNION ALL SELECT 'lndare', COUNT(*) FROM enc_west.lndare;"
 ```
 
 #### Step 3: Configure Workflow
@@ -327,10 +344,10 @@ weighting:
 #### Step 4: Run Workflow
 ```bash
 # Dry run first (validate setup)
-python scripts/maritime_graph_postgis_workflow.py --dry-run
+python scripts/maritime_graph_postgis_workflow.py --config docs/maritime_workflow_config.yml --dry-run
 
 # Full workflow
-python scripts/maritime_graph_postgis_workflow.py
+python scripts/maritime_graph_postgis_workflow.py --config docs/maritime_workflow_config.yml
 
 # Expected output
 # Base Graph Creation: 127.4s (2.1 min)
@@ -343,13 +360,13 @@ python scripts/maritime_graph_postgis_workflow.py
 #### Step 5: Visualize Results
 ```bash
 # Check generated route
-cat docs/notebooks/output/detailed_route_7.5m_draft.geojson | head -50
+cat output/detailed_route_7.5m_draft.geojson | head -50
 
 # Open GeoPackage in QGIS
-open docs/notebooks/output/h3_graph_directed_pg_6_11.gpkg
+open output/h3_graph_directed_pg_6_11.gpkg
 
 # Check performance benchmarks
-cat docs/notebooks/output/benchmark_graph_base.csv
+cat output/benchmark_graph_base.csv
 ```
 
 ---
@@ -372,19 +389,19 @@ python scripts/import_s57.py \
 # Expected output
 # ✓ Found 47 S-57 files
 # ✓ Conversion completed in 2400s
-# ✓ Output file: docs/notebooks/output/enc_west.gpkg (1.2 GB)
+# ✓ Output file: output/enc_west.gpkg (1.2 GB)
 # ✓ Feature verification complete
 ```
 
 #### Step 2: Verify Import
 ```bash
 # List all layers in GeoPackage
-ogrinfo docs/notebooks/output/enc_west.gpkg | grep "^  "
+ogrinfo output/enc_west.gpkg | grep "^  "
 
 # Expected: seaare, lndare, fairwy, drgare, tsslpt, soundg, etc.
 
 # Count features
-ogrinfo docs/notebooks/output/enc_west.gpkg seaare -summary | grep "Feature Count"
+ogrinfo output/enc_west.gpkg seaare -summary | grep "Feature Count"
 ```
 
 #### Step 3: Configure Workflow
@@ -393,7 +410,7 @@ Same as PostGIS (uses same YAML file)
 #### Step 4: Run Workflow
 ```bash
 # Workflow uses GeoPackage automatically
-python scripts/maritime_graph_geopackage_workflow.py
+python scripts/maritime_graph_geopackage_workflow.py --config docs/maritime_workflow_config.yml
 
 # Expected output (faster than PostGIS)
 # Base Graph Creation: 117.5s (2.0 min)
@@ -406,14 +423,14 @@ python scripts/maritime_graph_geopackage_workflow.py
 #### Step 5: Share/Deploy
 ```bash
 # All outputs in single portable directory
-ls -lh docs/notebooks/output/
+ls -lh output/
 
 # Copy to USB drive or share
-tar -czf maritime_workflow.tar.gz docs/notebooks/output/*.gpkg docs/logs/
+tar -czf maritime_workflow.tar.gz output/*.gpkg docs/logs/
 
 # On another machine, extract and open in QGIS (no server needed!)
 tar -xzf maritime_workflow.tar.gz
-open docs/notebooks/output/h3_graph_wt_20.gpkg
+open output/h3_graph_wt_20.gpkg
 ```
 
 ---
@@ -429,7 +446,7 @@ python scripts/import_s57.py \
   --mode update \
   --update-source data/ENC_UPDATES_2025 \
   --output-format postgis \
-  --schema us_enc_all \
+  --schema enc_west \
   --db-host 127.0.0.1 \
   --db-user postgres
 
@@ -439,10 +456,10 @@ python scripts/import_s57.py \
 #### Step 2: Regenerate Graphs
 ```bash
 # Regenerate all graphs with updated data
-python scripts/maritime_graph_postgis_workflow.py
+python scripts/maritime_graph_postgis_workflow.py --config docs/maritime_workflow_config.yml
 
 # For GeoPackage: graphs reload updated data automatically
-python scripts/maritime_graph_geopackage_workflow.py
+python scripts/maritime_graph_geopackage_workflow.py --config docs/maritime_workflow_config.yml
 ```
 
 #### Step 3: Compare Routes
@@ -451,7 +468,7 @@ python scripts/maritime_graph_geopackage_workflow.py
 # Previous: detailed_route_7.5m_draft.geojson (59.43 NM)
 # New: same file now has updated route
 
-cat docs/notebooks/output/detailed_route_7.5m_draft.geojson
+cat output/detailed_route_7.5m_draft.geojson
 ```
 
 ---
@@ -478,7 +495,7 @@ cat docs/notebooks/output/detailed_route_7.5m_draft.geojson
 
 ```bash
 # ✓ CORRECT: PostGIS → PostGIS
-python scripts/import_s57.py ... --output-format postgis --schema us_enc_all
+python scripts/import_s57.py ... --output-format postgis --schema enc_west
 python scripts/maritime_graph_postgis_workflow.py
 
 # ✓ CORRECT: GeoPackage → GeoPackage
@@ -497,19 +514,19 @@ python scripts/maritime_graph_geopackage_workflow.py  # Fails - no GeoPackage da
 ### Skip Steps (Resume Workflow)
 ```bash
 # Skip base graph (already exists)
-.venv/bin/python scripts/maritime_graph_postgis_workflow.py --skip-base
+python scripts/maritime_graph_postgis_workflow.py --skip-base
 
 # Skip fine graph too
-.venv/bin/python scripts/maritime_graph_postgis_workflow.py --skip-base --skip-fine
+python scripts/maritime_graph_postgis_workflow.py --skip-base --skip-fine
 
 # Only run weighting and pathfinding
-.venv/bin/python scripts/maritime_graph_postgis_workflow.py --skip-base --skip-fine
+python scripts/maritime_graph_postgis_workflow.py --skip-base --skip-fine
 ```
 
 ### Use Different Graph Mode
 ```bash
 # Use fine grid (regular grid) instead of H3 (hexagonal)
-.venv/bin/python scripts/maritime_graph_postgis_workflow.py --graph-mode fine
+python scripts/maritime_graph_postgis_workflow.py --graph-mode fine
 
 # Fine grid is faster but less uniform
 # Expected time: ~15-25 minutes (vs 25-35 for H3)
@@ -518,7 +535,7 @@ python scripts/maritime_graph_geopackage_workflow.py  # Fails - no GeoPackage da
 ### Custom Vessel Parameters
 ```bash
 # Different vessel draft (affects routing)
-.venv/bin/python scripts/maritime_graph_postgis_workflow.py --vessel-draft 10.5
+python scripts/maritime_graph_postgis_workflow.py --vessel-draft 10.5
 
 # Override vessel in config file too for persistence
 ```
@@ -526,10 +543,10 @@ python scripts/maritime_graph_geopackage_workflow.py  # Fails - no GeoPackage da
 ### Debug Mode
 ```bash
 # INFO mode (default): Clean logs, ~1MB per file
-.venv/bin/python scripts/maritime_graph_postgis_workflow.py --log-level INFO
+python scripts/maritime_graph_postgis_workflow.py --log-level INFO
 
 # DEBUG mode: Comprehensive debugging, ~5-10MB per file
-.venv/bin/python scripts/maritime_graph_postgis_workflow.py --log-level DEBUG
+python scripts/maritime_graph_postgis_workflow.py --log-level DEBUG
 
 # View detailed log file (automatically rotates at 50MB/500MB)
 tail -f docs/logs/maritime_workflow_*.log
@@ -588,24 +605,24 @@ routes.base_routes                   # Base route
 ### GeoPackage Files
 Auto-generated names from `fine_graph.mode` and `fine_graph.name_suffix`:
 ```
-docs/notebooks/output/base_graph.gpkg
-docs/notebooks/output/{mode}_graph_{suffix}.gpkg         (e.g., h3_graph_20.gpkg)
-docs/notebooks/output/{mode}_graph_wt_{suffix}.gpkg      (e.g., h3_graph_wt_20.gpkg)
-docs/notebooks/output/maritime_routes.gpkg (GeoPackage only)
+output/base_graph.gpkg
+output/{mode}_graph_{suffix}.gpkg         (e.g., h3_graph_20.gpkg)
+output/{mode}_graph_wt_{suffix}.gpkg      (e.g., h3_graph_wt_20.gpkg)
+output/maritime_routes.gpkg (GeoPackage only)
 ```
 Open in QGIS for visualization
 
 ### Routes (GeoJSON)
 ```
-docs/notebooks/output/detailed_route_7.5m_draft.geojson
+output/detailed_route_7.5m_draft.geojson
 ```
 View in web map or GIS software
 
 ### Benchmarks (CSV)
 ```
-docs/notebooks/output/benchmark_graph_base.csv
-docs/notebooks/output/benchmark_graph_fine.csv
-docs/notebooks/output/benchmark_graph_weighted_directed.csv
+output/benchmark_graph_base.csv
+output/benchmark_graph_fine.csv
+output/benchmark_graph_weighted_directed.csv
 ```
 Track performance across runs
 
@@ -639,14 +656,14 @@ Error: No S-57 files (*.000) found in /path/to/data
 
 #### Error: Database Schema Not Found After Import
 ```
-ProgrammingError: schema "us_enc_all" does not exist
+ProgrammingError: schema "enc_west" does not exist
 ```
 
 **Why This Happens**: Workflow can't find imported data
 
 **Solution**:
 1. Verify import completed: `python scripts/import_s57.py ... --verify`
-2. Check schema exists: `psql -d ENC_db -c "SELECT schema_name FROM information_schema.schemata;"`
+2. Check schema exists: `psql -d enc_db -c "SELECT schema_name FROM information_schema.schemata;"`
 3. Verify correct backend:
    ```bash
    # If you imported to PostGIS, use PostGIS workflow
@@ -669,11 +686,11 @@ FileNotFoundError: Layer 'seaare' not found
 1. Verify what layers were imported:
    ```bash
    # PostGIS
-   psql -d ENC_db -c "SELECT table_name FROM information_schema.tables
-                      WHERE table_schema='us_enc_all' ORDER BY table_name;"
+   psql -d enc_db -c "SELECT table_name FROM information_schema.tables
+                      WHERE table_schema='enc_west' ORDER BY table_name;"
 
    # GeoPackage
-   ogrinfo docs/notebooks/output/enc_west.gpkg | grep "^  "
+   ogrinfo output/enc_west.gpkg | grep "^  "
    ```
 
 2. If critical layers missing, re-import with `--overwrite`:
@@ -712,7 +729,7 @@ DatabaseError: database is locked
 
 **Solution**:
 1. Close other applications using the file (QGIS, etc.)
-2. Delete lock files: `rm docs/notebooks/output/enc_west.gpkg-wal`
+2. Delete lock files: `rm output/enc_west.gpkg-wal`
 3. Retry import
 
 ---
@@ -725,7 +742,7 @@ DatabaseError: database is locked
 sudo systemctl status postgresql
 
 # Test connection
-psql -h localhost -U postgres -d ENC_db -c "SELECT version();"
+psql -h localhost -U postgres -d enc_db -c "SELECT version();"
 ```
 
 #### Port Not Found
@@ -766,9 +783,9 @@ Graph creation fails with different results than before update
 
 #### Error: Workflow Can't Find Data
 ```
-FileNotFoundError: No such file or directory: '.../us_enc_all.gpkg'
+FileNotFoundError: No such file or directory: '.../enc_west.gpkg'
 OR
-schema "us_enc_all" does not exist
+schema "enc_west" does not exist
 ```
 
 **Why This Happens**: Import and workflow backends don't match
@@ -783,8 +800,8 @@ python scripts/maritime_graph_postgis_workflow.py
 python scripts/maritime_graph_geopackage_workflow.py
 
 # If unsure, check what exists:
-psql -d ENC_db -c "SELECT schema_name FROM information_schema.schemata LIKE 'us_enc%';"
-ls docs/notebooks/output/*.gpkg
+psql -d enc_db -c "SELECT schema_name FROM information_schema.schemata LIKE 'us_enc%';"
+ls output/*.gpkg
 ```
 
 ## File Structure

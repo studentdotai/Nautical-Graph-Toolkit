@@ -4,6 +4,7 @@
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-blue)](https://www.python.org/downloads/)
 [![GitHub Release](https://img.shields.io/github/v/release/studentdotai/Nautical-Graph-Toolkit)](https://github.com/studentdotai/Nautical-Graph-Toolkit/releases)
 [![Changelog](https://img.shields.io/badge/changelog-keep%20a%20changelog-blue)](CHANGELOG.md)
+[![Open Collective](https://img.shields.io/badge/Open%20Collective-vectornautical-blueviolet)](https://opencollective.com/vectornautical)
 
 A comprehensive maritime analysis toolkit for converting NOAA S-57 Electronic Navigational Charts (ENC) into analysis-ready geospatial formats, generating intelligent maritime routing networks, and performing advanced vessel route optimization.
 
@@ -60,70 +61,98 @@ This toolkit transforms raw S-57 chart data into production-ready geospatial dat
 
 ### Installation
 
-**Prerequisites**: Python 3.11+
+⚠️ **Important**: This package requires **Conda/Mamba** for installation. Pure pip installation is not supported.
 
-#### Option 1: Install from GitHub (Recommended)
-```bash
-pip install git+https://github.com/studentdotai/Nautical-Graph-Toolkit.git
-```
+**Prerequisites**:
+- Miniforge (includes mamba) or Conda with mamba installed
+  - Download: https://github.com/conda-forge/miniforge/releases
+- Python 3.11+ (automatically installed via environment.yml)
+- Git installed
+  - Windows: https://git-scm.com/download/win
 
-#### Option 2: Clone and Install Locally
+**Note for Windows PowerShell users:** If you prefer PowerShell over Miniforge Prompt and encounter issues with `mamba` commands not being recognized, see [Windows PowerShell & Mamba Issues](docs/TROUBLESHOOTING.md#windows-powershell--mamba-issues) for the fix.
+
+#### Clone and Install
+
+**Step 1: Clone repository**
 ```bash
 git clone https://github.com/studentdotai/Nautical-Graph-Toolkit.git
 cd Nautical-Graph-Toolkit
-
-# Install with uv (recommended for development)
-uv sync
-
-# Or install with pip
-pip install -e .
 ```
+
+**Step 2: Create Conda environment (base layer with GDAL)**
+```bash
+mamba env create -f environment.yml
+mamba activate nautical
+```
+
+**Step 3: Compile and install Python dependencies**
+```bash
+# Install uv (fast Python package manager)
+pip install uv
+
+# Compile Python dependencies (optional - skip to use tested snapshot)
+# Run this only if you need updated dependency versions
+uv pip compile requirements.in -o requirements.txt
+
+# Safety check (verify no Conda packages being overwritten)
+uv pip install --no-deps -r requirements.txt --dry-run
+
+# Install Python packages
+uv pip install --no-deps -r requirements.txt
+
+# Install Nautical Graph Toolkit in editable mode
+uv pip install -e .
+```
+
+**Step 4: Verify installation**
+```bash
+python -c "from nautical_graph_toolkit import S57Base; print('✓ Installation successful')"
+```
+
+See [INSTALL.md](INSTALL.md) for detailed troubleshooting and platform-specific guides.
+
+**⚠️ Windows Users:** If you encounter issues with Mamba/Conda commands in PowerShell (command not recognized, scripts disabled, etc.), see the [Windows PowerShell & Mamba Issues](docs/TROUBLESHOOTING.md#windows-powershell--mamba-issues) troubleshooting section.
 
 #### GDAL Installation
-This package requires GDAL ≥ 3.11.3. Installation methods (in order of preference):
 
-**Method 1: Automatic (via PyPI wheel)** - Works on most systems
+This package requires **GDAL 3.10.3** (latest stable in Conda).
+
+GDAL is automatically installed via Conda in Step 2 above. To verify:
+
 ```bash
-# GDAL wheel will install automatically with pip
-# Verify installation:
-python -c "from osgeo import gdal; print(f'GDAL {gdal.__version__} installed')"
+python -c "from osgeo import gdal; print(f'✓ GDAL {gdal.__version__} installed')"
+# Expected: ✓ GDAL 3.10.3
 ```
 
-**Method 2: System Package Manager** - If wheel installation fails
-```bash
-# Ubuntu/Debian
-sudo apt-get install gdal-bin python3-gdal
+**⚠️ Important:** Do NOT install GDAL via pip (`pip install gdal`). This will conflict with the Conda installation and cause version mismatches.
 
-# macOS (with Homebrew)
-brew install gdal
+If you encounter GDAL issues, see [INSTALL.md](INSTALL.md) for troubleshooting.
+
+#### PostGIS Database Setup (Optional, for production workflows)
+
+For large-scale deployments (1000+ ENCs), PostGIS provides better performance.
+
+**Choose your platform:**
+```bash
+# Download the appropriate docker-compose file
+# Linux
+cp docker-compose.linux.yml docker-compose.yml
+
+# macOS ARM (M1/M4)
+cp docker-compose.macos-arm.yml docker-compose.yml
 
 # Windows
-# Download and run: https://trac.osgeo.org/osgeo4w/
-# Or use conda: conda install -c conda-forge gdal
+cp docker-compose.windows.yml docker-compose.yml
+
+# Start database
+docker-compose up -d
+
+# Verify connection
+python -c "from sqlalchemy import create_engine; engine = create_engine('postgresql://postgres:postgres@localhost:5433/enc_db'); print('✓ PostGIS connected')"
 ```
 
-**Method 3: Conda** - Reliable cross-platform installation
-```bash
-conda create -n nautical python=3.11 gdal=3.11.3 -c conda-forge
-conda activate nautical
-pip install git+https://github.com/studentdotai/Nautical-Graph-Toolkit.git
-```
-
-See [INSTALL.md](INSTALL.md) for detailed GDAL troubleshooting and platform-specific guides.
-
-**Database Setup** (for PostGIS backend):
-```bash
-# Create PostgreSQL database with PostGIS extension
-createdb maritime_db
-psql maritime_db -c "CREATE EXTENSION IF NOT EXISTS postgis;"
-
-# Set environment variables
-export POSTGRES_HOST=localhost
-export POSTGRES_PORT=5432
-export POSTGRES_USER=your_user
-export POSTGRES_PASSWORD=your_password
-export POSTGRES_DB=maritime_db
-```
+See [INSTALL.md Section 4](INSTALL.md#4-docker-postgis-setup) for complete platform-specific configuration and troubleshooting.
 
 ### 5-Minute Example: Build a Route Graph
 
@@ -300,7 +329,7 @@ Comprehensive real-world performance analysis from production testing (Nov 2025)
 
 We have a comprehensive public roadmap that outlines our development journey from foundation to production-ready QGIS integration.
 
-**Current Status**: v0.1.0 Released ✅
+**Current Status**: v0.1.1 Released ✅ (2026-01-20)
 
 **Near-term Goals** (v0.2.0 - Foundation & Polish):
 - PyPI distribution for easy installation
@@ -374,17 +403,14 @@ nautical_graph_toolkit/
 
 ### Convert ENC Data to GeoPackage
 ```python
-from nautical_graph_toolkit.core import S57Converter
+from nautical_graph_toolkit.core import S57Base
 
-converter = S57Converter(
-    input_dir="/path/to/enc_files",
-    output_db="maritime.gpkg",
-    backend="geopackage",
-    by_layer=True  # Group by feature type
+converter = S57Base(
+    input_path="/path/to/enc_files",
+    output_dest="maritime.gpkg",
+    output_format="gpkg"
 )
-converter.convert(
-    progress_callback=lambda p: print(f"Progress: {p}%")
-)
+converter.convert_by_enc()
 ```
 
 ### Build a Production Maritime Graph on PostGIS
@@ -439,21 +465,22 @@ noaa.download_updates(updates, destination="/data/encs")
 ## 📦 Installation & Dependencies
 
 ### System Requirements
-- Python 3.11+
-- GDAL ≥ 3.11.3 (geospatial library)
-- PostgreSQL 16+ (optional, for PostGIS backend)
+- **Miniforge** (with mamba) or Conda - Required for GDAL installation
+- Python 3.11+ (automatically installed via environment.yml)
+- GDAL 3.10.3 (automatically installed via Conda)
+- Docker + Docker Compose (optional, for PostGIS backend)
 
 ### Python Dependencies
 - **Geospatial**: GeoPandas 1.1+, Shapely 2.0+, Fiona 1.10+, GeoAlchemy2 0.18+
 - **Data Processing**: Pandas 2.3+, ruamel.yaml 0.18+
 - **Routing & Graphs**: NetworkX 3.5+, H3 4.3+ (hexagonal grids)
-- **Database**: SQLAlchemy 2.0+, psycopg2-binary 2.9+, pysqlite3-binary 0.5+
+- **Database**: SQLAlchemy 2.0+, psycopg2-binary 2.9+, Conda sqlite (RTREE support)
 - **Data Validation**: Pydantic 2.11+
 - **Visualization**: Plotly 6.3+, IPykernel 6.30+ (Jupyter support)
 - **Web Scraping**: BeautifulSoup4 4.13+, requests 2.32+
 - **Utilities**: python-dotenv 1.1+, nbformat 5.10+
 
-Full dependency list in [pyproject.toml](pyproject.toml)
+Full dependency list in [requirements.txt](requirements.txt)
 
 ## 🧪 Testing
 
@@ -505,7 +532,7 @@ nautical-graph-toolkit/
       WORKFLOW_QUICKSTART.md
       WORKFLOW_POSTGIS_GUIDE.md
    tests/                   # Unit & integration tests
-   pyproject.toml           # Package metadata
+   setup.py                 # Package metadata
    README.md                # This file
 ```
 
@@ -560,6 +587,47 @@ In the meantime, you can:
 5. Ensure tests pass and code follows project style
 
 For major changes, please open an issue first to discuss proposed changes.
+
+## 🌊 Support Vector Nautical: By Seamen, For Seamen
+
+**[Vector Nautical](https://opencollective.com/vectornautical) Support this project on [Open Collective](https://opencollective.com/vectornautical)**
+
+### The Mission
+
+While the maritime industry focuses heavily on black-box automation and expensive proprietary systems, **Vector Nautical focuses on the navigator.**
+
+This is a solo-developer initiative driven by an active seafarer who bridged the gap to software engineering through the power of AI innovations. By leveraging Coding Agents and LLMs, we are building professional-grade tools that would normally require a full team.
+
+While the core development is a one-person effort carried out part-time (often at sea), the project is validated and supported by a growing network of fellow maritime officers and academic PhD researchers.
+
+### Flagship Product: Nautical Graph Toolkit
+
+Our first step toward this vision is the **Nautical Graph Toolkit (v0.1.0)**. It is an open-source engine designed to bridge the gap between raw hydrographic data (S-57 ENCs) and intelligent routing. It transforms static charts into vessel-aware, weighted graphs, allowing developers and mariners to analyze the marine environment without the barriers of legacy software.
+
+### Why We Need Your Support: The Hardware Fund
+
+Vector Nautical is unique: this code is written part-time, often from the middle of the ocean, during active sea contracts.
+
+**The Challenge:** As a solo developer at sea, I rely on AI Agents to accelerate development and simulate a software team. However, running these agents and processing global-scale graphs without an internet connection requires massive compute power.
+
+**The Solution:** We are fundraising for an NVIDIA DGX Spark (2026).
+
+**The Impact:** Its 128GB of unified memory allows us to run Offline AI Agents locally. This enables me to write code, test routes, and validate global graphs while completely disconnected from the internet—keeping the project moving forward, no matter where the ship is.
+
+### Our Vision: Augmenting the Bridge, Not Replacing It
+
+The maritime sector is built on strict regulations and certified "black box" systems (OT). We understand that these systems are necessary for compliance, but they often lock data away and limit the navigator's analytical potential.
+
+**Vector Nautical is not trying to replace certified navigation equipment.** Instead, we are building the **Open Analysis Layer** that sits alongside it:
+
+- **Decision Support:** We give officers flexible tools to calculate UKC, visualize terrain, and stress-test routes before entering them into the ECDIS
+- **Offline Independence:** We ensure that advanced analysis happens locally on the ship, enabling innovation even without shore-side cloud services or satellite internet
+- **Security by Design:** We support strict onboard cyber-security protocols by keeping all processing in an isolated environment. The toolkit accepts S-57 ENC data as input and exports standard routes/polygons via local storage (USB), requiring no direct network connection to the ship's ECDIS or OT network
+- **Data Sovereignty:** We transform static S-57 charts into intelligent, accessible data that can actually be used for research and innovation
+
+**[Join us in building the intelligent open layer that empowers the modern navigator.](https://opencollective.com/vectornautical)**
+
+---
 
 ## 💬 Support
 

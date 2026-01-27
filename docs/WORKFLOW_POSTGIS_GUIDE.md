@@ -41,7 +41,7 @@ The workflow performs four major steps:
 ### Required Software
 - Python 3.8+
 - PostgreSQL with PostGIS extension
-- GDAL/OGR (for S-57 conversion)
+- GDAL/OGR (for S-57 conversion - see WORKFLOW_QUICKSTART.md for pinned version)
 - All dependencies listed in `pyproject.toml`
 
 ### Required Data
@@ -53,12 +53,27 @@ The workflow performs four major steps:
 Ensure PostGIS database is running and populated with S-57 data:
 
 ```bash
+# Select platform-specific docker-compose file
+# Linux
+cp docker-compose.linux.yml docker-compose.yml
+
+# macOS ARM (M1/M4)
+cp docker-compose.macos-arm.yml docker-compose.yml
+
+# Windows
+cp docker-compose.windows.yml docker-compose.yml
+
+# Start database
+docker-compose up -d
+
 # Check connection
-psql -h localhost -U postgres -d ENC_db -c "SELECT version();"
+psql -h localhost -U postgres -d enc_db -c "SELECT version();"
 
 # Check S-57 schema exists
-psql -h localhost -U postgres -d ENC_db -c "SELECT * FROM information_schema.schemata WHERE schema_name = 'us_enc_all';"
+psql -h localhost -U postgres -d enc_db -c "SELECT * FROM information_schema.schemata WHERE schema_name = 'enc_west';"
 ```
+
+See [INSTALL.md Section 4](../INSTALL.md#4-docker-postgis-setup) for complete platform-specific configuration and troubleshooting.
 
 ## Installation & Setup
 
@@ -69,14 +84,18 @@ cd ~/python_projects_wsl2/1_MaritimeModule_V1
 
 ### 2. Install Dependencies
 ```bash
-uv sync
+mamba env update -f environment.yml --prune
+pip install uv
+uv pip compile requirements.in -o requirements.txt  # Optional: skip to use tested snapshot
+uv pip install --no-deps -r requirements.txt
+uv pip install -e .
 ```
 
 ### 3. Configure Database Credentials
 Edit `.env` file:
 ```bash
 # .env
-DB_NAME="ENC_db"
+DB_NAME="enc_db"
 DB_USER="postgres"
 DB_PASSWORD="your_password"
 DB_HOST="127.0.0.1"
@@ -337,9 +356,9 @@ graph.{mode}_graph_wt_{suffix}_edges    - Directed edges with weights:
 
 ### GeoPackage Files
 ```
-docs/notebooks/output/base_graph_PG.gpkg
-docs/notebooks/output/h3_graph_PG_6_11.gpkg
-docs/notebooks/output/h3_graph_directed_pg_6_11_v3.gpkg
+output/base_graph_PG.gpkg
+output/h3_graph_PG_6_11.gpkg
+output/h3_graph_directed_pg_6_11_v3.gpkg
 ```
 
 - Portable offline format
@@ -348,7 +367,7 @@ docs/notebooks/output/h3_graph_directed_pg_6_11_v3.gpkg
 
 ### Route Files
 ```
-docs/notebooks/output/detailed_route_7.5m_draft.geojson
+output/detailed_route_7.5m_draft.geojson
 ```
 
 - GeoJSON format with route segments
@@ -375,9 +394,9 @@ docs/logs/maritime_workflow_20251027_142310.log.3  # Rotated backup
 
 ### Benchmark Files
 ```
-docs/notebooks/output/benchmark_graph_base.csv
-docs/notebooks/output/benchmark_graph_fine.csv
-docs/notebooks/output/benchmark_graph_weighted_directed.csv
+output/benchmark_graph_base.csv
+output/benchmark_graph_fine.csv
+output/benchmark_graph_weighted_directed.csv
 ```
 
 - Performance metrics in CSV format
@@ -516,7 +535,7 @@ Error: Failed to initialize database: could not connect to server
 
 #### 2. Missing Schema or Tables
 ```
-Error: schema "us_enc_all" does not exist
+Error: schema "enc_west" does not exist
 ```
 
 **Solution:**
@@ -569,7 +588,7 @@ Warning: H3 graph is not connected. Selecting the largest component.
 
 3. **Verify PostGIS setup:**
    ```bash
-   psql -d ENC_db -c "SELECT postgis_version();"
+   psql -d enc_db -c "SELECT postgis_version();"
    ```
 
 4. **Test with verbose logging:**
@@ -641,8 +660,8 @@ The script automatically generates benchmark CSVs:
 
 ```bash
 # View benchmarks
-cat docs/notebooks/output/benchmark_graph_base.csv
-cat docs/notebooks/output/benchmark_graph_fine.csv
+cat output/benchmark_graph_base.csv
+cat output/benchmark_graph_fine.csv
 ```
 
 Compare across runs:
@@ -653,7 +672,7 @@ python scripts/maritime_graph_postgis_workflow.py
 # Analyze performance trends
 python -c "
 import pandas as pd
-df = pd.read_csv('docs/notebooks/output/benchmark_graph_fine.csv')
+df = pd.read_csv('output/benchmark_graph_fine.csv')
 print(df[['timestamp', 'node_count', 'edge_count', 'total_pipeline_sec']])
 "
 ```

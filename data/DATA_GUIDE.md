@@ -101,6 +101,8 @@ For users who want to skip lengthy data processing or validate their outputs aga
 
 ### 📊 Source ENC Databases
 
+**Note:** `enc_west.gpkg` (209 MB) is the **recommended starting point** for most users. `us_enc_all.gpkg` (6.97 GB) provides complete US coastal coverage for production-scale testing.
+
 Ready-to-use ENC databases that can be directly queried for graph generation without requiring the import step:
 
 | File | Size | Coverage | Resolution | Best For |

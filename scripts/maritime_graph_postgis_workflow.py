@@ -85,6 +85,7 @@ from nautical_graph_toolkit.core.s57_data import ENCDataFactory
 from nautical_graph_toolkit.core.pathfinding_lite import Route
 from nautical_graph_toolkit.utils.port_utils import Boundaries, PortData
 from nautical_graph_toolkit.utils.geometry_utils import Buffer, Slicer
+from nautical_graph_toolkit.utils.logging_utils import ICONS, SafeStreamHandler
 
 try:
     from tqdm import tqdm
@@ -140,7 +141,7 @@ class WorkflowLogger:
         self.logger.addHandler(fh)
 
         # Console handler (configurable level)
-        ch = logging.StreamHandler()
+        ch = SafeStreamHandler(sys.stdout)
         ch.setLevel(getattr(logging, console_level))
         ch.setFormatter(logging.Formatter(
             '[%(asctime)s] %(message)s',
@@ -335,8 +336,11 @@ class MaritimeWorkflow:
             }
 
             self.db_params = db_params
-            self.factory = ENCDataFactory(source=db_params, schema="us_enc_all")
+            # Use enc_schema from config file (defaults to 'enc_west' if not specified)
+            enc_schema = self.config.get('database.enc_schema', 'enc_west')
+            self.factory = ENCDataFactory(source=db_params, schema=enc_schema)
             self.logger(f"Database: {db_params['dbname']} @ {db_params['host']}:{db_params['port']}")
+            self.logger(f"ENC schema: {enc_schema}")
         except Exception as e:
             self.logger_error(f"Failed to initialize database: {e}")
             raise
@@ -364,7 +368,7 @@ class MaritimeWorkflow:
 
             self.output_dir = output_dir
             self.logger(f"Output directory: {output_dir}")
-            self.logger("✓ Configuration validated")
+            self.logger(f"{ICONS['OK']} Configuration validated")
             return True
         except Exception as e:
             self.logger_error(f"Configuration validation failed: {e}")
@@ -431,20 +435,20 @@ class MaritimeWorkflow:
                 self.logger_error("Could not find departure or arrival port")
                 return False
 
-            self.logger(f"✓ {port.format_port_string(port1)}")
-            self.logger(f"✓ {port.format_port_string(port2)}")
+            self.logger(f"{ICONS['OK']} {port.format_port_string(port1)}")
+            self.logger(f"{ICONS['OK']} {port.format_port_string(port2)}")
 
             port_bbox = bbox.create_geo_boundary(
                 geometries=[port1.geometry, port2.geometry],
                 expansion=cfg['expansion_nm'],
                 date_line=True
             )
-            self.logger(f"✓ Port boundary created ({cfg['expansion_nm']} NM expansion)")
+            self.logger(f"{ICONS['OK']} Port boundary created ({cfg['expansion_nm']} NM expansion)")
 
             # Filter ENCs
             self.logger("Filtering ENCs by boundary...")
             enc_list = self.factory.get_encs_by_boundary(port_bbox.geometry.iloc[0])
-            self.logger(f"✓ Filtered {len(enc_list)} ENCs")
+            self.logger(f"{ICONS['OK']} Filtered {len(enc_list)} ENCs")
 
             # Create base graph
             self.logger("Creating base graph...")
@@ -460,30 +464,38 @@ class MaritimeWorkflow:
                 layer_table=cfg['layer_table'],
                 reduce_distance_nm=cfg['reduce_distance_nm']
             )
-            self.logger(f"✓ Grid created with {len(grid)} components")
+            self.logger(f"{ICONS['OK']} Grid created with {len(grid)} components")
 
             # Build graph
             self.logger("Building NetworkX graph...")
+
+            # Get subdivision settings from graph config
+            graph_config = self.config.graph_manager.get_value("fine_settings")
+            max_points = graph_config.get('max_points_per_subdivision', 1000000)
+            max_subdivision_factor = 4  # Default for PostGIS base graphs
+
             G = bg.create_base_graph(
                 grid["combined_grid"],
                 spacing_nm=cfg['spacing_nm'],
-                keep_largest_component=True
+                keep_largest_component=True,
+                max_points=max_points,
+                max_subdivision_factor=max_subdivision_factor
             )
-            self.logger(f"✓ Graph created: {G.number_of_nodes():,} nodes, {G.number_of_edges():,} edges")
+            self.logger(f"{ICONS['OK']} Graph created: {G.number_of_nodes():,} nodes, {G.number_of_edges():,} edges")
 
             # Save graph
             self.logger("Saving graph...")
             base_graph_name = self.config.graph_names['base']
             output_file = self.output_dir / f"{base_graph_name}.gpkg"
             bg.save_graph_to_gpkg(G, output_file)
-            self.logger(f"✓ Saved to GeoPackage: {output_file.name}")
+            self.logger(f"{ICONS['OK']} Saved to GeoPackage: {output_file.name}")
 
             bg.save_graph_to_postgis(
                 graph=G,
                 table_prefix=base_graph_name,
                 drop_existing=True
             )
-            self.logger(f"✓ Saved to PostGIS: {base_graph_name}")
+            self.logger(f"{ICONS['OK']} Saved to PostGIS: {base_graph_name}")
 
             # Calculate base route
             self.logger("Calculating base route...")
@@ -492,7 +504,7 @@ class MaritimeWorkflow:
                 departure_point=port1.geometry,
                 arrival_point=port2.geometry
             )
-            self.logger(f"✓ Route calculated: {distance:.2f} NM")
+            self.logger(f"{ICONS['OK']} Route calculated: {distance:.2f} NM")
 
             # Save route
             base_route_name = self.config.graph_names['base_route']
@@ -503,10 +515,10 @@ class MaritimeWorkflow:
                 table_name="base_routes",
                 overwrite=True
             )
-            self.logger(f"✓ Route saved to PostGIS")
+            self.logger(f"{ICONS['OK']} Route saved to PostGIS")
 
             elapsed = self.perf.end_step()
-            self.logger(f"✓ Step 1 complete: {elapsed:.1f}s")
+            self.logger(f"{ICONS['OK']} Step 1 complete: {elapsed:.1f}s")
             return True
         except Exception as e:
             self.logger_error(f"Base graph creation failed: {e}")
@@ -535,12 +547,12 @@ class MaritimeWorkflow:
                 schema_name=self.config.get('database.route_schema', 'routes'),
                 table_name="base_routes"
             )
-            self.logger("✓ Base route loaded")
+            self.logger(f"{ICONS['OK']} Base route loaded")
 
             # Create buffer
             self.logger("Creating buffer around route...")
             route_buffer = Buffer.create_buffer(route, cfg['buffer_size_nm'])
-            self.logger(f"✓ Buffer created ({cfg['buffer_size_nm']} NM)")
+            self.logger(f"{ICONS['OK']} Buffer created ({cfg['buffer_size_nm']} NM)")
 
             # Optional slicing
             active_buffer = route_buffer
@@ -549,11 +561,11 @@ class MaritimeWorkflow:
                 active_buffer = Slicer.slice_by_bbox(
                     route_buffer, south=cfg['slice_south_degree']
                 )
-                self.logger("✓ Buffer sliced")
+                self.logger(f"{ICONS['OK']} Buffer sliced")
 
             # Filter ENCs
             enc_list = self.factory.get_encs_by_boundary(active_buffer)
-            self.logger(f"✓ Filtered {len(enc_list)} ENCs for graph area")
+            self.logger(f"{ICONS['OK']} Filtered {len(enc_list)} ENCs for graph area")
 
             # Get layer configuration
             layers_config = self.config.graph_manager.get_value("layers")
@@ -575,16 +587,23 @@ class MaritimeWorkflow:
                     navigable_layers=navigable_layers,
                     obstacle_layers=obstacle_layers
                 )
-                self.logger("✓ Fine grid created")
+                self.logger(f"{ICONS['OK']} Fine grid created")
+
+                # Get subdivision settings from graph config
+                graph_config = self.config.graph_manager.get_value("fine_settings")
+                max_points = graph_config.get('max_points_per_subdivision', 1000000)
+                max_subdivision_factor = 4  # Default for PostGIS graphs
 
                 G = fg.create_base_graph(
                     grid_data=fg_grid["combined_grid"],
                     spacing_nm=cfg['fine_spacing_nm'],
                     max_edge_factor=cfg['fine_max_edge_factor'],
                     bridge_components=cfg['fine_bridge_components'],
-                    keep_largest_component=True
+                    keep_largest_component=True,
+                    max_points=max_points,
+                    max_subdivision_factor=max_subdivision_factor
                 )
-                self.logger(f"✓ Fine graph created: {G.number_of_nodes():,} nodes, {G.number_of_edges():,} edges")
+                self.logger(f"{ICONS['OK']} Fine graph created: {G.number_of_nodes():,} nodes, {G.number_of_edges():,} edges")
 
                 # Save fine graph
                 fine_graph_name = self.config.graph_names['fine_undirected']
@@ -592,7 +611,7 @@ class MaritimeWorkflow:
                 if cfg['save_gpkg']:
                     output_file = self.output_dir / f"{fine_graph_name}.gpkg"
                     fg.save_graph_to_gpkg(G, output_file)
-                    self.logger(f"✓ Saved to GeoPackage")
+                    self.logger(f"{ICONS['OK']} Saved to GeoPackage")
 
                 if cfg['save_postgis_optimized']:
                     fg.save_graph_to_postgis_optimized(
@@ -601,14 +620,14 @@ class MaritimeWorkflow:
                         drop_existing=cfg['drop_existing'],
                         chunk_size=cfg['postgis_chunk_size']
                     )
-                    self.logger(f"✓ Saved to PostGIS (optimized)")
+                    self.logger(f"{ICONS['OK']} Saved to PostGIS (optimized)")
                 elif cfg['save_postgis']:
                     fg.save_graph_to_postgis(
                         graph=G,
                         table_prefix=fine_graph_name,
                         drop_existing=cfg['drop_existing']
                     )
-                    self.logger(f"✓ Saved to PostGIS")
+                    self.logger(f"{ICONS['OK']} Saved to PostGIS")
 
                 graph_class = fg
 
@@ -631,7 +650,7 @@ class MaritimeWorkflow:
                     connectivity_config=connectivity_config,
                     keep_largest_component=True
                 )
-                self.logger(f"✓ H3 graph created: {G.number_of_nodes():,} nodes, {G.number_of_edges():,} edges")
+                self.logger(f"{ICONS['OK']} H3 graph created: {G.number_of_nodes():,} nodes, {G.number_of_edges():,} edges")
 
                 # Save H3 graph
                 fine_graph_name = self.config.graph_names['fine_undirected']
@@ -639,7 +658,7 @@ class MaritimeWorkflow:
                 if cfg['save_gpkg']:
                     output_file = self.output_dir / f"{fine_graph_name}.gpkg"
                     h3.save_graph_to_gpkg(G, output_file)
-                    self.logger(f"✓ Saved to GeoPackage")
+                    self.logger(f"{ICONS['OK']} Saved to GeoPackage")
 
                 if cfg['save_postgis_optimized']:
                     h3.save_graph_to_postgis_optimized(
@@ -648,14 +667,14 @@ class MaritimeWorkflow:
                         drop_existing=cfg['drop_existing'],
                         chunk_size=cfg['postgis_chunk_size']
                     )
-                    self.logger(f"✓ Saved to PostGIS (optimized)")
+                    self.logger(f"{ICONS['OK']} Saved to PostGIS (optimized)")
                 elif cfg['save_postgis']:
                     h3.save_graph_to_postgis(
                         graph=G,
                         table_prefix=fine_graph_name,
                         drop_existing=cfg['drop_existing']
                     )
-                    self.logger(f"✓ Saved to PostGIS")
+                    self.logger(f"{ICONS['OK']} Saved to PostGIS")
 
                 graph_class = h3
 
@@ -675,10 +694,10 @@ class MaritimeWorkflow:
                 departure_point=dep_point.geometry,
                 arrival_point=arr_point.geometry
             )
-            self.logger(f"✓ Route calculated: {distance:.2f} NM")
+            self.logger(f"{ICONS['OK']} Route calculated: {distance:.2f} NM")
 
             elapsed = self.perf.end_step()
-            self.logger(f"✓ Step 2 complete: {elapsed:.1f}s")
+            self.logger(f"{ICONS['OK']} Step 2 complete: {elapsed:.1f}s")
             return True
         except Exception as e:
             self.logger_error(f"Fine graph creation failed: {e}")
@@ -727,7 +746,7 @@ class MaritimeWorkflow:
                     edges_schema=self.config.get('database.graph_schema', 'graph'),
                     drop_existing=True
                 )
-                self.logger("✓ Directed graph created")
+                self.logger(f"{ICONS['OK']} Directed graph created")
 
             # Step 2: Enrich features
             if steps.get('enrich_features', True):
@@ -735,32 +754,34 @@ class MaritimeWorkflow:
                 feature_layers = weights_manager.get_feature_layers_from_classifier()
                 enrichment_cfg = cfg.get('enrichment', {})
 
+                enc_schema = self.config.get('database.enc_schema', 'enc_west')
                 weights_manager.enrich_edges_with_features_postgis(
                     enc_names=enc_list,
                     schema_name=self.config.get('database.graph_schema', 'graph'),
                     graph_name=target_graph,
-                    enc_schema=self.config.get('database.enc_schema', 'us_enc_all'),
+                    enc_schema=enc_schema,
                     feature_layers=feature_layers,
                     is_directed=True,
                     include_sources=enrichment_cfg.get('include_sources', False),
                     soundg_buffer_meters=enrichment_cfg.get('soundg_buffer_meters', 30)
                 )
-                self.logger("✓ Features enriched")
+                self.logger(f"{ICONS['OK']} Features enriched")
 
             # Step 3: Static weights
             if steps.get('apply_static_weights', True):
                 self.logger("Applying static weights...")
                 config = weights_manager._load_config()
 
+                enc_schema = self.config.get('database.enc_schema', 'enc_west')
                 weights_manager.apply_static_weights_postgis(
                     graph_name=target_graph,
                     enc_names=enc_list,
                     schema_name=self.config.get('database.graph_schema', 'graph'),
-                    enc_schema=self.config.get('database.enc_schema', 'us_enc_all'),
+                    enc_schema=enc_schema,
                     static_layers=config['weight_settings']['static_layers'],
                     usage_bands=cfg.get('static_weights_usage_bands', [3, 4, 5])
                 )
-                self.logger("✓ Static weights applied")
+                self.logger(f"{ICONS['OK']} Static weights applied")
 
             # Step 4: Directional weights
             if steps.get('apply_directional_weights', True):
@@ -776,7 +797,7 @@ class MaritimeWorkflow:
                     two_way_enabled=directional_cfg.get('two_way_traffic', {}).get('enabled', True),
                     reverse_check_threshold=directional_cfg.get('two_way_traffic', {}).get('reverse_check_threshold', 95)
                 )
-                self.logger("✓ Directional weights applied")
+                self.logger(f"{ICONS['OK']} Directional weights applied")
 
             # Step 5: Dynamic weights
             if steps.get('apply_dynamic_weights', True):
@@ -790,10 +811,10 @@ class MaritimeWorkflow:
                     vessel_parameters=vessel_cfg,
                     environmental_conditions=env_cfg
                 )
-                self.logger("✓ Dynamic weights applied")
+                self.logger(f"{ICONS['OK']} Dynamic weights applied")
 
             elapsed = self.perf.end_step()
-            self.logger(f"✓ Step 3 complete: {elapsed:.1f}s")
+            self.logger(f"{ICONS['OK']} Step 3 complete: {elapsed:.1f}s")
             return True
         except Exception as e:
             self.logger_error(f"Weighting failed: {e}")
@@ -821,7 +842,7 @@ class MaritimeWorkflow:
             self.logger("Loading weighted graph from PostGIS...")
             target_graph = self.config.graph_names['fine_weighted']
             G = h3.load_graph_from_postgis(target_graph)
-            self.logger(f"✓ Graph loaded: {G.number_of_nodes():,} nodes, {G.number_of_edges():,} edges")
+            self.logger(f"{ICONS['OK']} Graph loaded: {G.number_of_nodes():,} nodes, {G.number_of_edges():,} edges")
 
             # Calculate route
             self.logger("Calculating optimal route...")
@@ -836,7 +857,7 @@ class MaritimeWorkflow:
                 arrival_point=arr_port.geometry,
                 weight_key=cfg['weight_key']
             )
-            self.logger(f"✓ Route calculated")
+            self.logger(f"{ICONS['OK']} Route calculated")
 
             # Save route
             weighting_cfg = self.config.get('weighting')
@@ -845,7 +866,7 @@ class MaritimeWorkflow:
             output_path = self.output_dir / route_filename
 
             route.save_detailed_route_to_file(route_detail, output_path=str(output_path))
-            self.logger(f"✓ Route saved: {route_filename}")
+            self.logger(f"{ICONS['OK']} Route saved: {route_filename}")
 
             # Optional: Export weighted graph to GeoPackage
             if cfg.get('export_weighted_graph', False):
@@ -857,12 +878,12 @@ class MaritimeWorkflow:
                         graph_name=target_graph,
                         output_path=str(output_gpkg)
                     )
-                    self.logger(f"✓ Graph exported to GeoPackage")
+                    self.logger(f"{ICONS['OK']} Graph exported to GeoPackage")
                 except FileExistsError:
                     self.logger_warning(f"GeoPackage already exists, skipping export")
 
             elapsed = self.perf.end_step()
-            self.logger(f"✓ Step 4 complete: {elapsed:.1f}s")
+            self.logger(f"{ICONS['OK']} Step 4 complete: {elapsed:.1f}s")
             return True
         except Exception as e:
             self.logger_error(f"Pathfinding failed: {e}")

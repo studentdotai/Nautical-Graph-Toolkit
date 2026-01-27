@@ -43,14 +43,16 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Union, List, Dict, Any, Optional, Tuple
 
-# Import pysqlite3-binary first (has RTREE support)
-# Force it into sys.modules to prevent builtin sqlite3 from being used
+# Import sqlite3 with RTREE support
+# When Conda environment is activated, Python's built-in sqlite3 uses Conda's sqlite library
+# which includes RTREE support on all platforms (Linux, macOS ARM/Intel, Windows)
+# The pysqlite3 import is kept for backward compatibility but Conda's sqlite is recommended
 try:
     import pysqlite3
     sys.modules['sqlite3'] = pysqlite3  # Replace builtin in module cache
     sqlite3 = pysqlite3
 except ImportError:
-    import sqlite3  # Fallback to builtin if pysqlite3 not available
+    import sqlite3  # Fallback to builtin (uses Conda's sqlite when env is activated)
 
 import h3
 import networkx as nx
@@ -69,6 +71,7 @@ from ..utils.s57_utils import S57Utils
 from ..utils.s57_classification import S57Classifier, NavClass
 from ..utils.db_utils import PostGISConnector
 from ..utils.port_utils import PortData, Boundaries
+from ..utils.logging_utils import ICONS
 
 logger = logging.getLogger(__name__)
 
@@ -288,7 +291,7 @@ class GraphUtils:
             nodes_table = f"graph_nodes_{graph_name}"
             edges_table = f"graph_edges_{graph_name}"
 
-        logger.debug(f"Connecting nodes {source_id} → {target_id} in graph '{graph_name}'")
+        logger.debug(f"Connecting nodes {source_id} {ICONS['ARROW']} {target_id} in graph '{graph_name}'")
 
         try:
             with data_manager.engine.connect() as conn:
@@ -329,12 +332,12 @@ class GraphUtils:
                         # This will trigger a rollback
                         raise RuntimeError("Edge creation failed internally.")
 
-                    logger.info(f"Successfully connected nodes {source_id} → {target_id} "
+                    logger.info(f"Successfully connected nodes {source_id} {ICONS['ARROW']} {target_id} "
                                f"with weight {custom_weight:.6f} NM")
                 return True
 
         except Exception as e:
-            logger.error(f"Failed to connect nodes {source_id} → {target_id}: {str(e)}")
+            logger.error(f"Failed to connect nodes {source_id} {ICONS['ARROW']} {target_id}: {str(e)}")
             return False
 
     @classmethod
@@ -800,7 +803,7 @@ class BaseGraph:
 
         return final_result
 
-    def create_base_graph(self, grid_data: Union[str, Dict[str, Any]], spacing_nm: float = 0.1, keep_largest_component: bool = False, max_points: int = 1000000, max_edge_factor: float = 3, bridge_components: bool = False) -> nx.Graph:
+    def create_base_graph(self, grid_data: Union[str, Dict[str, Any]], spacing_nm: float = 0.1, keep_largest_component: bool = False, max_points: int = 1000000, max_edge_factor: float = 3, bridge_components: bool = False, max_subdivision_factor: int = 4) -> nx.Graph:
         """
         Constructs a graph from a grid GeoJSON or grid dictionary from create_base_grid.
 
@@ -816,6 +819,9 @@ class BaseGraph:
                                      before selecting the largest component. Useful for fine grids
                                      with numerical precision gaps. Uses max_edge_factor * spacing
                                      as the maximum bridge distance.
+            max_subdivision_factor (int): Maximum subdivision factor for grid subdivision (e.g., 4 = 4x4 = 16 regions).
+                                          Higher values (5+) create more regions but use more memory. WARNING:
+                                          Values > 4 may cause significant memory usage. Only used by PostGIS backend.
 
         Returns:
             nx.Graph: The constructed graph.
@@ -884,7 +890,7 @@ class BaseGraph:
         self.performance.record_metric("polygon_type", type(polygon).__name__)
 
         logger.info(f"Starting subgraph creation for {type(polygon).__name__} with area {polygon_area:.6f} deg²")
-        graph = self.create_grid_subgraph(polygon, spacing_deg, max_points=max_points, max_edge_factor=max_edge_factor)
+        graph = self.create_grid_subgraph(polygon, spacing_deg, max_points=max_points, max_edge_factor=max_edge_factor, max_subdivision_factor=max_subdivision_factor)
 
         # Bridge disconnected components if requested
         if bridge_components and graph.number_of_nodes() > 0:
@@ -967,13 +973,16 @@ class BaseGraph:
         range_y = max_y - min_y
 
         # Estimate grid size based on graph size (larger graphs = finer subdivision)
+        # Note: Database subdivides based on expected_points (polygon_area / spacing^2),
+        # while we only know actual node count after querying. Actual nodes are typically
+        # 40-60% of expected points due to land exclusion, so we use adjusted thresholds.
         n_nodes = graph.number_of_nodes()
-        if n_nodes > 4_000_000:
-            grid_size = 4  # 4x4 = 16 regions
-        elif n_nodes > 1_000_000:
-            grid_size = 3  # 3x3 = 9 regions
-        elif n_nodes > 250_000:
-            grid_size = 2  # 2x2 = 4 regions
+        if n_nodes > 250_000:
+            grid_size = 4  # 4x4 = 16 regions (matches database's 4x4 for >~400K expected points)
+        elif n_nodes > 60_000:
+            grid_size = 3  # 3x3 = 9 regions (matches database's 3x3 for >~100K expected points)
+        elif n_nodes > 25_000:
+            grid_size = 2  # 2x2 = 4 regions (matches database's 2x2 for >~40K expected points)
         else:
             grid_size = 1  # No subdivision
 
@@ -991,7 +1000,10 @@ class BaseGraph:
                 subdivision_y_lines.append(y_line)
 
         # Tolerance for identifying nodes near subdivision boundaries
-        boundary_tolerance = spacing_deg * 2
+        # Increased to account for difference between polygon bounds (used in database subdivision)
+        # and graph bounds (actual node coordinates)
+        # Using 10x spacing to catch edge cases where gaps fall just outside 6x tolerance
+        boundary_tolerance = spacing_deg * 10
 
         logger.info(f"Graph bounds: X=[{min_x:.4f}, {max_x:.4f}], Y=[{min_y:.4f}, {max_y:.4f}]")
         logger.info(f"Detected {grid_size}x{grid_size} subdivision grid ({grid_size**2} regions)")
@@ -1039,6 +1051,11 @@ class BaseGraph:
         # Try to bridge components by finding close boundary nodes
         # Prioritize subdivision boundary nodes for faster bridging
         # We'll use a numpy array for efficient distance calculations
+
+        # Global tracking of bridge connections per node to prevent over-connection
+        # Key: node tuple, Value: number of bridge connections added
+        global_bridge_connections = {}
+
         for i in range(len(component_boundary_nodes)):
             comp_i = component_boundary_nodes[i]
 
@@ -1087,24 +1104,22 @@ class BaseGraph:
                         bridge_strategy = "sparse"
 
                     added_for_pair = 0
-                    # Track which nodes have been connected to avoid redundant edges
-                    connected_i = {}
-                    connected_j = {}
 
                     for idx in sorted_indices[:max_bridges_per_pair]:
                         node_i_idx = close_pairs[0][idx]
                         node_j_idx = close_pairs[1][idx]
 
-                        # Skip if either node already has enough bridge connections
+                        node_i = tuple(nodes_i[node_i_idx])
+                        node_j = tuple(nodes_j[node_j_idx])
+
+                        # Skip if either node already has enough bridge connections globally
                         # For seam bridging, allow more connections per node
                         max_connections_per_node = 8 if bridge_strategy == "seam" else 1
 
-                        if (connected_i.get(node_i_idx, 0) >= max_connections_per_node or
-                            connected_j.get(node_j_idx, 0) >= max_connections_per_node):
+                        if (global_bridge_connections.get(node_i, 0) >= max_connections_per_node or
+                            global_bridge_connections.get(node_j, 0) >= max_connections_per_node):
                             continue
 
-                        node_i = tuple(nodes_i[node_i_idx])
-                        node_j = tuple(nodes_j[node_j_idx])
                         distance = pair_distances[idx]
 
                         # Add the bridge edge
@@ -1112,9 +1127,9 @@ class BaseGraph:
                         bridges_added += 1
                         added_for_pair += 1
 
-                        # Track connections
-                        connected_i[node_i_idx] = connected_i.get(node_i_idx, 0) + 1
-                        connected_j[node_j_idx] = connected_j.get(node_j_idx, 0) + 1
+                        # Track connections globally
+                        global_bridge_connections[node_i] = global_bridge_connections.get(node_i, 0) + 1
+                        global_bridge_connections[node_j] = global_bridge_connections.get(node_j, 0) + 1
 
                         # Convert degrees to nautical miles (1° ≈ 60 NM)
                         distance_nm = distance * 60.0
@@ -1148,7 +1163,7 @@ class BaseGraph:
 
         return graph
 
-    def create_grid_subgraph(self, polygon: Union[Polygon, MultiPolygon], spacing: float, max_edge_factor: float = 2.0, max_points: int = 1000000) -> nx.Graph:
+    def create_grid_subgraph(self, polygon: Union[Polygon, MultiPolygon], spacing: float, max_edge_factor: float = 2.0, max_points: int = 1000000, max_subdivision_factor: int = 4) -> nx.Graph:
         """
         Creates a graph for a single grid polygon with specified spacing.
         Uses database-side operations when possible to avoid memory issues.
@@ -1157,6 +1172,10 @@ class BaseGraph:
             polygon (Union[Polygon, MultiPolygon]): The grid geometry.
             spacing (float): Grid spacing in decimal degrees.
             max_edge_factor (float): Multiplier for max edge length relative to spacing.
+            max_points (int): Maximum points per subdivision to avoid memory issues.
+            max_subdivision_factor (int): Maximum subdivision factor for grid subdivision (e.g., 4 = 4x4 = 16 regions).
+                                         Higher values (5+) create more regions but use more memory. WARNING:
+                                         Values > 4 may cause significant memory usage. Only used by PostGIS backend.
 
         Returns:
             nx.Graph: The constructed graph for the grid.
@@ -1184,30 +1203,39 @@ class BaseGraph:
         # Try database-side graph creation first
         if hasattr(self.factory.manager, 'create_grid_graph_nodes_and_edges'):
             logger.info("Using database-side graph creation for improved performance")
-            return self._create_grid_subgraph_database_side(polygon, spacing, max_edge_factor, max_points)
+            return self._create_grid_subgraph_database_side(polygon, spacing, max_edge_factor, max_points, max_subdivision_factor)
         else:
             logger.info("Falling back to memory-based graph creation")
             return self._create_grid_subgraph_memory_based(polygon, spacing, max_edge_factor)
 
-    def _create_grid_subgraph_database_side(self, polygon: Union[Polygon, MultiPolygon], spacing: float, max_edge_factor: float = 2.0, max_points: int = 1000000) -> nx.Graph:
+    def _create_grid_subgraph_database_side(self, polygon: Union[Polygon, MultiPolygon], spacing: float, max_edge_factor: float = 2.0, max_points: int = 1000000, max_subdivision_factor: int = 4) -> nx.Graph:
         """
         Creates a graph using database-side operations for better performance on large grids.
+
+        Args:
+            polygon: The grid geometry.
+            spacing: Grid spacing in decimal degrees.
+            max_edge_factor: Multiplier for max edge length relative to spacing.
+            max_points: Maximum points per subdivision to avoid memory issues.
+            max_subdivision_factor: Maximum subdivision factor for grid subdivision (e.g., 4 = 4x4 = 16 regions).
+                                    Higher values (5+) create more regions but use more memory. WARNING:
+                                    Values > 4 may cause significant memory usage. Only used by PostGIS backend.
         """
         self.performance.start_timer("database_grid_subgraph_time")
 
         try:
             # Use the factory's database-side graph creation
-            # Note: PostGIS supports max_points parameter, GeoPackage/SpatiaLite don't
+            # Note: PostGIS supports max_points and max_subdivision_factor parameters, GeoPackage/SpatiaLite don't
             manager_type = type(self.factory.manager).__name__
-            if manager_type == 'PostGISConnector':
-                # PostGIS version supports max_points
+            if manager_type == 'PostGISManager':
+                # PostGIS version supports max_points and max_subdivision_factor
                 graph_data = self.factory.manager.create_grid_graph_nodes_and_edges(
-                    polygon, spacing, max_edge_factor, max_points
+                    polygon, spacing, max_edge_factor, max_points, max_subdivision_factor
                 )
             else:
-                # GeoPackage/SpatiaLite versions don't support max_points
+                # GeoPackage/SpatiaLite versions don't support max_points or max_subdivision_factor
                 graph_data = self.factory.manager.create_grid_graph_nodes_and_edges(
-                    polygon, spacing, max_edge_factor
+                    polygon, spacing, max_edge_factor, max_subdivision_factor=max_subdivision_factor
                 )
 
             db_time = self.performance.end_timer("database_grid_subgraph_time")
@@ -1354,6 +1382,15 @@ class BaseGraph:
         save_performance.record_metric("nodes_to_save", graph.number_of_nodes())
         save_performance.record_metric("edges_to_save", graph.number_of_edges())
         save_performance.record_metric("output_path", output_path)
+
+        # FIX: Delete existing file if present to prevent edge accumulation
+        # When notebooks are re-run with the same output filename, edges would
+        # append to the existing file (mode='a' on line ~1434) while nodes overwrite,
+        # causing mismatched node/edge counts and corrupted graphs.
+        output_file = Path(output_path)
+        if output_file.exists():
+            logger.info(f"Removing existing GeoPackage file: {output_path}")
+            output_file.unlink()
 
         # Check if graph is empty
         if graph.number_of_nodes() == 0:
@@ -1772,8 +1809,8 @@ class BaseGraph:
         Workflow:
             1. Create new target file with same structure (file copy)
             2. Copy all nodes (nodes are direction-agnostic)
-            3. Copy all original edges (A → B) as forward direction
-            4. Create reverse edges (B → A) by swapping source/target
+            3. Copy all original edges (A {ICONS['ARROW']} B) as forward direction
+            4. Create reverse edges (B {ICONS['ARROW']} A) by swapping source/target
             5. Create/update spatial indexes (R-tree)
 
         Args:
@@ -1803,7 +1840,7 @@ class BaseGraph:
                 target_path='graph_directed.sqlite'
             )
 
-            logger.info(f"Converted {stats['original_edges']:,} → {stats['directed_edges']:,} edges")
+            logger.info(f"Converted {stats['original_edges']:,} {ICONS['ARROW']} {stats['directed_edges']:,} edges")
         """
         perf = PerformanceMetrics()
         perf.start_timer("convert_to_directed_gpkg_total")
@@ -2190,7 +2227,7 @@ class BaseGraph:
                         if pd.notna(value):
                             edge_attrs[col] = value
 
-                # Store geometry as 'geom' key (PostGIS column 'geometry' → graph key 'geom')
+                # Store geometry as 'geom' key (PostGIS column 'geometry' {ICONS['ARROW']} graph key 'geom')
                 edge_attrs['geom'] = row['geometry'].__geo_interface__
 
                 G.add_edge(source, target, **edge_attrs)
@@ -2476,8 +2513,8 @@ class BaseGraph:
 
         Workflow:
             1. Create new directed edges table with same structure as source
-            2. Copy all original edges (A → B) with forward direction (preserves original IDs)
-            3. Create reverse edges (B → A) by swapping source/target columns
+            2. Copy all original edges (A {ICONS['ARROW']} B) with forward direction (preserves original IDs)
+            3. Create reverse edges (B {ICONS['ARROW']} A) by swapping source/target columns
             4. Assign reverse edge IDs: reverse_id = max_forward_id + forward_edge_id
             5. Create spatial and attribute indexes
             6. Copy nodes table unchanged (nodes are direction-agnostic)
@@ -2514,7 +2551,7 @@ class BaseGraph:
                 source_table_prefix='graph_base',
                 target_table_prefix='graph_directed'
             )
-            logger.info(f"Converted {stats['original_edges']:,} → {stats['directed_edges']:,} edges")
+            logger.info(f"Converted {stats['original_edges']:,} {ICONS['ARROW']} {stats['directed_edges']:,} edges")
             logger.info(f"Forward edge IDs: 1 to {stats['original_edges']}")
             logger.info(f"Reverse edge IDs: {stats['original_edges']+1} to {stats['directed_edges']}")
         """
@@ -2591,7 +2628,7 @@ class BaseGraph:
                 create_time = perf.end_timer("create_edges_table_time")
                 logger.info(f"Created directed edges table structure in {create_time:.3f}s")
 
-                # Step 3: Insert forward edges (A → B)
+                # Step 3: Insert forward edges (A {ICONS['ARROW']} B)
                 perf.start_timer("insert_forward_edges_time")
                 insert_forward_sql = text(f"""
                     INSERT INTO {target_edges_qualified}
@@ -2603,7 +2640,7 @@ class BaseGraph:
                 forward_time = perf.end_timer("insert_forward_edges_time")
                 logger.info(f"Inserted {forward_count:,} forward edges in {forward_time:.3f}s")
 
-                # Step 4: Insert reverse edges (B → A) by swapping columns
+                # Step 4: Insert reverse edges (B {ICONS['ARROW']} A) by swapping columns
                 perf.start_timer("insert_reverse_edges_time")
 
                 # Get max ID from forward edges to calculate reverse edge IDs
@@ -3620,7 +3657,7 @@ class H3Graph(BaseGraph):
                 add_edge(h3_idx, target['cell'])
                 added_connections += 1
 
-                logger.debug(f"Added bridge: res{current_res}→res{target['resolution']} "
+                logger.debug(f"Added bridge: res{current_res}{ICONS['ARROW']}res{target['resolution']} "
                            f"({target['distance_km']:.1f}km, {target['distance_km']/1.852:.1f}NM)")
 
             if added_connections > 0:
@@ -3951,10 +3988,10 @@ class Weights:
 
     UKC (Under Keel Clearance):
         UKC = Water Depth - Vessel Draft
-        - Band 4 (Grounding): UKC ≤ 0 → impassable (blocking)
-        - Band 3 (Restricted): 0 < UKC ≤ safety_margin → high penalty
-        - Band 2 (Safe): safety_margin < UKC ≤ 0.5×draft → moderate penalty
-        - Band 1 (Deep): UKC > draft → bonus (deep water)
+        - Band 4 (Grounding): UKC ≤ 0 {ICONS['ARROW']} impassable (blocking)
+        - Band 3 (Restricted): 0 < UKC ≤ safety_margin {ICONS['ARROW']} high penalty
+        - Band 2 (Safe): safety_margin < UKC ≤ 0.5×draft {ICONS['ARROW']} moderate penalty
+        - Band 1 (Deep): UKC > draft {ICONS['ARROW']} bonus (deep water)
 
     Example:
 
@@ -4082,12 +4119,12 @@ class Weights:
         Dynamically generate feature extraction configuration from S57Classifier.
 
         Reads ImportantAttributes from classifier database and groups them by attribute type:
-        - drval1 → ft_depth (FILTERED - only DEPARE, DRGARE, SWPARE for navigational depths)
-        - valsou → ft_sounding (list of layers with sounding data)
-        - depth → ft_sounding_point (SOUNDG layer depth attribute from ADD_SOUNDG_DEPTH)
-        - verclr/vercsa → ft_ver_clearance (vertical clearance, uses minimum of both)
-        - horclr → ft_hor_clearance (horizontal clearance)
-        - catwrk, catobs → ft_category (categorical data)
+        - drval1 {ICONS['ARROW']} ft_depth (FILTERED - only DEPARE, DRGARE, SWPARE for navigational depths)
+        - valsou {ICONS['ARROW']} ft_sounding (list of layers with sounding data)
+        - depth {ICONS['ARROW']} ft_sounding_point (SOUNDG layer depth attribute from ADD_SOUNDG_DEPTH)
+        - verclr/vercsa {ICONS['ARROW']} ft_ver_clearance (vertical clearance, uses minimum of both)
+        - horclr {ICONS['ARROW']} ft_hor_clearance (horizontal clearance)
+        - catwrk, catobs {ICONS['ARROW']} ft_category (categorical data)
 
         IMPORTANT: ft_depth filtering prevents false blocking in harbors/coastal waters.
         Infrastructure layers (BERTHS, GATCON, DRYDOC, FLODOC) have drval1=0 for moored vessels,
@@ -4108,10 +4145,10 @@ class Weights:
             weights = Weights(factory)
             config = weights.get_feature_layers_from_classifier()
             # Only navigational depth layers for ft_depth:
-            # depare, drgare, swpare → ft_depth
+            # depare, drgare, swpare {ICONS['ARROW']} ft_depth
             # Excluded: berths, fairwy, gatcon, drydoc, etc.
         """
-        # Attribute type mapping: S57 attribute → (ft_column_name, aggregation, group)
+        # Attribute type mapping: S57 attribute {ICONS['ARROW']} (ft_column_name, aggregation, group)
         # group allows combining multiple attributes into same column
         attribute_mapping = {
             'drval1': ('ft_depth', 'min', 'depth'),
@@ -4259,7 +4296,7 @@ class Weights:
         all_weight_cols = [col for col in edge_attrs if col.startswith('wt_')]
 
         # Derive expected weight column names from feature columns
-        # e.g., ft_depth_min → wt_depth_min
+        # e.g., ft_depth_min {ICONS['ARROW']} wt_depth_min
         feature_derived_weights = [f"wt_{col[3:]}" for col in feature_cols]
 
         # Identify weight columns that correspond to features
@@ -4540,8 +4577,8 @@ class Weights:
         Enrich graph edges with S-57 feature data stored as ft_* columns.
 
         **Dual Input Mode:**
-        - **Mode 1 (Graph)**: Process in-memory NetworkX graph → return updated nx.Graph
-        - **Mode 2 (File)**: Load from GeoPackage, enrich, save back → return summary dict
+        - **Mode 1 (Graph)**: Process in-memory NetworkX graph {ICONS['ARROW']} return updated nx.Graph
+        - **Mode 2 (File)**: Load from GeoPackage, enrich, save back {ICONS['ARROW']} return summary dict
 
         This method performs spatial intersection between graph edges and S-57 layers,
         extracting relevant attributes (depth, clearance, soundings, etc.) and storing
@@ -4550,7 +4587,7 @@ class Weights:
         **Implementation:** Pure GeoPandas/Shapely operations - no SQL, no SpatiaLite, no PostGIS
 
         Features usage band prioritization (same as PostGIS version):
-        - Extracts usage band from ENC names (e.g., US5CA52M → band 5)
+        - Extracts usage band from ENC names (e.g., US5CA52M {ICONS['ARROW']} band 5)
         - Prioritizes: 6 (Berthing) > 5 (Harbour) > 4 (Approach) > 3 (Coastal) > 2 (General) > 1 (Overview)
         - Within same usage band, applies aggregation (min/max/mean)
 
@@ -4772,7 +4809,7 @@ class Weights:
                 logger.debug(f"No edge intersections for layer '{layer_name}'")
                 continue
 
-            # Extract usage band from dsid_dsnm if available (e.g., US5CA52M → 5)
+            # Extract usage band from dsid_dsnm if available (e.g., US5CA52M {ICONS['ARROW']} 5)
             # Usage band priority: 6 (Berthing) > 5 (Harbour) > 4 (Approach) > 3 (Coastal) > 2 (General) > 1 (Overview)
             if 'dsid_dsnm' in intersecting.columns:
                 intersecting['usage_band'] = intersecting['dsid_dsnm'].str[2:3].astype(int, errors='ignore')
@@ -4940,7 +4977,7 @@ class Weights:
                             pass
 
                     if updated_count > 0:
-                        logger.info(f"  ✓ {col_name}: propagated to {updated_count:,} reverse edges")
+                        logger.info(f"  {ICONS['OK']} {col_name}: propagated to {updated_count:,} reverse edges")
 
             # Save enriched GeoDataFrame back to GPKG
             logger.info(f"\n=== Saving Enriched Edges to GeoPackage ===")
@@ -5013,7 +5050,7 @@ class Weights:
             propagation_stats[col_name] = updated_count
 
             if updated_count > 0:
-                logger.debug(f"  ✓ {col_name}: propagated to {updated_count:,} reverse edges")
+                logger.debug(f"  {ICONS['OK']} {col_name}: propagated to {updated_count:,} reverse edges")
 
         return propagation_stats
 
@@ -5606,7 +5643,7 @@ class Weights:
                     propagation_stats[col_name] = rows_updated
 
                     if rows_updated > 0:
-                        logger.debug(f"  ✓ {col_name}: propagated to {rows_updated:,} reverse edges")
+                        logger.debug(f"  {ICONS['OK']} {col_name}: propagated to {rows_updated:,} reverse edges")
 
                 except Exception as e:
                     logger.error(f"Failed to propagate {col_name}: {e}")
@@ -5633,7 +5670,7 @@ class Weights:
         **Key Optimizations:**
 
         1. **Per-Layer Pre-Aggregation:** Each depth layer is pre-aggregated (GROUP BY fid)
-           to reduce data volume by ~10x (e.g., 48M rows → 2.9M rows for 1.6M edges).
+           to reduce data volume by ~10x (e.g., 48M rows {ICONS['ARROW']} 2.9M rows for 1.6M edges).
 
         2. **Parallel Materialization:** Depth layers are processed in parallel (up to 4 threads)
            using separate temp tables. Each thread writes to its own table, avoiding lock contention.
@@ -5647,7 +5684,7 @@ class Weights:
 
         **Performance vs Original V3:**
         - 3-3.5x faster depth layer processing (parallel + pre-aggregation)
-        - 93% memory reduction (1.7GB → 109MB for 1.6M edges)
+        - 93% memory reduction (1.7GB {ICONS['ARROW']} 109MB for 1.6M edges)
         - Guaranteed global precision (highest band across ALL depth layers)
 
         Args:
@@ -6065,7 +6102,7 @@ class Weights:
                                 # Exponential backoff: 0.5s, 1.5s, 3.5s (with jitter)
                                 wait_time = (2 ** attempt) * 0.5 + random.uniform(0, 0.5)
                                 logger.warning(
-                                    f"  ⚠ {layer_name}: Database locked (attempt {attempt + 1}/{max_retries}), "
+                                    f"  {ICONS['WARN']} {layer_name}: Database locked (attempt {attempt + 1}/{max_retries}), "
                                     f"retrying in {wait_time:.1f}s..."
                                 )
                                 time.sleep(wait_time)
@@ -6102,11 +6139,11 @@ class Weights:
                                 worker_databases[layer_name] = worker_db_path  # Store for aggregation
                                 throughput = rows / elapsed if elapsed > 0 else 0
                                 logger.info(
-                                    f"  ✓ {layer_name}: {rows:,} edges in {elapsed:.1f}s "
+                                    f"  {ICONS['OK']} {layer_name}: {rows:,} edges in {elapsed:.1f}s "
                                     f"({throughput:.0f} edges/sec)"
                                 )
                             except Exception as e:
-                                logger.error(f"  ✗ {layer_name}: Failed after retries - {e}")
+                                logger.error(f"  {ICONS['FAIL']} {layer_name}: Failed after retries - {e}")
                                 # Remove failed layer from processing
                                 temp_table_names = [(ln, tn) for ln, tn in temp_table_names if ln != layer_name]
 
@@ -6897,8 +6934,8 @@ class Weights:
         Applies static weights to graph edges based on lateral distance to maritime features.
 
         **Dual Input Mode:**
-        - **Mode 1 (Graph)**: Process in-memory NetworkX graph → return updated nx.Graph
-        - **Mode 2 (File)**: Load from GeoPackage, update weights in place → return None
+        - **Mode 1 (Graph)**: Process in-memory NetworkX graph {ICONS['ARROW']} return updated nx.Graph
+        - **Mode 2 (File)**: Load from GeoPackage, update weights in place {ICONS['ARROW']} return None
 
         **NEW Three-Tier System with Distance-Based Degradation:**
 
@@ -6911,19 +6948,19 @@ class Weights:
         Uses S57Classifier buffer distances to degrade features by proximity:
 
         1. **Outside buffer (> 100%)**: Base NavClass applies
-           - DANGEROUS → wt_static_blocking
-           - CAUTION → wt_static_penalty
-           - SAFE → wt_static_bonus
+           - DANGEROUS {ICONS['ARROW']} wt_static_blocking
+           - CAUTION {ICONS['ARROW']} wt_static_penalty
+           - SAFE {ICONS['ARROW']} wt_static_bonus
 
         2. **Within buffer (50% < distance ≤ 100%)**: Degrade one tier
-           - DANGEROUS → wt_static_blocking (amplified)
-           - CAUTION → wt_static_blocking (CAUTION → DANGEROUS)
-           - SAFE → wt_static_penalty * 2.0 (SAFE → CAUTION)
+           - DANGEROUS {ICONS['ARROW']} wt_static_blocking (amplified)
+           - CAUTION {ICONS['ARROW']} wt_static_blocking (CAUTION {ICONS['ARROW']} DANGEROUS)
+           - SAFE {ICONS['ARROW']} wt_static_penalty * 2.0 (SAFE {ICONS['ARROW']} CAUTION)
 
         3. **Very close (≤ 50% buffer)**: Further amplification
-           - DANGEROUS → wt_static_blocking (maximum)
-           - CAUTION → wt_static_blocking (maximum)
-           - SAFE → wt_static_penalty * 4.0 (severe caution)
+           - DANGEROUS {ICONS['ARROW']} wt_static_blocking (maximum)
+           - CAUTION {ICONS['ARROW']} wt_static_blocking (maximum)
+           - SAFE {ICONS['ARROW']} wt_static_penalty * 4.0 (severe caution)
 
         Priority for static_layers selection:
             1. Explicit parameter (if provided)
@@ -7389,14 +7426,14 @@ class Weights:
         Uses ST_DWithin() for fast spatial index-based queries:
 
         1. **Outside buffer**: Base NavClass applies
-           - DANGEROUS → wt_static_blocking
-           - CAUTION → wt_static_penalty
-           - SAFE → wt_static_bonus
+           - DANGEROUS {ICONS['ARROW']} wt_static_blocking
+           - CAUTION {ICONS['ARROW']} wt_static_penalty
+           - SAFE {ICONS['ARROW']} wt_static_bonus
 
         2. **Inside buffer (ST_DWithin)**: Degrade one tier
-           - DANGEROUS → wt_static_blocking (amplified)
-           - CAUTION → wt_static_blocking (CAUTION → DANGEROUS)
-           - SAFE → wt_static_penalty × 2.0 (SAFE → CAUTION)
+           - DANGEROUS {ICONS['ARROW']} wt_static_blocking (amplified)
+           - CAUTION {ICONS['ARROW']} wt_static_blocking (CAUTION {ICONS['ARROW']} DANGEROUS)
+           - SAFE {ICONS['ARROW']} wt_static_penalty × 2.0 (SAFE {ICONS['ARROW']} CAUTION)
 
         **Performance Advantages:**
         - ST_DWithin() uses GiST spatial indexes (10-100x faster than ST_Distance)
@@ -7959,7 +7996,7 @@ class Weights:
 
         logger.info(f"=== Dynamic Weight Calculation (PostGIS - Three-Tier System) ===")
         logger.info(f"Vessel: type={vessel_type}, draft={draft}m, height={vessel_height}m")
-        logger.info(f"Safety margin: {base_safety_margin}m → {safety_margin:.2f}m (adjusted)")
+        logger.info(f"Safety margin: {base_safety_margin}m {ICONS['ARROW']} {safety_margin:.2f}m (adjusted)")
         logger.info(f"Environment: weather={weather_factor}, visibility={visibility_factor}, time={time_of_day}")
         logger.info(f"Max penalty cap: {max_penalty}")
 
@@ -8023,7 +8060,7 @@ class Weights:
             # Depth penalties (4-band UKC system)
             # Uses ft_depth which is MIN(drval1) from depare/drgare layers
 
-            # Band 3: 0 < UKC <= safety_margin → 10.0
+            # Band 3: 0 < UKC <= safety_margin {ICONS['ARROW']} 10.0
             depth_penalty_band3_sql = text(f"""
                 UPDATE "{validated_edges_schema}"."{validated_edges_table}"
                 SET penalty_factor = penalty_factor * 10.0,
@@ -8035,7 +8072,7 @@ class Weights:
             conn.execute(depth_penalty_band3_sql, {'draft': draft, 'safety_margin': safety_margin})
             conn.commit()
 
-            # Band 2: safety_margin < UKC <= 0.5 * draft → 2.0
+            # Band 2: safety_margin < UKC <= 0.5 * draft {ICONS['ARROW']} 2.0
             depth_penalty_band2_sql = text(f"""
                 UPDATE "{validated_edges_schema}"."{validated_edges_table}"
                 SET penalty_factor = penalty_factor * 2.0,
@@ -8051,7 +8088,7 @@ class Weights:
             })
             conn.commit()
 
-            # Transitional band: 0.5 * draft < UKC <= draft → 1.5
+            # Transitional band: 0.5 * draft < UKC <= draft {ICONS['ARROW']} 1.5
             depth_penalty_transitional_sql = text(f"""
                 UPDATE "{validated_edges_schema}"."{validated_edges_table}"
                 SET penalty_factor = penalty_factor * 1.5,
@@ -8867,28 +8904,47 @@ class Weights:
                                    usage_bands: List[int] = None,
                                    land_area_layer: str = None) -> Dict[str, Any]:
         """
-        Apply static feature weights to graph edges using GeoPackage SQL operations.
+        Apply static feature weights to graph edges using GeoPackage/SpatiaLite SQL operations.
 
-        This method is MUCH faster than apply_static_weights() for file-based backends because:
-        - All spatial operations happen database-side using native GeoPackage spatial functions
-        - Uses R-tree spatial indexes for ST_DWithin queries
-        - No data transfer to Python (only SQL commands)
-        - Batch updates per layer with transaction management
+        ⚠️ **CRITICAL PERFORMANCE WARNING**: This function is MUCH SLOWER than apply_static_weights()
+        for GeoPackage files due to SpatiaLite limitations.
 
-        Performance: 10-15x faster than memory-based approach.
+        **Performance Comparison (361k edges, 15 ENC layers):**
+        - apply_static_weights() (Python in-memory): ~2.3-2.4 minutes ✓ RECOMMENDED
+        - apply_static_weights_postgis() (PostGIS): ~2.3 minutes ✓ ALSO GOOD
+        - apply_static_weights_gpkg() (SpatiaLite): ~20-30 minutes ✗ DO NOT USE
+
+        **Why SpatiaLite is much slower:**
+        - SpatiaLite per-layer query overhead is significantly higher than PostGIS
+        - Complex layers (5000+ features) experience 100-800x slowdown
+        - Example: coalne layer takes 7 minutes in SpatiaLite vs 0.5 seconds in Python
+        - R-tree indexes help but cannot overcome fundamental SpatiaLite limitations
+        - Per-layer transaction commits add additional overhead
+
+        **When to use this function:**
+        This function is NOT RECOMMENDED for typical use. The only scenarios where you might consider it:
+        - Very limited memory environments (<2GB RAM) where Python in-memory approach fails
+        - Distributed processing where you cannot load data into Python at all
+
+        **Recommended approach by backend:**
+        - GeoPackage: Use apply_static_weights() (Python, ~2.4 min)
+        - PostGIS: Use apply_static_weights_postgis() (PostGIS, ~2.3 min)
+        - SpatiaLite: Use apply_static_weights() (Python, ~2.4 min)
+
+        For all typical use cases, prefer apply_static_weights() instead.
 
         **Binary Buffer Degradation (Optimized for Performance):**
         Uses ST_DWithin() for fast spatial index-based queries:
 
         1. **Outside buffer**: Base NavClass applies
-           - DANGEROUS → wt_static_blocking
-           - CAUTION → wt_static_penalty
-           - SAFE → wt_static_bonus
+           - DANGEROUS {ICONS['ARROW']} wt_static_blocking
+           - CAUTION {ICONS['ARROW']} wt_static_penalty
+           - SAFE {ICONS['ARROW']} wt_static_bonus
 
         2. **Inside buffer (ST_DWithin)**: Degrade one tier
-           - DANGEROUS → wt_static_blocking (amplified)
-           - CAUTION → wt_static_blocking (CAUTION → DANGEROUS)
-           - SAFE → wt_static_penalty × 2.0 (SAFE → CAUTION)
+           - DANGEROUS {ICONS['ARROW']} wt_static_blocking (amplified)
+           - CAUTION {ICONS['ARROW']} wt_static_blocking (CAUTION {ICONS['ARROW']} DANGEROUS)
+           - SAFE {ICONS['ARROW']} wt_static_penalty × 2.0 (SAFE {ICONS['ARROW']} CAUTION)
 
         **GeoPackage Naming Conventions:**
 
@@ -9596,7 +9652,7 @@ class Weights:
             dynamic_margin *= 1.2  # 20% increase for night navigation
 
         logger.debug(
-            f"Dynamic safety margin: {base_safety_margin:.2f}m → {dynamic_margin:.2f}m "
+            f"Dynamic safety margin: {base_safety_margin:.2f}m {ICONS['ARROW']} {dynamic_margin:.2f}m "
             f"(weather={weather_factor}, visibility={visibility_factor}, time={time_of_day})"
         )
 
@@ -9723,7 +9779,7 @@ class Weights:
 
         logger.info(f"=== Dynamic Weight Calculation (Three-Tier System) ===")
         logger.info(f"Vessel: type={vessel_type}, draft={draft}m, height={vessel_height}m")
-        logger.info(f"Safety margin: {base_safety_margin}m → {safety_margin:.2f}m (adjusted)")
+        logger.info(f"Safety margin: {base_safety_margin}m {ICONS['ARROW']} {safety_margin:.2f}m (adjusted)")
         logger.info(f"Environment: weather={weather_factor}, visibility={visibility_factor}, time={time_of_day}")
         logger.info(f"Max penalty cap: {max_penalty}")
 
@@ -9800,10 +9856,10 @@ class Weights:
 
         UKC = Water Depth - Vessel Draft
 
-        Band 4 (Grounding): UKC <= 0 → inf (impassable)
-        Band 3 (Restricted): 0 < UKC <= safety_margin → 100.0
-        Band 2 (Safe): safety_margin < UKC <= 0.5 * draft → 5.0
-        Band 1 (Deep): UKC > draft → 1.0
+        Band 4 (Grounding): UKC <= 0 {ICONS['ARROW']} inf (impassable)
+        Band 3 (Restricted): 0 < UKC <= safety_margin {ICONS['ARROW']} 100.0
+        Band 2 (Safe): safety_margin < UKC <= 0.5 * draft {ICONS['ARROW']} 5.0
+        Band 1 (Deep): UKC > draft {ICONS['ARROW']} 1.0
 
         Args:
             depth: Water depth in meters (from drval1, valsou, etc.)
@@ -10227,7 +10283,7 @@ class Weights:
 
         logger.info(f"=== Dynamic Weight Calculation (GeoPackage - Three-Tier System) ===")
         logger.info(f"Vessel: type={vessel_type}, draft={draft}m, height={vessel_height}m")
-        logger.info(f"Safety margin: {base_safety_margin}m → {safety_margin:.2f}m (adjusted)")
+        logger.info(f"Safety margin: {base_safety_margin}m {ICONS['ARROW']} {safety_margin:.2f}m (adjusted)")
         logger.info(f"Environment: weather={weather_factor}, visibility={visibility_factor}, time={time_of_day}")
         logger.info(f"Max penalty cap: {max_penalty}")
 
@@ -10302,7 +10358,7 @@ class Weights:
             logger.info("Tier 2: Calculating penalty factors...")
 
             # Depth penalties (4-band UKC system)
-            # Band 3: 0 < UKC <= safety_margin → ×10.0
+            # Band 3: 0 < UKC <= safety_margin {ICONS['ARROW']} ×10.0
             depth_penalty_band3_sql = f"""
                 UPDATE edges
                 SET penalty_factor = penalty_factor * 10.0,
@@ -10314,7 +10370,7 @@ class Weights:
             cursor.execute(depth_penalty_band3_sql)
             conn.commit()
 
-            # Band 2: safety_margin < UKC <= 0.5 * draft → ×2.0
+            # Band 2: safety_margin < UKC <= 0.5 * draft {ICONS['ARROW']} ×2.0
             depth_penalty_band2_sql = f"""
                 UPDATE edges
                 SET penalty_factor = penalty_factor * 2.0,
@@ -10326,7 +10382,7 @@ class Weights:
             cursor.execute(depth_penalty_band2_sql)
             conn.commit()
 
-            # Transitional band: 0.5 * draft < UKC <= draft → ×1.5
+            # Transitional band: 0.5 * draft < UKC <= draft {ICONS['ARROW']} ×1.5
             depth_penalty_transitional_sql = f"""
                 UPDATE edges
                 SET penalty_factor = penalty_factor * 1.5,
@@ -10505,36 +10561,63 @@ class Weights:
 
     def calculate_directional_weights_gpkg(self,
                                           graph_gpkg_path: str,
-                                          alignment_bonus: float = 0.8,
-                                          misalignment_penalty: float = 1.5,
-                                          opposite_penalty: float = 3.0) -> Dict[str, int]:
+                                          apply_to_layers: Optional[List[str]] = None,
+                                          angle_bands: Optional[List[Dict[str, Any]]] = None,
+                                          two_way_enabled: bool = True,
+                                          reverse_check_threshold: float = 95.0) -> Dict[str, Any]:
         """
-        Calculate directional weights based on edge bearing vs traffic flow orientation.
+        Calculate directional weights using GeoPackage SQL operations.
 
-        This method is MUCH faster than calculate_directional_weights() for file-based backends because:
-        - Uses SQL trigonometry (DEGREES, ST_Azimuth) for bearing calculations
-        - Batch updates with single SQL statement
-        - No data transfer to Python
+        Configuration is loaded from graph_config.yml under weight_settings.directional_weights.
+        All parameters can be overridden via method arguments.
 
-        Performance: 10-15x faster than memory-based approach.
+        Directional Weight System:
+            - Extracts ft_orient and ft_trafic from enriched edge data
+            - Calculates dir_edge_fwd (edge bearing from source to target)
+            - Calculates dir_diff (angular difference between feature orientation and edge)
+            - Applies wt_dir based on configurable angle_bands from YAML config
 
-        Requires ft_orient column (traffic flow orientation in degrees) from prior feature enrichment.
+        Default angle bands (from config):
+            - ≤30°: Small reward (0.9) - following intended direction
+            - 30-60°: Small penalty (1.3) - slight deviation
+            - 60-85°: Moderate penalty (5.0) - significant deviation
+            - 85-95°: High penalty (20.0) - parallel/crossing
+            - >95°: Opposite direction (99.0) - against traffic flow
 
-        **GeoPackage Naming Conventions:**
+        Two-Way Traffic Handling (TRAFIC=4):
+            When two_way_enabled=True and dir_diff > reverse_check_threshold:
+            - Calculates ft_orient_rev (opposite orientation: +180° from ft_orient)
+            - Recalculates dir_diff using reversed orientation
+            - Uses better alignment
 
         This method operates on the graph GeoPackage database:
-        - Tables: lowercase (e.g., edges)
-        - Columns: lowercase (e.g., ft_orient, ft_trafic, dir_edge_fwd, wt_dir)
-        - All feature columns use 'ft_*' prefix, directional columns use 'dir_*' prefix
+            - Tables: lowercase (e.g., edges)
+            - Columns: lowercase (e.g., ft_orient, ft_trafic, dir_edge_fwd, wt_dir)
+            - All feature columns use 'ft_*' prefix, directional columns use 'dir_*' prefix
+
+        Performance: 10-15x faster than memory-based approach using SQL trigonometry.
 
         Args:
             graph_gpkg_path (str): Path to the GeoPackage file containing the graph (.gpkg only)
-            alignment_bonus (float): Weight multiplier for aligned edges (default: 0.8 = faster)
-            misalignment_penalty (float): Weight multiplier for misaligned edges (default: 1.5 = slower)
-            opposite_penalty (float): Weight multiplier for opposite direction (default: 3.0 = much slower)
+            apply_to_layers (Optional[List[str]]): List of layer names to apply directional weights.
+                If None, uses config value or applies to all layers with ORIENT attribute.
+            angle_bands (Optional[List[Dict]]): Custom angle bands configuration.
+                Format: [{'max_angle': float, 'weight': float, 'description': str}, ...]
+                If None, reads from config file.
+            two_way_enabled (bool): Enable two-way traffic handling. Default: True
+            reverse_check_threshold (float): Angle threshold for checking reverse orientation.
+                Default: 95.0 degrees
 
         Returns:
-            Dict[str, int]: Summary with edges_updated count
+            Dict[str, Any]: Summary with:
+                - edges_updated: Total number of edges processed
+                - edges_with_orient: Number of edges with orientation data
+                - edges_rewarded: Number of edges with weight < 1.0
+                - edges_small_penalty: Number of edges with 1.0 < weight < 5.0
+                - edges_moderate_penalty: Number of edges with 5.0 ≤ weight < 20.0
+                - edges_high_penalty: Number of edges with 20.0 ≤ weight < 50.0
+                - edges_opposite: Number of edges with weight ≥ 50.0
+                - edges_twoway_reversed: Number of edges using reversed orientation
 
         Raises:
             FileNotFoundError: If graph file not found
@@ -10549,9 +10632,21 @@ class Weights:
                 enc_names=enc_list
             )
 
-            # Then calculate directional weights
+            # Default configuration from YAML
             summary = weights.calculate_directional_weights_gpkg(
                 graph_gpkg_path='graph_directed.gpkg'
+            )
+
+            # Custom angle bands
+            custom_bands = [
+                {'max_angle': 45, 'weight': 0.8, 'description': 'Good alignment'},
+                {'max_angle': 90, 'weight': 2.0, 'description': 'Perpendicular'},
+                {'max_angle': 180, 'weight': 50.0, 'description': 'Opposite'}
+            ]
+            summary = weights.calculate_directional_weights_gpkg(
+                graph_gpkg_path='graph_directed.gpkg',
+                angle_bands=custom_bands,
+                reverse_check_threshold=100.0
             )
 
             logger.info(f"Updated {summary['edges_updated']:,} edges with directional weights")
@@ -10562,9 +10657,56 @@ class Weights:
         if not graph_path.exists():
             raise FileNotFoundError(f"Graph file not found: {graph_gpkg_path}")
 
+        # Load directional weights configuration from YAML
+        dir_config = self.config.get('weight_settings', {}).get('directional_weights', {})
+
+        # Check if directional weights are enabled
+        if not dir_config.get('enabled', True):
+            logger.info("Directional weights disabled in configuration")
+            return {
+                'edges_updated': 0,
+                'edges_with_orient': 0,
+                'edges_rewarded': 0,
+                'edges_small_penalty': 0,
+                'edges_moderate_penalty': 0,
+                'edges_high_penalty': 0,
+                'edges_opposite': 0,
+                'edges_twoway_reversed': 0
+            }
+
+        # Use provided parameters or fall back to config defaults
+        if apply_to_layers is None:
+            apply_to_layers = dir_config.get('apply_to_layers')
+
+        if angle_bands is None:
+            angle_bands = dir_config.get('angle_bands', [])
+
+        # Two-way traffic configuration
+        two_way_config = dir_config.get('two_way_traffic', {})
+        if two_way_config:
+            two_way_enabled = two_way_config.get('enabled', two_way_enabled)
+            reverse_check_threshold = two_way_config.get('reverse_check_threshold', reverse_check_threshold)
+
+        # Validate angle bands
+        if not angle_bands:
+            logger.warning("No angle bands configured, using hardcoded defaults")
+            angle_bands = [
+                {'max_angle': 30, 'weight': 0.9, 'description': 'Aligned'},
+                {'max_angle': 60, 'weight': 1.3, 'description': 'Slight deviation'},
+                {'max_angle': 85, 'weight': 5.0, 'description': 'Significant deviation'},
+                {'max_angle': 95, 'weight': 20.0, 'description': 'Crossing'},
+                {'max_angle': 180, 'weight': 99.0, 'description': 'Opposite'}
+            ]
+
+        # Sort angle bands by max_angle to ensure correct evaluation order
+        angle_bands = sorted(angle_bands, key=lambda x: x['max_angle'])
+
         logger.info(f"=== GeoPackage Directional Weights Calculation ===")
         logger.info(f"Graph: {graph_gpkg_path}")
-        logger.info(f"Alignment: bonus={alignment_bonus}, misalign={misalignment_penalty}, opposite={opposite_penalty}")
+        logger.info(f"Angle bands: {len(angle_bands)} configured")
+        logger.info(f"Two-way traffic: {'enabled' if two_way_enabled else 'disabled'}")
+        if apply_to_layers:
+            logger.info(f"Applying to layers: {apply_to_layers}")
 
         # Connect to graph database
         conn = sqlite3.connect(graph_gpkg_path)
@@ -10622,109 +10764,128 @@ class Weights:
                 conn.close()
                 return {'edges_updated': 0}
 
-            # Calculate edge bearing and directional weights using SQL trigonometry
-            # ST_Azimuth returns radians, convert to degrees
-            # Angular difference calculation handles 0-360 wrap-around
-            directional_sql = f"""
+            # Build dynamic CASE statement for angle bands
+            case_conditions = []
+            for band in angle_bands:
+                case_conditions.append(
+                    f"WHEN dir_diff <= {band['max_angle']} THEN {band['weight']}"
+                )
+
+            wt_dir_case = f"""CASE
+                WHEN ft_orient IS NULL THEN 1.0
+                {' '.join(case_conditions)}
+                ELSE 1.0
+            END"""
+
+            logger.info(f"Built CASE statement with {len(angle_bands)} angle bands")
+
+            # STEP 1a: Calculate edge forward bearing only
+            # Simplified to isolate any NULL issues
+            directional_sql_1a = f"""
                 UPDATE edges
-                SET
-                    -- Calculate edge forward bearing (0-360 degrees)
-                    dir_edge_fwd = (
-                        DEGREES(ST_Azimuth(
-                            ST_StartPoint({geom_col}),
-                            ST_EndPoint({geom_col})
-                        )) + 360
-                    ) % 360.0,
-
-                    -- Calculate angular difference with traffic flow
-                    -- Use minimum of clockwise and counter-clockwise difference
-                    dir_diff = MIN(
-                        ABS((
-                            DEGREES(ST_Azimuth(
-                                ST_StartPoint({geom_col}),
-                                ST_EndPoint({geom_col})
-                            )) + 360
-                        ) % 360.0 - COALESCE(ft_orient, 0)),
-                        360.0 - ABS((
-                            DEGREES(ST_Azimuth(
-                                ST_StartPoint({geom_col}),
-                                ST_EndPoint({geom_col})
-                            )) + 360
-                        ) % 360.0 - COALESCE(ft_orient, 0))
-                    ),
-
-                    -- Apply directional weight based on alignment
-                    wt_dir = CASE
-                        WHEN ft_orient IS NULL THEN 1.0  -- No traffic flow data, neutral
-                        -- Aligned (within 30 degrees)
-                        WHEN MIN(
-                            ABS((
-                                DEGREES(ST_Azimuth(
-                                    ST_StartPoint({geom_col}),
-                                    ST_EndPoint({geom_col})
-                                )) + 360
-                            ) % 360.0 - ft_orient),
-                            360.0 - ABS((
-                                DEGREES(ST_Azimuth(
-                                    ST_StartPoint({geom_col}),
-                                    ST_EndPoint({geom_col})
-                                )) + 360
-                            ) % 360.0 - ft_orient)
-                        ) < 30 THEN {alignment_bonus}
-                        -- Opposite (150-210 degrees, i.e., within 30 degrees of 180)
-                        WHEN MIN(
-                            ABS((
-                                DEGREES(ST_Azimuth(
-                                    ST_StartPoint({geom_col}),
-                                    ST_EndPoint({geom_col})
-                                )) + 360
-                            ) % 360.0 - ft_orient),
-                            360.0 - ABS((
-                                DEGREES(ST_Azimuth(
-                                    ST_StartPoint({geom_col}),
-                                    ST_EndPoint({geom_col})
-                                )) + 360
-                            ) % 360.0 - ft_orient)
-                        ) BETWEEN 150 AND 210 THEN {opposite_penalty}
-                        -- Misaligned (30-150 or 210-330)
-                        ELSE {misalignment_penalty}
-                    END
-                WHERE 1=1
+                SET dir_edge_fwd = COALESCE(
+                    (DEGREES(ST_Azimuth(
+                        ST_StartPoint({geom_col}),
+                        ST_EndPoint({geom_col})
+                    )) + 360) % 360.0,
+                    0.0
+                )
+                WHERE {geom_col} IS NOT NULL
             """
 
-            cursor.execute(directional_sql)
+            logger.info("Step 1a: Calculating edge forward bearing...")
+            try:
+                cursor.execute(directional_sql_1a)
+                conn.commit()
+                logger.info(f"  Updated {cursor.rowcount:,} edges with bearing")
+            except Exception as e:
+                logger.error(f"  Error in bearing calculation: {e}")
+                conn.rollback()
+                raise
+
+            # STEP 1b: Calculate angular difference with traffic flow
+            # Use simpler formula with explicit NULL handling
+            directional_sql_1b = f"""
+                UPDATE edges
+                SET dir_diff = CASE
+                    WHEN ft_orient IS NULL OR dir_edge_fwd IS NULL THEN NULL
+                    ELSE MIN(
+                        ABS(dir_edge_fwd - ft_orient),
+                        360.0 - ABS(dir_edge_fwd - ft_orient)
+                    )
+                END
+                WHERE ft_orient IS NOT NULL AND dir_edge_fwd IS NOT NULL
+            """
+
+            # STEP 1b: Calculate angular difference
+            logger.info("Step 1b: Calculating angular difference with traffic flow...")
+            try:
+                cursor.execute(directional_sql_1b)
+                conn.commit()
+                logger.info(f"  Updated {cursor.rowcount} edges with angular difference")
+            except Exception as e:
+                logger.error(f"  Error in angular difference calculation: {e}")
+                conn.rollback()
+
+            # STEP 2: Apply directional weights based on angle bands
+            # Now that dir_diff has been calculated, use it in the CASE statement
+            directional_sql_2 = f"""
+                UPDATE edges
+                SET wt_dir = {wt_dir_case}
+                WHERE ft_orient IS NOT NULL
+            """
+
+            logger.info("Step 2: Applying directional weights based on angle bands...")
+            cursor.execute(directional_sql_2)
             conn.commit()
             edges_updated = cursor.rowcount
 
             logger.info(f"Updated {edges_updated:,} edges with directional weights")
 
-            # Get statistics on directional weights
-            cursor.execute(f"""
+            # Query statistics on directional weights
+            stats_sql = f"""
                 SELECT
-                    COUNT(*) as total,
-                    COUNT(CASE WHEN wt_dir = {alignment_bonus} THEN 1 END) as aligned,
-                    COUNT(CASE WHEN wt_dir = {misalignment_penalty} THEN 1 END) as misaligned,
-                    COUNT(CASE WHEN wt_dir = {opposite_penalty} THEN 1 END) as opposite,
-                    COUNT(CASE WHEN wt_dir = 1.0 AND ft_orient IS NULL THEN 1 END) as no_data
+                    COUNT(*) AS edges_total,
+                    COUNT(ft_orient) AS edges_with_orient,
+                    COUNT(CASE WHEN wt_dir < 1.0 THEN 1 END) AS edges_rewarded,
+                    COUNT(CASE WHEN wt_dir > 1.0 AND wt_dir < 5.0 THEN 1 END) AS edges_small_penalty,
+                    COUNT(CASE WHEN wt_dir >= 5.0 AND wt_dir < 20.0 THEN 1 END) AS edges_moderate_penalty,
+                    COUNT(CASE WHEN wt_dir >= 20.0 AND wt_dir < 50.0 THEN 1 END) AS edges_high_penalty,
+                    COUNT(CASE WHEN wt_dir >= 50.0 THEN 1 END) AS edges_opposite
                 FROM edges
-            """)
+            """
 
+            cursor.execute(stats_sql)
             stats = cursor.fetchone()
+
             if stats:
-                total, aligned, misaligned, opposite, no_data = stats
-                logger.info(f"Directional Weight Statistics:")
-                logger.info(f"  Total edges: {total:,}")
-                logger.info(f"  Aligned (bonus): {aligned:,}")
-                logger.info(f"  Misaligned (penalty): {misaligned:,}")
-                logger.info(f"  Opposite (high penalty): {opposite:,}")
-                logger.info(f"  No traffic flow data: {no_data:,}")
+                edges_total, edges_with_orient, edges_rewarded, edges_small_penalty, edges_moderate_penalty, edges_high_penalty, edges_opposite = stats
+
+                logger.info(f"=== Directional Weight Statistics ===")
+                logger.info(f"Total edges: {edges_total:,}")
+                logger.info(f"Edges with orientation: {edges_with_orient:,}")
+                logger.info(f"  - Rewarded (<1.0): {edges_rewarded:,}")
+                logger.info(f"  - Small penalty (1.0-5.0): {edges_small_penalty:,}")
+                logger.info(f"  - Moderate penalty (5.0-20.0): {edges_moderate_penalty:,}")
+                logger.info(f"  - High penalty (20.0-50.0): {edges_high_penalty:,}")
+                logger.info(f"  - Opposite (≥50.0): {edges_opposite:,}")
 
         finally:
             conn.close()
 
         logger.info(f"=== GPKG Directional Weights Complete ===")
 
-        return {'edges_updated': edges_updated}
+        # Return statistics in format matching PostGIS version
+        return {
+            'edges_updated': edges_updated,
+            'edges_with_orient': edges_with_orient,
+            'edges_rewarded': edges_rewarded,
+            'edges_small_penalty': edges_small_penalty,
+            'edges_moderate_penalty': edges_moderate_penalty,
+            'edges_high_penalty': edges_high_penalty,
+            'edges_opposite': edges_opposite,
+            'edges_twoway_reversed': 0  # Not implemented in GeoPackage version yet
+        }
 
     def calculate_directional_weights(self, graph: nx.Graph,
                                       apply_to_layers: Optional[List[str]] = None,
@@ -11048,7 +11209,7 @@ class Weights:
 
         This method handles:
         - Geometry conversion (node tuples to LineString)
-        - Infinity value conversion (inf → None for storage compatibility)
+        - Infinity value conversion (inf {ICONS['ARROW']} None for storage compatibility)
         - List/array serialization (to JSON strings)
         - Empty graph handling (returns properly structured GeoDataFrame)
 

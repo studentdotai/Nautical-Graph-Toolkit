@@ -148,14 +148,14 @@ from nautical_graph_toolkit.core.s57_data import ENCDataFactory
 
 # Connect to data source (PostGIS, GeoPackage, or SpatiaLite)
 db_params = {
-    'dbname': 'ENC_db',
+    'dbname': 'enc_db',
     'user': 'postgres',
     'password': 'password',
     'host': 'localhost',
-    'port': 5432
+    'port': 5433
 }
 
-factory = ENCDataFactory(source=db_params, schema='us_enc_all')
+factory = ENCDataFactory(source=db_params, schema='enc_west')
 
 # Initialize graph generator
 h3_graph = H3Graph(data_factory=factory)
@@ -365,14 +365,14 @@ from nautical_graph_toolkit.core.s57_data import ENCDataFactory
 # ============================================================================
 
 db_params = {
-    'dbname': 'ENC_db',
+    'dbname': 'enc_db',
     'user': 'postgres',
     'password': 'password',
     'host': 'localhost',
-    'port': 5432
+    'port': 5433
 }
 
-factory = ENCDataFactory(source=db_params, schema='us_enc_all')
+factory = ENCDataFactory(source=db_params, schema='enc_west')
 h3_graph = H3Graph(data_factory=factory, graph_schema_name='graph')
 weights = Weights(factory)
 
@@ -382,7 +382,7 @@ weights = Weights(factory)
 #
 # The initialization above uses TWO different PostGIS schemas:
 #
-# 1. ENCDataFactory.schema='us_enc_all'
+# 1. ENCDataFactory.schema='enc_west'
 #    - Contains the imported S-57 ENC feature data (depare, drgare, bridge, etc.)
 #    - Used by the classifier to determine available feature layers
 #    - Referenced as 'enc_schema' parameter in weighting methods
@@ -428,7 +428,7 @@ enrichment_summary = weights.enrich_edges_with_features_postgis(
     graph_name='florida_keys',  # Graph table prefix (edges table is florida_keys_edges)
     enc_names=enc_list,
     schema_name='graph',  # PostGIS schema containing the graph tables
-    enc_schema='us_enc_all',  # PostGIS schema containing the ENC feature data
+    enc_schema='enc_west',  # PostGIS schema containing the ENC feature data
     feature_layers=None,  # None = use all layers from classifier (depare, drgare, bridge, wrecks, obstrn)
     # Alternative: feature_layers=['depare', 'drgare', 'bridge'] for specific layers
     is_directed=False,
@@ -446,7 +446,7 @@ static_summary = weights.apply_static_weights_postgis(
     graph_name='florida_keys',  # Graph table prefix
     enc_names=enc_list,
     schema_name='graph',  # PostGIS schema containing graph tables
-    enc_schema='us_enc_all',  # PostGIS schema containing ENC features
+    enc_schema='enc_west',  # PostGIS schema containing ENC features
     # static_layers uses config defaults
     # usage_bands defaults to [1,2,3,4,5,6]
 )
@@ -528,7 +528,7 @@ from nautical_graph_toolkit.core.s57_data import ENCDataFactory
 import networkx as nx
 
 # Initialize
-factory = ENCDataFactory(source=db_params, schema='us_enc_all')
+factory = ENCDataFactory(source=db_params, schema='enc_west')
 weights = Weights(factory)
 
 # Assume we have an enriched graph
@@ -664,19 +664,19 @@ dynamic = weights.calculate_dynamic_weights(static, vessel_params)
 
 ### PostGIS Weighting Methods - Common Parameters
 
-| Parameter | Type | Description | Example |
-|-----------|------|-------------|---------|
-| `graph_name` | str | Graph table prefix (edges table = `{graph_name}_edges`) | `'florida_keys'` |
-| `schema_name` | str | PostGIS schema containing graph tables | `'graph'` |
-| `enc_schema` | str | PostGIS schema containing ENC feature data | `'us_enc_all'` |
-| `enc_names` | List[str] | List of ENC chart names to process | `['US5FL14M', 'US5FL15M']` |
-| `feature_layers` | List[str] \| None | Feature layers to enrich. `None` = all available layers | `None` or `['depare', 'bridge']` |
-| `vessel_parameters` | Dict | Vessel specs: `{draft, height, safety_margin, vessel_type}` | `{'draft': 7.5, 'height': 30.0}` |
+| Parameter | Type | Description | Example                                             |
+|-----------|------|-------------|-----------------------------------------------------|
+| `graph_name` | str | Graph table prefix (edges table = `{graph_name}_edges`) | `'florida_keys'`                                    |
+| `schema_name` | str | PostGIS schema containing graph tables | `'graph'`                                           |
+| `enc_schema` | str | PostGIS schema containing ENC feature data | `'enc_west'`                                        |
+| `enc_names` | List[str] | List of ENC chart names to process | `['US5FL14M', 'US5FL15M']`                          |
+| `feature_layers` | List[str] \| None | Feature layers to enrich. `None` = all available layers | `None` or `['depare', 'bridge']`                    |
+| `vessel_parameters` | Dict | Vessel specs: `{draft, height, safety_margin, vessel_type}` | `{'draft': 7.5, 'height': 30.0}`                    |
 | `environmental_conditions` | Dict | Environmental factors: `{weather_factor, visibility_factor, time_of_day}` | `{'weather_factor': 1.5, 'visibility_factor': 1.2}` |
-| `is_directed` | bool | Whether graph has directional edges | `False` |
-| `include_sources` | bool | Include ENC source in enrichment | `False` |
-| `soundg_buffer_meters` | float | Buffer distance for depth measurements | `30.0` |
-| `max_penalty` | float | Maximum penalty weight for hazardous areas | `50.0` |
+| `is_directed` | bool | Whether graph has directional edges | `False`                                             |
+| `include_sources` | bool | Include ENC source in enrichment | `False`                                             |
+| `soundg_buffer_meters` | float | Buffer distance for depth measurements | `30.0`                                              |
+| `max_penalty` | float | Maximum penalty weight for hazardous areas | `50.0`                                              |
 
 ### Methods Using These Parameters
 

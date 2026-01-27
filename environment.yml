@@ -1,0 +1,24 @@
+name: nautical
+channels:
+  - conda-forge
+dependencies:
+  # System-level GIS libraries with exact versions
+  - gdal>=3.10,<3.11
+  - libgdal>=3.10,<3.11
+  - sqlite  # Provides SQLite with RTREE support for GeoPackage operations
+
+  # Python Core
+  - python=3.11      # Pin only major.minor
+
+  # Python Data/GIS Stack
+  - geopandas>=1.1
+  - pandas>=2.3
+  - fiona>=1.10
+  - shapely>=2.0
+  - pyproj>=3.0
+  - numpy>=2.0
+
+  # Build tools needed by some packages
+  - pip=25.*
+
+  # We'll install Python packages with UV next

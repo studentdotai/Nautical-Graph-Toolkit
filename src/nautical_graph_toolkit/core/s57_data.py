@@ -794,7 +794,7 @@ class S57Advanced:
             'RETURN_PRIMITIVES=OFF', 'SPLIT_MULTIPOINT=ON', 'ADD_SOUNDG_DEPTH=ON',
             'UPDATES=APPLY', 'LNAM_REFS=ON', 'RECODE_BY_DSSI=ON', 
             'LIST_AS_STRING=OFF',  # Critical: ensures list fields come as native OGR types
-            'RETURN_LINKAGES=OFF'   # Helps preserve S-57 relationships and attributes
+            'RETURN_LINKAGES=ON'   # Helps preserve S-57 relationships and attributes
         ]
         
         src_ds = gdal.OpenEx(str(s57_file), gdal.OF_VECTOR, open_options=s57_open_options)
@@ -905,7 +905,10 @@ class S57Advanced:
                 src_ds = file_info['dataset']
                 
                 # Create memory dataset
-                mem_driver = ogr.GetDriverByName('MEM')
+                # NOTE: GDAL 3.11+ deprecates 'Memory' driver in favor of 'MEM'
+                # When upgrading to GDAL 3.11.3+, change 'Memory' to 'MEM'
+                # See docs/TROUBLESHOOTING.md - "GDAL 3.11+ Driver Deprecations"
+                mem_driver = ogr.GetDriverByName('Memory')
                 mem_ds = mem_driver.CreateDataSource(f'batch_{enc_name}_{layer_name}')
                 
                 try:
@@ -938,7 +941,7 @@ class S57Advanced:
                     else:
                         logger.warning(f"Could not process layer '{layer_name}' from {s57_file.name}: {e}")
                     # Clean up failed memory dataset
-                    if mem_ds: mem_ds.Destroy() # Explicitly destroy
+                    if mem_ds: mem_ds.Close()
                     mem_ds = None
                     continue
             
@@ -981,7 +984,7 @@ class S57Advanced:
         finally:
             # Clean up temporary datasets
             for mem_ds in temp_datasets:
-                if mem_ds: mem_ds.Destroy() # Explicitly destroy
+                if mem_ds: mem_ds.Close()
 
     def _build_unified_schema(self) -> Dict[str, Dict]:
         """Build unified schemas from cached file information."""
@@ -3481,6 +3484,93 @@ class PostGISManager:
         df = pd.DataFrame(summary_data)
         return df.sort_values(by='FeatureCount', ascending=False).reset_index(drop=True)
 
+    def _bytes_to_human(self, size_bytes: int) -> str:
+        """
+        Converts a size in bytes to a human-readable format.
+
+        Args:
+            size_bytes (int): Size in bytes.
+
+        Returns:
+            str: Human-readable size string (e.g., '1.23 MB', '456 KB', '12.34 GB').
+        """
+        for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+            if size_bytes < 1024.0:
+                return f"{size_bytes:.2f} {unit}" if unit == 'B' else f"{size_bytes:.2f} {unit}"
+            size_bytes /= 1024.0
+        return f"{size_bytes:.2f} PB"
+
+    def get_table_sizes(self, include_empty: bool = False, table_name: Optional[str] = None, schema_name: str = 'graph') -> pd.DataFrame:
+        """
+        Retrieves disk usage statistics for tables in the specified PostGIS schema.
+
+        Queries PostgreSQL system catalogs to get table sizes including total size,
+        main table size, and indexes size.
+
+        Args:
+            include_empty (bool): If False, excludes tables with 0 bytes total size.
+            table_name (Optional[str]): If specified, returns only that table's size.
+                                      None returns all tables in the schema.
+            schema_name (str): Schema to query. Defaults to 'graph'.
+
+        Returns:
+            pd.DataFrame: A DataFrame with columns:
+                - table_name: Name of the table
+                - schema_name: Name of the schema
+                - total_size: Total size in human-readable format (table + indexes + TOAST)
+                - table_size: Main table size in human-readable format
+                - indexes_size: Indexes size in human-readable format
+        """
+        logger.info(f"Fetching table sizes for schema '{schema_name}'...")
+
+        # SQL query to get table sizes from PostgreSQL system catalogs
+        # Uses pg_total_relation_size, pg_relation_size, and pg_indexes_size functions
+        query = text("""
+            SELECT
+                t.relname AS table_name,
+                n.nspname AS schema_name,
+                pg_total_relation_size(t.oid) AS total_size_bytes,
+                pg_relation_size(t.oid) AS table_size_bytes,
+                pg_indexes_size(t.oid) AS indexes_size_bytes
+            FROM pg_class t
+            JOIN pg_namespace n ON t.relnamespace = n.oid
+            WHERE n.nspname = :schema_name
+                AND t.relkind = 'r'
+                AND (:table_name IS NULL OR t.relname = :table_name)
+            ORDER BY total_size_bytes DESC
+        """)
+
+        try:
+            with self.engine.connect() as conn:
+                result = conn.execute(query, {'schema_name': schema_name, 'table_name': table_name})
+                rows = result.fetchall()
+
+            # Convert results to list of dictionaries
+            size_data = []
+            for row in rows:
+                total_bytes = row.total_size_bytes
+                table_bytes = row.table_size_bytes
+                indexes_bytes = row.indexes_size_bytes
+
+                # Skip empty tables if include_empty is False
+                if not include_empty and total_bytes == 0:
+                    continue
+
+                size_data.append({
+                    'table_name': row.table_name,
+                    'schema_name': row.schema_name,
+                    'total_size': self._bytes_to_human(total_bytes),
+                    'table_size': self._bytes_to_human(table_bytes),
+                    'indexes_size': self._bytes_to_human(indexes_bytes)
+                })
+
+            df = pd.DataFrame(size_data)
+            return df.reset_index(drop=True)
+
+        except Exception as e:
+            logger.error(f"Error fetching table sizes: {e}")
+            return pd.DataFrame()
+
     def get_encs_by_usage_band(self, usage_band: Union[int, List[int]]) -> List[str]:
         """
         Filters and returns ENC names based on their navigational usage band.
@@ -3909,7 +3999,7 @@ class PostGISManager:
             logger.error(f"Error executing PostGIS grid creation: {e}")
             return {}
 
-    def create_grid_graph_nodes_and_edges(self, polygon: Union[Polygon, MultiPolygon], spacing: float, max_edge_factor: float = 2.0, max_points: int = 1000000) -> Dict[str, Any]:
+    def create_grid_graph_nodes_and_edges(self, polygon: Union[Polygon, MultiPolygon], spacing: float, max_edge_factor: float = 2.0, max_points: int = 1000000, max_subdivision_factor: int = 4) -> Dict[str, Any]:
         """
         Creates graph nodes and edges using PostGIS spatial operations with spatial subdivision for large grids.
         Returns nodes and edges data that can be used to construct a NetworkX graph.
@@ -3919,7 +4009,18 @@ class PostGISManager:
             spacing: Grid spacing in degrees
             max_edge_factor: Maximum edge length as multiple of spacing
             max_points: Maximum points per subdivision to avoid memory issues
+            max_subdivision_factor: Maximum subdivision factor for grid subdivision (e.g., 4 = 4x4 = 16 regions).
+                                    Higher values (5+) create more regions but use more memory. WARNING:
+                                    Values > 4 may cause significant memory usage.
         """
+
+        # Warn user if using high subdivision factor
+        if max_subdivision_factor > 4:
+            logger.warning(
+                f"max_subdivision_factor={max_subdivision_factor} > 4 may cause "
+                f"significant memory usage and slower performance. "
+                f"Ensure you have adequate RAM (32GB+ recommended for 5x5)."
+            )
 
         minx, miny, maxx, maxy = polygon.bounds
         max_edge_length = spacing * max_edge_factor
@@ -3935,7 +4036,7 @@ class PostGISManager:
         # Use spatial subdivision for large grids
         if expected_points > max_points:
             logger.info(f"Using spatial subdivision (threshold: {max_points:,} points)")
-            return self._create_grid_graph_subdivided(polygon, spacing, max_edge_factor, max_points)
+            return self._create_grid_graph_subdivided(polygon, spacing, max_edge_factor, max_points, max_subdivision_factor)
         else:
             logger.info("Using single-query approach")
             return self._create_grid_graph_single(polygon, spacing, max_edge_factor)
@@ -4035,9 +4136,16 @@ class PostGISManager:
             logger.error(f"Error executing PostGIS graph creation: {e}")
             return {'nodes': [], 'edges': []}
 
-    def _create_grid_graph_subdivided(self, polygon: Union[Polygon, MultiPolygon], spacing: float, max_edge_factor: float, max_points: int) -> Dict[str, Any]:
+    def _create_grid_graph_subdivided(self, polygon: Union[Polygon, MultiPolygon], spacing: float, max_edge_factor: float, max_points: int, max_subdivision_factor: int = 4) -> Dict[str, Any]:
         """
         Creates graph nodes and edges using spatial subdivision for large polygons.
+
+        Args:
+            polygon: The polygon/multipolygon to create grid within
+            spacing: Grid spacing in degrees
+            max_edge_factor: Maximum edge length as multiple of spacing
+            max_points: Maximum points per subdivision to avoid memory issues
+            max_subdivision_factor: Maximum subdivision factor for grid subdivision (e.g., 4 = 4x4 = 16 regions).
         """
 
         minx, miny, maxx, maxy = polygon.bounds
@@ -4045,7 +4153,7 @@ class PostGISManager:
 
         # Calculate subdivision factor based on expected points
         subdivision_factor = max(2, int((expected_points / max_points) ** 0.5) + 1)
-        subdivision_factor = min(subdivision_factor, 4)  # Cap at 4x4 = 16 subdivisions
+        subdivision_factor = min(subdivision_factor, max_subdivision_factor)  # Use max_subdivision_factor instead of hardcoded 4
 
         logger.info(f"Subdividing into {subdivision_factor}x{subdivision_factor} grid ({subdivision_factor**2} regions)")
 
@@ -4764,11 +4872,17 @@ class SpatiaLiteManager:
             "combined_grid": final_grid_geom,
         }
 
-    def create_grid_graph_nodes_and_edges(self, polygon: Union[Polygon, MultiPolygon], spacing: float, max_edge_factor: float = 2.0) -> Dict[str, Any]:
+    def create_grid_graph_nodes_and_edges(self, polygon: Union[Polygon, MultiPolygon], spacing: float, max_edge_factor: float = 2.0, max_subdivision_factor: int = 4) -> Dict[str, Any]:
         """
         Creates graph nodes and edges using optimized in-memory operations for SpatiaLite.
         Since SpatiaLite has limited spatial SQL capabilities compared to PostGIS,
         this uses the same high-performance numpy/shapely approach as GPKG.
+
+        Args:
+            polygon: The polygon/multipolygon to create grid within
+            spacing: Grid spacing in degrees
+            max_edge_factor: Maximum edge length as multiple of spacing
+            max_subdivision_factor: Unused parameter (for API consistency with PostGISManager).
         """
 
         minx, miny, maxx, maxy = polygon.bounds
@@ -5477,11 +5591,17 @@ class GPKGManager:
             "combined_grid": final_grid_geom,
         }
 
-    def create_grid_graph_nodes_and_edges(self, polygon: Union[Polygon, MultiPolygon], spacing: float, max_edge_factor: float = 2.0) -> Dict[str, Any]:
+    def create_grid_graph_nodes_and_edges(self, polygon: Union[Polygon, MultiPolygon], spacing: float, max_edge_factor: float = 2.0, max_subdivision_factor: int = 4) -> Dict[str, Any]:
         """
         Creates graph nodes and edges using in-memory operations for GPKG.
         Since GPKG has limited spatial SQL capabilities compared to PostGIS,
         this uses a Python-based approach similar to the memory fallback.
+
+        Args:
+            polygon: The polygon/multipolygon to create grid within
+            spacing: Grid spacing in degrees
+            max_edge_factor: Maximum edge length as multiple of spacing
+            max_subdivision_factor: Unused parameter (for API consistency with PostGISManager).
         """
 
         minx, miny, maxx, maxy = polygon.bounds

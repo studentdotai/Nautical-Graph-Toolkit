@@ -1,13 +1,19 @@
 include README.md
 include LICENSE.md
 include THIRD_PARTY_LICENSES.md
-include pyproject.toml
-include uv.lock
+include environment.yml
+include requirements.in
+include requirements.txt
 
 recursive-include scripts *.py *.md
 recursive-include docs *.md *.yml *.ipynb
 recursive-include src/nautical_graph_toolkit/data *.csv *.yml
 recursive-include tests *.py
+
+# Explicitly exclude development tools
+prune .claude
+prune dev
+exclude CLAUDE.md
 
 global-exclude __pycache__
 global-exclude *.pyc

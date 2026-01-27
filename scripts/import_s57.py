@@ -44,8 +44,7 @@ import pandas as pd
 
 # Add src to path for local development
 project_root = Path(__file__).parent.parent
-if str(project_root / "src") not in sys.path:
-    sys.path.insert(0, str(project_root / "src"))
+
 
 # Project imports
 from nautical_graph_toolkit.core.s57_data import (
@@ -58,6 +57,7 @@ from nautical_graph_toolkit.core.s57_data import (
     GPKGManager,
 )
 from nautical_graph_toolkit.utils.db_utils import PostGISConnector
+from nautical_graph_toolkit.utils.logging_utils import ICONS, SafeStreamHandler
 
 
 # ============================================================================
@@ -78,8 +78,8 @@ def setup_logging(verbose: bool = False, quiet: bool = False, log_file: Optional
         datefmt='%Y-%m-%d %H:%M:%S'
     )
 
-    # Console handler
-    console_handler = logging.StreamHandler(sys.stdout)
+    # Console handler with safe Unicode handling
+    console_handler = SafeStreamHandler(sys.stdout)
     console_handler.setFormatter(formatter)
 
     # File handler (optional)
@@ -114,9 +114,18 @@ def validate_environment(logger: logging.Logger) -> bool:
     # Check GDAL
     try:
         from osgeo import gdal
-        logger.info(f"✓ GDAL version: {gdal.__version__} ({gdal.VersionInfo('RELEASE_NAME')})")
+        logger.info(f"{ICONS['OK']} GDAL version: {gdal.__version__} ({gdal.VersionInfo('RELEASE_NAME')})")
+        
+        # List drivers if verbose logging is enabled
+        if logger.isEnabledFor(logging.DEBUG):
+            driver_count = gdal.GetDriverCount()
+            logger.debug(f"  Installed Drivers ({driver_count}):")
+            for i in range(driver_count):
+                driver = gdal.GetDriver(i)
+                logger.debug(f"    - {driver.ShortName}: {driver.LongName}")
+                
     except ImportError:
-        logger.error("✗ GDAL not available - S-57 processing requires GDAL")
+        logger.error(f"{ICONS['FAIL']} GDAL not available - S-57 processing requires GDAL")
         return False
 
     return True
@@ -127,18 +136,18 @@ def validate_input_paths(args: argparse.Namespace, logger: logging.Logger) -> bo
     input_path = Path(args.input_path).resolve()
 
     if not input_path.exists():
-        logger.error(f"✗ Input path not found: {input_path}")
+        logger.error(f"{ICONS['FAIL']} Input path not found: {input_path}")
         return False
 
-    logger.info(f"✓ Input path: {input_path}")
+    logger.info(f"{ICONS['OK']} Input path: {input_path}")
 
     # Discover S-57 files
     s57_files = list(input_path.rglob('*.000'))
     if not s57_files:
-        logger.error(f"✗ No S-57 files (*.000) found in {input_path}")
+        logger.error(f"{ICONS['FAIL']} No S-57 files (*.000) found in {input_path}")
         return False
 
-    logger.info(f"✓ Found {len(s57_files)} S-57 files")
+    logger.info(f"{ICONS['OK']} Found {len(s57_files)} S-57 files")
     return True
 
 
@@ -148,9 +157,9 @@ def validate_output_paths(args: argparse.Namespace, logger: logging.Logger) -> b
         output_path = Path(args.output_dir).resolve()
         try:
             output_path.mkdir(parents=True, exist_ok=True)
-            logger.info(f"✓ Output directory: {output_path}")
+            logger.info(f"{ICONS['OK']} Output directory: {output_path}")
         except Exception as e:
-            logger.error(f"✗ Failed to create output directory: {e}")
+            logger.error(f"{ICONS['FAIL']} Failed to create output directory: {e}")
             return False
     return True
 
@@ -158,7 +167,7 @@ def validate_output_paths(args: argparse.Namespace, logger: logging.Logger) -> b
 def validate_postgis_connection(db_params: Dict[str, Any], logger: logging.Logger) -> bool:
     """Validate PostGIS database connection."""
     if not all(db_params.values()):
-        logger.error("✗ Incomplete PostGIS credentials")
+        logger.error(f"{ICONS['FAIL']} Incomplete PostGIS credentials")
         return False
 
     try:
@@ -166,11 +175,11 @@ def validate_postgis_connection(db_params: Dict[str, Any], logger: logging.Logge
         connector = PostGISConnector(db_params)
         connector.connect()
         schemas = connector.get_schemas()
-        logger.info(f"✓ Connected to PostGIS: {db_params['dbname']}@{db_params['host']}:{db_params['port']}")
+        logger.info(f"{ICONS['OK']} Connected to PostGIS: {db_params['dbname']}@{db_params['host']}:{db_params['port']}")
         logger.debug(f"  Available schemas: {schemas}")
         return True
     except Exception as e:
-        logger.error(f"✗ PostGIS connection failed: {e}")
+        logger.error(f"{ICONS['FAIL']} PostGIS connection failed: {e}")
         return False
 
 
@@ -180,20 +189,20 @@ def validate_update_source(args: argparse.Namespace, logger: logging.Logger) -> 
         return True
 
     if not args.update_source:
-        logger.error("✗ --update-source required for update mode")
+        logger.error(f"{ICONS['FAIL']} --update-source required for update mode")
         return False
 
     update_path = Path(args.update_source).resolve()
     if not update_path.exists():
-        logger.error(f"✗ Update source path not found: {update_path}")
+        logger.error(f"{ICONS['FAIL']} Update source path not found: {update_path}")
         return False
 
     s57_files = list(update_path.rglob('*.000'))
     if not s57_files:
-        logger.error(f"✗ No S-57 files found in update source: {update_path}")
+        logger.error(f"{ICONS['FAIL']} No S-57 files found in update source: {update_path}")
         return False
 
-    logger.info(f"✓ Update source: {update_path} ({len(s57_files)} files)")
+    logger.info(f"{ICONS['OK']} Update source: {update_path} ({len(s57_files)} files)")
     return True
 
 
@@ -221,14 +230,14 @@ def run_preflight_validation(args: argparse.Namespace, db_params: Dict[str, Any]
             if not check_func():
                 all_valid = False
         except Exception as e:
-            logger.error(f"✗ {check_name} validation error: {e}")
+            logger.error(f"{ICONS['FAIL']} {check_name} validation error: {e}")
             all_valid = False
 
     logger.info("=" * 70)
     if all_valid:
-        logger.info("✓ All validation checks passed\n")
+        logger.info(f"{ICONS['OK']} All validation checks passed\n")
     else:
-        logger.error("✗ Some validation checks failed\n")
+        logger.error(f"{ICONS['FAIL']} Some validation checks failed\n")
 
     return all_valid
 
@@ -267,21 +276,21 @@ def convert_base(args: argparse.Namespace, db_params: Dict[str, Any], logger: lo
         converter.convert_by_enc()
 
         elapsed = time.perf_counter() - start_time
-        logger.info(f"✓ Conversion completed in {elapsed:.2f}s")
+        logger.info(f"{ICONS['OK']} Conversion completed in {elapsed:.2f}s")
 
         # Validation
         if args.output_format in ['gpkg', 'spatialite']:
             output_path = Path(args.output_dir).resolve()
             files = list(output_path.glob(f'*.{args.output_format}'))
             total_size_mb = sum(f.stat().st_size for f in files) / (1024 ** 2)
-            logger.info(f"✓ Created {len(files)} output files")
-            logger.info(f"✓ Total size: {total_size_mb:.2f} MB")
+            logger.info(f"{ICONS['OK']} Created {len(files)} output files")
+            logger.info(f"{ICONS['OK']} Total size: {total_size_mb:.2f} MB")
 
         logger.info("=" * 70 + "\n")
         return True
 
     except Exception as e:
-        logger.error(f"✗ Conversion failed: {type(e).__name__}: {e}")
+        logger.error(f"{ICONS['FAIL']} Conversion failed: {type(e).__name__}: {e}")
         if args.verbose:
             logger.exception("Full traceback:")
         return False
@@ -343,7 +352,7 @@ def convert_advanced(args: argparse.Namespace, db_params: Dict[str, Any], logger
         converter.convert_to_layers()
 
         elapsed = time.perf_counter() - start_time
-        logger.info(f"✓ Conversion completed in {elapsed:.2f}s")
+        logger.info(f"{ICONS['OK']} Conversion completed in {elapsed:.2f}s")
 
         # Validation
         if args.output_format in ['gpkg', 'spatialite']:
@@ -351,16 +360,16 @@ def convert_advanced(args: argparse.Namespace, db_params: Dict[str, Any], logger
             file_path = Path(args.output_dir).resolve() / f"{args.schema}.{file_extension}"
             if file_path.exists():
                 size_mb = file_path.stat().st_size / (1024 ** 2)
-                logger.info(f"✓ Output file size: {size_mb:.2f} MB")
-                logger.info(f"✓ Output file: {file_path}")
+                logger.info(f"{ICONS['OK']} Output file size: {size_mb:.2f} MB")
+                logger.info(f"{ICONS['OK']} Output file: {file_path}")
             else:
-                logger.warning(f"⚠ Output file not found: {file_path}")
+                logger.warning(f"{ICONS['WARN']} Output file not found: {file_path}")
 
         logger.info("=" * 70 + "\n")
         return True
 
     except Exception as e:
-        logger.error(f"✗ Conversion failed: {type(e).__name__}: {e}")
+        logger.error(f"{ICONS['FAIL']} Conversion failed: {type(e).__name__}: {e}")
         if args.verbose:
             logger.exception("Full traceback:")
         return False
@@ -404,7 +413,7 @@ def update_database(args: argparse.Namespace, db_params: Dict[str, Any], logger:
             update_results = updater.update_from_location(update_source)
 
         elapsed = time.perf_counter() - start_time
-        logger.info(f"✓ Update completed in {elapsed:.2f}s")
+        logger.info(f"{ICONS['OK']} Update completed in {elapsed:.2f}s")
 
         # Summary
         try:
@@ -418,7 +427,7 @@ def update_database(args: argparse.Namespace, db_params: Dict[str, Any], logger:
         return True
 
     except Exception as e:
-        logger.error(f"✗ Update failed: {type(e).__name__}: {e}")
+        logger.error(f"{ICONS['FAIL']} Update failed: {type(e).__name__}: {e}")
         if args.verbose:
             logger.exception("Full traceback:")
         return False
@@ -456,18 +465,18 @@ def verify_output(args: argparse.Namespace, db_params: Dict[str, Any], logger: l
             try:
                 layer_df = manager.get_layer(layer)
                 if len(layer_df) > 0:
-                    logger.info(f"  ✓ '{layer}': {len(layer_df)} features")
+                    logger.info(f"  {ICONS['OK']} '{layer}': {len(layer_df)} features")
                 else:
-                    logger.info(f"  ⚠ '{layer}': 0 features")
+                    logger.info(f"  {ICONS['WARN']} '{layer}': 0 features")
             except Exception as e:
-                logger.debug(f"  ⚠ '{layer}': not found or error - {e}")
+                logger.debug(f"  {ICONS['WARN']} '{layer}': not found or error - {e}")
 
         # Verify DSID stamping (Advanced mode only)
         if args.mode == 'advanced':
             logger.info("Verifying feature update status (DSID stamping)...")
             try:
                 verification_results = manager.verify_feature_update_status()
-                logger.info("✓ Feature update status verified")
+                logger.info(f"{ICONS['OK']} Feature update status verified")
                 logger.debug(verification_results.to_string())
             except Exception as e:
                 logger.warning(f"Could not verify update status: {e}")
@@ -476,7 +485,7 @@ def verify_output(args: argparse.Namespace, db_params: Dict[str, Any], logger: l
         return True
 
     except Exception as e:
-        logger.error(f"✗ Verification failed: {e}")
+        logger.error(f"{ICONS['FAIL']} Verification failed: {e}")
         if args.verbose:
             logger.exception("Full traceback:")
         return False
@@ -509,7 +518,7 @@ def export_benchmark(args: argparse.Namespace, duration: float, logger: logging.
             df = pd.concat([existing_df, df], ignore_index=True)
 
         df.to_csv(benchmark_path, index=False)
-        logger.info(f"✓ Benchmark saved to {benchmark_path}")
+        logger.info(f"{ICONS['OK']} Benchmark saved to {benchmark_path}")
         return True
 
     except Exception as e:
@@ -726,7 +735,7 @@ def main():
 
         # Dry-run mode
         if args.dry_run:
-            logger.info("✓ Dry-run completed successfully (no changes made)")
+            logger.info(f"{ICONS['OK']} Dry-run completed successfully (no changes made)")
             return 0
 
         # Execute workflow
@@ -755,14 +764,14 @@ def main():
         export_benchmark(args, total_time, logger)
 
         logger.info("=" * 70)
-        logger.info("✓ S-57 Import Tool Completed Successfully")
+        logger.info(f"{ICONS['OK']} S-57 Import Tool Completed Successfully")
         return 0
 
     except KeyboardInterrupt:
         logger.warning("\nInterrupted by user")
         return 130
     except Exception as e:
-        logger.error(f"✗ Unexpected error: {type(e).__name__}: {e}")
+        logger.error(f"{ICONS['FAIL']} Unexpected error: {type(e).__name__}: {e}")
         logger.exception("Full traceback:")
         return 1
 

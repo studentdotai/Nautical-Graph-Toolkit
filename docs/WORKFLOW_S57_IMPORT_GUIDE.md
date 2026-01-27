@@ -34,7 +34,7 @@ The tool performs automated S-57 conversion with the following features:
 
 ### Required Software
 - Python 3.8+
-- GDAL 3.11.3 (exactly pinned version)
+- GDAL (exactly pinned version - see WORKFLOW_QUICKSTART.md for version details)
 - PostgreSQL with PostGIS extension (for PostGIS output)
 - All dependencies listed in `pyproject.toml`
 
@@ -53,8 +53,8 @@ sudo systemctl status postgresql
 psql -h localhost -U postgres -d postgres -c "SELECT version();"
 
 # Create database if needed
-createdb -h localhost -U postgres ENC_db
-psql -h localhost -U postgres -d ENC_db -c "CREATE EXTENSION IF NOT EXISTS postgis;"
+createdb -h localhost -U postgres enc_db
+psql -h localhost -U postgres -d enc_db -c "CREATE EXTENSION IF NOT EXISTS postgis;"
 ```
 
 ## Installation & Setup
@@ -66,14 +66,18 @@ cd ~/python_projects_wsl2/1_MaritimeModule_V1
 
 ### 2. Install Dependencies
 ```bash
-uv sync
+mamba env update -f environment.yml --prune
+pip install uv
+uv pip compile requirements.in -o requirements.txt  # Optional: skip to use tested snapshot
+uv pip install --no-deps -r requirements.txt
+uv pip install -e .
 ```
 
 ### 3. Configure Database Credentials
 Create or edit `.env` file:
 ```bash
 # .env
-DB_NAME="ENC_db"
+DB_NAME="enc_db"
 DB_USER="postgres"
 DB_PASSWORD="your_password"
 DB_HOST="127.0.0.1"
@@ -82,7 +86,7 @@ DB_PORT="5432"
 
 Or pass credentials via command-line arguments:
 ```bash
---db-name ENC_db --db-user postgres --db-password xxx --db-host 127.0.0.1 --db-port 5432
+--db-name enc_db --db-user postgres --db-password xxx --db-host 127.0.0.1 --db-port 5432
 ```
 
 ## Usage Guide
@@ -133,7 +137,7 @@ python scripts/import_s57.py \
   --mode advanced \
   --input-path data/ENC_ROOT \
   --output-format postgis \
-  --schema us_enc_all \
+  --schema enc_west \
   --verify \
   --db-host 127.0.0.1 \
   --db-user postgres
@@ -145,7 +149,7 @@ python scripts/import_s57.py \
   --mode advanced \
   --input-path data/ENC_ROOT \
   --output-format gpkg \
-  --schema us_enc_all \
+  --schema enc_west \
   --output-dir output \
   --enable-parallel \
   --max-workers 4 \
@@ -158,7 +162,7 @@ python scripts/import_s57.py \
   --mode advanced \
   --input-path data/ENC_ROOT \
   --output-format postgis \
-  --schema us_enc_all \
+  --schema enc_west \
   --batch-size 500 \
   --memory-limit-mb 2048
 ```
@@ -175,7 +179,7 @@ python scripts/import_s57.py \
   --mode update \
   --update-source data/ENC_ROOT_UPDATE \
   --output-format postgis \
-  --schema us_enc_all \
+  --schema enc_west \
   --db-host 127.0.0.1 \
   --db-user postgres
 ```
@@ -186,7 +190,7 @@ python scripts/import_s57.py \
   --mode update \
   --update-source data/ENC_ROOT_UPDATE \
   --output-format postgis \
-  --schema us_enc_all \
+  --schema enc_west \
   --force-update
 ```
 
@@ -196,7 +200,7 @@ python scripts/import_s57.py \
   --mode update \
   --update-source data/ENC_ROOT_UPDATE \
   --output-format postgis \
-  --schema us_enc_all \
+  --schema enc_west \
   --force-update \
   --enc-filter US3CA52M US1GC09M US1PO02M
 ```
@@ -371,7 +375,7 @@ Schema: us1gc09m
 
 **Single Merged Dataset**
 ```
-PostGIS Schema: us_enc_all
+PostGIS Schema: enc_west
   - lndmrk (landmarks)
   - seaare (sea areas)
   - soundg (soundings/depth)
@@ -386,7 +390,7 @@ All features include:
 
 **GeoPackage/SpatiaLite**:
 ```
-File: us_enc_all.gpkg
+File: enc_west.gpkg
   Layers:
     - lndmrk
     - seaare
@@ -478,8 +482,9 @@ Error: GDAL not available - S-57 processing requires GDAL
 
 **Solution**:
 ```bash
-# Reinstall GDAL (exact version required)
-pip install GDAL==3.11.3.1
+# Reinstall GDAL (exact version required - see WORKFLOW_QUICKSTART.md)
+# Using conda for better compatibility
+mamba install gdal
 
 # Verify installation
 python -c "from osgeo import gdal; print(gdal.__version__)"
@@ -523,7 +528,7 @@ python scripts/import_s57.py ... --enable-parallel --max-workers 2
 
 ### Issue 5: Schema Already Exists
 ```
-Error: schema "us_enc_all" already exists
+Error: schema "enc_west" already exists
 ```
 
 **Solution**:
@@ -532,10 +537,10 @@ Error: schema "us_enc_all" already exists
 python scripts/import_s57.py ... --overwrite
 
 # Option 2: Use different schema name
-python scripts/import_s57.py ... --schema us_enc_all_v2
+python scripts/import_s57.py ... --schema enc_west_v2
 
 # Option 3: Drop existing schema (CAUTION!)
-# psql -h 127.0.0.1 -U postgres -d ENC_db -c "DROP SCHEMA us_enc_all CASCADE;"
+# psql -h 127.0.0.1 -U postgres -d enc_db -c "DROP SCHEMA enc_west CASCADE;"
 ```
 
 ---
@@ -575,16 +580,16 @@ python scripts/import_s57.py ... --schema us_enc_all_v2
 
 4. **Verify PostGIS after import**:
    ```bash
-   psql -h 127.0.0.1 -U postgres -d ENC_db -c \
-     "SELECT table_name FROM information_schema.tables WHERE table_schema='us_enc_all' ORDER BY table_name;"
+   psql -h 127.0.0.1 -U postgres -d enc_db -c \
+     "SELECT table_name FROM information_schema.tables WHERE table_schema='enc_west' ORDER BY table_name;"
    ```
 
 5. **Check feature counts**:
    ```bash
-   psql -h 127.0.0.1 -U postgres -d ENC_db -c \
-     "SELECT 'seaare' as layer, COUNT(*) FROM us_enc_all.seaare UNION ALL
-      SELECT 'soundg', COUNT(*) FROM us_enc_all.soundg UNION ALL
-      SELECT 'lndmrk', COUNT(*) FROM us_enc_all.lndmrk;"
+   psql -h 127.0.0.1 -U postgres -d enc_db -c \
+     "SELECT 'seaare' as layer, COUNT(*) FROM enc_west.seaare UNION ALL
+      SELECT 'soundg', COUNT(*) FROM enc_west.soundg UNION ALL
+      SELECT 'lndmrk', COUNT(*) FROM enc_west.lndmrk;"
    ```
 
 ## Advanced Topics
@@ -645,12 +650,12 @@ In Advanced mode, each feature includes `dsid_dsnm` (data source name):
 
 ```sql
 -- Find features from specific ENC
-SELECT * FROM us_enc_all.seaare
+SELECT * FROM enc_west.seaare
 WHERE dsid_dsnm = 'US1WC01M';
 
 -- Count features per ENC
 SELECT dsid_dsnm, COUNT(*)
-FROM us_enc_all.soundg
+FROM enc_west.soundg
 GROUP BY dsid_dsnm
 ORDER BY COUNT(*) DESC;
 ```
@@ -685,8 +690,8 @@ Useful for:
 2. **Analyze coverage**:
    ```bash
    # Query spatial extent
-   psql -h 127.0.0.1 -U postgres -d ENC_db -c \
-     "SELECT ST_Extent(geom) FROM us_enc_all.seaare;"
+   psql -h 127.0.0.1 -U postgres -d enc_db -c \
+     "SELECT ST_Extent(geom) FROM enc_west.seaare;"
    ```
 
 3. **Create visualizations**:

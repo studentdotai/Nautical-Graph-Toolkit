@@ -15,7 +15,7 @@ IMPORTANT: This version eliminates GeoPandas processing artifacts by using pure 
 queries for all analysis, providing an artifact-free, database-first approach.
 
 Usage:
-    # Basic testing (initial imports only)
+    # Basic testing (requires .env file with DB credentials or --skip-postgis)
     python tests/core__real_data/deep_test_s57_workflow.py --data-root /path/to/ENC_ROOT
 
     # Full testing with updates
@@ -24,8 +24,17 @@ Usage:
     # Skip PostGIS if database not available
     python tests/core__real_data/deep_test_s57_workflow.py --data-root /path/to/ENC_ROOT --skip-postgis
 
+    # Override .env credentials via CLI
+    python tests/core__real_data/deep_test_s57_workflow.py --data-root /path/to/ENC_ROOT \
+        --db-host localhost --db-port 5433 --db-name enc_db --db-user myuser --db-password mypass
+
     # Preserve outputs for manual verification
     python tests/core__real_data/deep_test_s57_workflow.py --data-root /path/to/ENC_ROOT --no-clean-output
+
+Database Configuration:
+    PostGIS credentials are loaded from .env file in project root. CLI arguments override .env values.
+    Required .env variables: DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD
+    See .env.example for template.
 
 Note: User should provide appropriately sized datasets in both ENC_ROOT and ENC_ROOT_UPDATE directories.
       Update tests are automatically skipped if --update-root is not provided.
@@ -47,6 +56,7 @@ from collections import Counter
 import warnings
 
 import pandas as pd
+from dotenv import load_dotenv
 # GeoPandas eliminated - using pure database-first approach
 from sqlalchemy import create_engine, text, inspect
 import psycopg2
@@ -55,6 +65,9 @@ from osgeo import gdal
 # Add project root to path for imports
 project_root = Path(__file__).resolve().parents[2]  # Two levels up: tests/core__real_data/deep_test_s57_workflow.py -> project_root
 sys.path.insert(0, str(project_root))
+
+# Load environment variables from project root .env file
+load_dotenv(project_root / ".env")
 
 from nautical_graph_toolkit.core.s57_data import S57Advanced, S57Updater, S57AdvancedConfig
 from nautical_graph_toolkit.utils.db_utils import PostGISConnector
@@ -96,15 +109,9 @@ class TestConfig:
     exclude_extra_cols: List[str] = None # Optional filter to exclude common extra columns like 'geometry'
 
     def __post_init__(self):
-        if self.postgis_config is None:
-            self.postgis_config = {
-                'host': 'localhost',
-                'port': '5432',
-                'dbname': 'ENC_db',
-                'user': 'postgres',
-                'password': 'postgres'
-            }
-        
+        # postgis_config should be set explicitly by caller
+        # Validation happens in main() before TestConfig creation
+
         if self.exclude_extra_cols is None:
             self.exclude_extra_cols = []
 
@@ -2557,6 +2564,60 @@ class S57DeepTester:
         print("\n" + "="*80)
 
 
+def load_postgis_credentials(args: argparse.Namespace) -> Optional[Dict[str, str]]:
+    """
+    Load PostGIS credentials with priority: CLI args > .env file > None.
+
+    Args:
+        args: Parsed command-line arguments
+
+    Returns:
+        Dictionary with db connection params if credentials available, None otherwise
+    """
+    # Check if ANY CLI credential arguments were provided
+    cli_creds_provided = any([
+        args.db_host is not None,
+        args.db_port is not None,
+        args.db_name is not None,
+        args.db_user is not None,
+        args.db_password is not None
+    ])
+
+    # Start with .env values (may be None if not set)
+    db_config = {
+        'host': os.getenv('DB_HOST'),
+        'port': os.getenv('DB_PORT'),
+        'dbname': os.getenv('DB_NAME'),
+        'user': os.getenv('DB_USER'),
+        'password': os.getenv('DB_PASSWORD')
+    }
+
+    # Override with CLI arguments if provided
+    if cli_creds_provided:
+        if args.db_host is not None:
+            db_config['host'] = args.db_host
+        if args.db_port is not None:
+            db_config['port'] = str(args.db_port)
+        if args.db_name is not None:
+            db_config['dbname'] = args.db_name
+        if args.db_user is not None:
+            db_config['user'] = args.db_user
+        if args.db_password is not None:
+            db_config['password'] = args.db_password
+
+    # Check if we have complete credentials
+    if all(db_config.values()):
+        logger.info(f"PostGIS credentials loaded (host={db_config['host']}, dbname={db_config['dbname']})")
+        return db_config
+
+    # Partial or no credentials
+    if any(db_config.values()):
+        missing_keys = [k for k, v in db_config.items() if not v]
+        logger.warning(f"Incomplete PostGIS credentials. Missing: {', '.join(missing_keys)}")
+
+    return None
+
+
 def main():
     """Main entry point for DeepTest execution."""
     parser = argparse.ArgumentParser(description='S57 DeepTest - Comprehensive Workflow Validation')
@@ -2578,8 +2639,34 @@ def main():
     parser.add_argument('--exclude-extra-cols', nargs='+', default=['geometry'],
                         help="Space-separated list of extra columns to exclude from comparisons (e.g., 'geometry').")
 
+    # Database configuration arguments (optional - override .env values)
+    parser.add_argument('--db-host', type=str,
+                        help='PostGIS database host (overrides DB_HOST from .env)')
+    parser.add_argument('--db-port', type=int,
+                        help='PostGIS database port (overrides DB_PORT from .env)')
+    parser.add_argument('--db-name', type=str,
+                        help='PostGIS database name (overrides DB_NAME from .env)')
+    parser.add_argument('--db-user', type=str,
+                        help='PostGIS database user (overrides DB_USER from .env)')
+    parser.add_argument('--db-password', type=str,
+                        help='PostGIS database password (overrides DB_PASSWORD from .env). '
+                             'WARNING: Visible in process list. Prefer .env file.')
+
     args = parser.parse_args()
-    
+
+    # Load PostGIS credentials (CLI args override .env)
+    postgis_config = load_postgis_credentials(args)
+
+    # Validate PostGIS configuration
+    if not args.skip_postgis and postgis_config is None:
+        logger.error("PostGIS testing enabled but no database credentials found!")
+        logger.error("Please either:")
+        logger.error("  1. Set credentials in .env file (DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD)")
+        logger.error("  2. Provide credentials via CLI: --db-host, --db-port, --db-name, --db-user, --db-password")
+        logger.error("  3. Skip PostGIS testing with --skip-postgis")
+        logger.error(f"Example .env location: {project_root / '.env'}")
+        sys.exit(1)
+
     # Configure test
     config = TestConfig(
         s57_data_root=args.data_root,
@@ -2589,7 +2676,8 @@ def main():
         skip_updates=args.skip_updates,
         test_level=args.test_level,
         clean_output=not args.no_clean_output,
-        exclude_extra_cols=args.exclude_extra_cols
+        exclude_extra_cols=args.exclude_extra_cols,
+        postgis_config=postgis_config
     )
     
     # Run DeepTest

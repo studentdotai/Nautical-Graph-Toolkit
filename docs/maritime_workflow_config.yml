@@ -25,10 +25,15 @@ graph_config_path: "src/nautical_graph_toolkit/data/graph_config.yml"
 
 # --- Database Schema Configuration ---
 database:
-  enc_schema: "enc_west"        # Schema containing S-57 ENC layers
-  graph_schema: "graph"           # Schema for saving graph tables
-  route_schema: "routes"          # Schema for route storage
-  geopackage_filename: "enc_west.gpkg"  # GeoPackage backend: Source ENC data file
+  # Input data directory (where ENC source files are located)
+  data_dir: "data"              # Default: PROJECT_ROOT/data/ (relative to project root)
+
+  # GeoPackage backend: Source ENC data file filename
+  geopackage_filename: "enc_west.gpkg"  # Located in data_dir above
+
+  enc_schema: "enc_west"        # Schema containing S-57 ENC layers (PostGIS only)
+  graph_schema: "graph"         # Schema for saving graph tables (PostGIS only)
+  route_schema: "routes"        # Schema for route storage (PostGIS only)
 
 # --- Workflow Control ---
 # Enable/disable major pipeline steps
@@ -73,8 +78,8 @@ fine_graph:
   # NOTE: Graph table names are automatically constructed from these values:
   #   - Undirected graph: {mode}_graph_{name_suffix}    (e.g., "h3_graph_20")
   #   - Weighted graph: {mode}_graph_wt_{name_suffix}   (e.g., "h3_graph_wt_20")
-  mode: "h3"                      # Options: "fine" (regular grid) or "h3" (hexagonal)
-  name_suffix: "gpkg_6_11"               # Suffix for graph table/file names
+  mode: "fine"                      # Options: "fine" (regular grid) or "h3" (hexagonal)
+  name_suffix: "gpkg_20"               # Suffix for graph table/file names
 
   # Route buffer configuration
   load_base_route: true           # Load pre-computed base route from step 1
@@ -194,10 +199,16 @@ pathfinding:
 # ===============================================
 # OUTPUT CONFIGURATION
 # ===============================================
+# Workflow auto-creates timestamped subdirectories in base_dir to avoid overwriting previous results.
+# Format: {base_dir}/workflow_{graph_name}_{YYYYMMDD_HHMMSS}/
+# Example: output/workflow_h3_graph_20260106_112059/
 
 output:
-  # Base output directories (created automatically if they don't exist)
-  base_dir: "output"      # Where GeoPackage files and routes are saved
+  # Output root directory (workflow creates timestamped subdirectories here)
+  # Paths are resolved relative to PROJECT_ROOT (not current working directory)
+  # Format: {base_dir}/workflow_{graph_name}_{YYYYMMDD_HHMMSS}/
+  # Example: output/workflow_h3_graph_20260106_112059/
+  base_dir: "output"      # Root for workflow output folders (default: PROJECT_ROOT/output/)
   log_dir: "docs/logs"    # Where workflow logs and debug files are saved
 
   # Performance benchmark CSV export (optional)
@@ -206,6 +217,31 @@ output:
     base_graph_file: "benchmark_graph_base.csv"        # Base graph timing stats
     fine_graph_file: "benchmark_graph_fine.csv"        # Fine/H3 graph timing stats
     weighted_graph_file: "benchmark_graph_weighted_directed.csv"  # Weighting timing stats
+
+# ===============================================
+# DIRECTORY STRUCTURE (v0.1.0+)
+# ===============================================
+#
+# PROJECT_ROOT/
+# ├── data/                          # Input: ENC source data (immutable)
+# │   └── enc_west.gpkg              # From import_s57.py
+# │
+# └── output/                        # Output: Workflow artifacts (auto-generated)
+#     ├── workflow_h3_graph_20260106_112059/
+#     │   ├── base_graph.gpkg
+#     │   ├── h3_graph_gpkg_6_11.gpkg
+#     │   ├── maritime_routes.gpkg
+#     │   └── benchmark_*.csv
+#     └── workflow_h3_graph_20260106_143022/
+#
+# Path Resolution Rules:
+#   - database.data_dir: "data" → PROJECT_ROOT/data/
+#   - output.base_dir: "output" → PROJECT_ROOT/output/
+#   - Absolute paths work: "/custom/path" → /custom/path
+#
+# CLI Overrides:
+#   --data-dir /path/to/enc_data     # Override input location
+#   --output-dir /path/to/results    # Override auto-generated output (skips timestamping)
 
 # ===============================================
 # LOGGING CONFIGURATION
@@ -242,12 +278,29 @@ logging:
 # 4. pathfinding: Calculates final optimized route on weighted graph
 #
 # COMMON ISSUES:
-# - Table not found: Verify fine_graph.mode and fine_graph.name_suffix are set correctly
-#   (auto-generated table names depend on these values)
-# - Coordinates out of bounds: Check longitude (negative = West), latitude ranges
-# - Memory errors: Reduce fine_spacing_nm, reduce buffer_size_nm, or enable slice_buffer
-#   (slice_buffer restricts area with: slice_south/north_degree, slice_west/east_degree)
-# - Slow performance: Increase spacing_nm, disable unused weighting steps
+# 1. File not found (enc_west.gpkg):
+#    - Run import_s57.py to create ENC source data in data/ directory first
+#    - Command: python scripts/import_s57.py --input-dir /path/to/ENC_ROOT \
+#                 --output-format gpkg --output-dir data
+#
+# 2. Output folder location:
+#    - Workflow auto-creates: output/workflow_{graph}_{timestamp}/
+#    - Manual override: --output-dir /custom/path (skips timestamping)
+#    - Each run gets separate folder (prevents overwriting previous results)
+#
+# 3. Input data location:
+#    - Default: data/ (set in database.data_dir)
+#    - Override: --data-dir /custom/enc_location
+#
+# 4. Table not found: Verify fine_graph.mode and fine_graph.name_suffix are set correctly
+#    (auto-generated table names depend on these values)
+#
+# 5. Coordinates out of bounds: Check longitude (negative = West), latitude ranges
+#
+# 6. Memory errors: Reduce fine_spacing_nm, reduce buffer_size_nm, or enable slice_buffer
+#    (slice_buffer restricts area with: slice_south/north_degree, slice_west/east_degree)
+#
+# 7. Slow performance: Increase spacing_nm, disable unused weighting steps
 #
 # OUTPUT FILES:
 # - GeoPackage files: {base_dir}/{mode}_graph_{suffix}.gpkg (e.g., h3_graph_20.gpkg)
