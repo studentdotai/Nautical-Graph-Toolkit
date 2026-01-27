@@ -218,7 +218,7 @@ For more pre-processed options including pre-generated graphs, see [data/DATA_GU
 
 #### 1. Verify Configuration
 ```bash
-python scripts/maritime_graph_postgis_workflow.py --dry-run
+python scripts/maritime_graph_postgis_workflow.py --config docs/maritime_workflow_config.yml --dry-run
 ```
 
 Expected output:
@@ -229,7 +229,7 @@ Dry run mode - configuration validated, exiting
 
 #### 2. Run Full Pipeline
 ```bash
-python scripts/maritime_graph_postgis_workflow.py
+python scripts/maritime_graph_postgis_workflow.py --config docs/maritime_workflow_config.yml
 ```
 
 **Estimated time: 45-60 minutes**
@@ -257,12 +257,12 @@ cat output/benchmark_graph_*.csv
 
 #### 1. Verify Configuration
 ```bash
-python scripts/maritime_graph_geopackage_workflow.py --dry-run
+python scripts/maritime_graph_geopackage_workflow.py --config docs/maritime_workflow_config.yml --dry-run
 ```
 
 #### 2. Run Full Pipeline
 ```bash
-python scripts/maritime_graph_geopackage_workflow.py
+python scripts/maritime_graph_geopackage_workflow.py --config docs/maritime_workflow_config.yml
 ```
 
 **Estimated time: 14-20 minutes** (faster than PostGIS for file-based operations)
@@ -344,10 +344,10 @@ weighting:
 #### Step 4: Run Workflow
 ```bash
 # Dry run first (validate setup)
-python scripts/maritime_graph_postgis_workflow.py --dry-run
+python scripts/maritime_graph_postgis_workflow.py --config docs/maritime_workflow_config.yml --dry-run
 
 # Full workflow
-python scripts/maritime_graph_postgis_workflow.py
+python scripts/maritime_graph_postgis_workflow.py --config docs/maritime_workflow_config.yml
 
 # Expected output
 # Base Graph Creation: 127.4s (2.1 min)
@@ -410,7 +410,7 @@ Same as PostGIS (uses same YAML file)
 #### Step 4: Run Workflow
 ```bash
 # Workflow uses GeoPackage automatically
-python scripts/maritime_graph_geopackage_workflow.py
+python scripts/maritime_graph_geopackage_workflow.py --config docs/maritime_workflow_config.yml
 
 # Expected output (faster than PostGIS)
 # Base Graph Creation: 117.5s (2.0 min)
@@ -456,10 +456,10 @@ python scripts/import_s57.py \
 #### Step 2: Regenerate Graphs
 ```bash
 # Regenerate all graphs with updated data
-python scripts/maritime_graph_postgis_workflow.py
+python scripts/maritime_graph_postgis_workflow.py --config docs/maritime_workflow_config.yml
 
 # For GeoPackage: graphs reload updated data automatically
-python scripts/maritime_graph_geopackage_workflow.py
+python scripts/maritime_graph_geopackage_workflow.py --config docs/maritime_workflow_config.yml
 ```
 
 #### Step 3: Compare Routes

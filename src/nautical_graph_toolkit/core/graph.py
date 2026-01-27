@@ -71,6 +71,7 @@ from ..utils.s57_utils import S57Utils
 from ..utils.s57_classification import S57Classifier, NavClass
 from ..utils.db_utils import PostGISConnector
 from ..utils.port_utils import PortData, Boundaries
+from ..utils.logging_utils import ICONS
 
 logger = logging.getLogger(__name__)
 
@@ -290,7 +291,7 @@ class GraphUtils:
             nodes_table = f"graph_nodes_{graph_name}"
             edges_table = f"graph_edges_{graph_name}"
 
-        logger.debug(f"Connecting nodes {source_id} → {target_id} in graph '{graph_name}'")
+        logger.debug(f"Connecting nodes {source_id} {ICONS['ARROW']} {target_id} in graph '{graph_name}'")
 
         try:
             with data_manager.engine.connect() as conn:
@@ -331,12 +332,12 @@ class GraphUtils:
                         # This will trigger a rollback
                         raise RuntimeError("Edge creation failed internally.")
 
-                    logger.info(f"Successfully connected nodes {source_id} → {target_id} "
+                    logger.info(f"Successfully connected nodes {source_id} {ICONS['ARROW']} {target_id} "
                                f"with weight {custom_weight:.6f} NM")
                 return True
 
         except Exception as e:
-            logger.error(f"Failed to connect nodes {source_id} → {target_id}: {str(e)}")
+            logger.error(f"Failed to connect nodes {source_id} {ICONS['ARROW']} {target_id}: {str(e)}")
             return False
 
     @classmethod
@@ -1808,8 +1809,8 @@ class BaseGraph:
         Workflow:
             1. Create new target file with same structure (file copy)
             2. Copy all nodes (nodes are direction-agnostic)
-            3. Copy all original edges (A → B) as forward direction
-            4. Create reverse edges (B → A) by swapping source/target
+            3. Copy all original edges (A {ICONS['ARROW']} B) as forward direction
+            4. Create reverse edges (B {ICONS['ARROW']} A) by swapping source/target
             5. Create/update spatial indexes (R-tree)
 
         Args:
@@ -1839,7 +1840,7 @@ class BaseGraph:
                 target_path='graph_directed.sqlite'
             )
 
-            logger.info(f"Converted {stats['original_edges']:,} → {stats['directed_edges']:,} edges")
+            logger.info(f"Converted {stats['original_edges']:,} {ICONS['ARROW']} {stats['directed_edges']:,} edges")
         """
         perf = PerformanceMetrics()
         perf.start_timer("convert_to_directed_gpkg_total")
@@ -2226,7 +2227,7 @@ class BaseGraph:
                         if pd.notna(value):
                             edge_attrs[col] = value
 
-                # Store geometry as 'geom' key (PostGIS column 'geometry' → graph key 'geom')
+                # Store geometry as 'geom' key (PostGIS column 'geometry' {ICONS['ARROW']} graph key 'geom')
                 edge_attrs['geom'] = row['geometry'].__geo_interface__
 
                 G.add_edge(source, target, **edge_attrs)
@@ -2512,8 +2513,8 @@ class BaseGraph:
 
         Workflow:
             1. Create new directed edges table with same structure as source
-            2. Copy all original edges (A → B) with forward direction (preserves original IDs)
-            3. Create reverse edges (B → A) by swapping source/target columns
+            2. Copy all original edges (A {ICONS['ARROW']} B) with forward direction (preserves original IDs)
+            3. Create reverse edges (B {ICONS['ARROW']} A) by swapping source/target columns
             4. Assign reverse edge IDs: reverse_id = max_forward_id + forward_edge_id
             5. Create spatial and attribute indexes
             6. Copy nodes table unchanged (nodes are direction-agnostic)
@@ -2550,7 +2551,7 @@ class BaseGraph:
                 source_table_prefix='graph_base',
                 target_table_prefix='graph_directed'
             )
-            logger.info(f"Converted {stats['original_edges']:,} → {stats['directed_edges']:,} edges")
+            logger.info(f"Converted {stats['original_edges']:,} {ICONS['ARROW']} {stats['directed_edges']:,} edges")
             logger.info(f"Forward edge IDs: 1 to {stats['original_edges']}")
             logger.info(f"Reverse edge IDs: {stats['original_edges']+1} to {stats['directed_edges']}")
         """
@@ -2627,7 +2628,7 @@ class BaseGraph:
                 create_time = perf.end_timer("create_edges_table_time")
                 logger.info(f"Created directed edges table structure in {create_time:.3f}s")
 
-                # Step 3: Insert forward edges (A → B)
+                # Step 3: Insert forward edges (A {ICONS['ARROW']} B)
                 perf.start_timer("insert_forward_edges_time")
                 insert_forward_sql = text(f"""
                     INSERT INTO {target_edges_qualified}
@@ -2639,7 +2640,7 @@ class BaseGraph:
                 forward_time = perf.end_timer("insert_forward_edges_time")
                 logger.info(f"Inserted {forward_count:,} forward edges in {forward_time:.3f}s")
 
-                # Step 4: Insert reverse edges (B → A) by swapping columns
+                # Step 4: Insert reverse edges (B {ICONS['ARROW']} A) by swapping columns
                 perf.start_timer("insert_reverse_edges_time")
 
                 # Get max ID from forward edges to calculate reverse edge IDs
@@ -3656,7 +3657,7 @@ class H3Graph(BaseGraph):
                 add_edge(h3_idx, target['cell'])
                 added_connections += 1
 
-                logger.debug(f"Added bridge: res{current_res}→res{target['resolution']} "
+                logger.debug(f"Added bridge: res{current_res}{ICONS['ARROW']}res{target['resolution']} "
                            f"({target['distance_km']:.1f}km, {target['distance_km']/1.852:.1f}NM)")
 
             if added_connections > 0:
@@ -3987,10 +3988,10 @@ class Weights:
 
     UKC (Under Keel Clearance):
         UKC = Water Depth - Vessel Draft
-        - Band 4 (Grounding): UKC ≤ 0 → impassable (blocking)
-        - Band 3 (Restricted): 0 < UKC ≤ safety_margin → high penalty
-        - Band 2 (Safe): safety_margin < UKC ≤ 0.5×draft → moderate penalty
-        - Band 1 (Deep): UKC > draft → bonus (deep water)
+        - Band 4 (Grounding): UKC ≤ 0 {ICONS['ARROW']} impassable (blocking)
+        - Band 3 (Restricted): 0 < UKC ≤ safety_margin {ICONS['ARROW']} high penalty
+        - Band 2 (Safe): safety_margin < UKC ≤ 0.5×draft {ICONS['ARROW']} moderate penalty
+        - Band 1 (Deep): UKC > draft {ICONS['ARROW']} bonus (deep water)
 
     Example:
 
@@ -4118,12 +4119,12 @@ class Weights:
         Dynamically generate feature extraction configuration from S57Classifier.
 
         Reads ImportantAttributes from classifier database and groups them by attribute type:
-        - drval1 → ft_depth (FILTERED - only DEPARE, DRGARE, SWPARE for navigational depths)
-        - valsou → ft_sounding (list of layers with sounding data)
-        - depth → ft_sounding_point (SOUNDG layer depth attribute from ADD_SOUNDG_DEPTH)
-        - verclr/vercsa → ft_ver_clearance (vertical clearance, uses minimum of both)
-        - horclr → ft_hor_clearance (horizontal clearance)
-        - catwrk, catobs → ft_category (categorical data)
+        - drval1 {ICONS['ARROW']} ft_depth (FILTERED - only DEPARE, DRGARE, SWPARE for navigational depths)
+        - valsou {ICONS['ARROW']} ft_sounding (list of layers with sounding data)
+        - depth {ICONS['ARROW']} ft_sounding_point (SOUNDG layer depth attribute from ADD_SOUNDG_DEPTH)
+        - verclr/vercsa {ICONS['ARROW']} ft_ver_clearance (vertical clearance, uses minimum of both)
+        - horclr {ICONS['ARROW']} ft_hor_clearance (horizontal clearance)
+        - catwrk, catobs {ICONS['ARROW']} ft_category (categorical data)
 
         IMPORTANT: ft_depth filtering prevents false blocking in harbors/coastal waters.
         Infrastructure layers (BERTHS, GATCON, DRYDOC, FLODOC) have drval1=0 for moored vessels,
@@ -4144,10 +4145,10 @@ class Weights:
             weights = Weights(factory)
             config = weights.get_feature_layers_from_classifier()
             # Only navigational depth layers for ft_depth:
-            # depare, drgare, swpare → ft_depth
+            # depare, drgare, swpare {ICONS['ARROW']} ft_depth
             # Excluded: berths, fairwy, gatcon, drydoc, etc.
         """
-        # Attribute type mapping: S57 attribute → (ft_column_name, aggregation, group)
+        # Attribute type mapping: S57 attribute {ICONS['ARROW']} (ft_column_name, aggregation, group)
         # group allows combining multiple attributes into same column
         attribute_mapping = {
             'drval1': ('ft_depth', 'min', 'depth'),
@@ -4295,7 +4296,7 @@ class Weights:
         all_weight_cols = [col for col in edge_attrs if col.startswith('wt_')]
 
         # Derive expected weight column names from feature columns
-        # e.g., ft_depth_min → wt_depth_min
+        # e.g., ft_depth_min {ICONS['ARROW']} wt_depth_min
         feature_derived_weights = [f"wt_{col[3:]}" for col in feature_cols]
 
         # Identify weight columns that correspond to features
@@ -4576,8 +4577,8 @@ class Weights:
         Enrich graph edges with S-57 feature data stored as ft_* columns.
 
         **Dual Input Mode:**
-        - **Mode 1 (Graph)**: Process in-memory NetworkX graph → return updated nx.Graph
-        - **Mode 2 (File)**: Load from GeoPackage, enrich, save back → return summary dict
+        - **Mode 1 (Graph)**: Process in-memory NetworkX graph {ICONS['ARROW']} return updated nx.Graph
+        - **Mode 2 (File)**: Load from GeoPackage, enrich, save back {ICONS['ARROW']} return summary dict
 
         This method performs spatial intersection between graph edges and S-57 layers,
         extracting relevant attributes (depth, clearance, soundings, etc.) and storing
@@ -4586,7 +4587,7 @@ class Weights:
         **Implementation:** Pure GeoPandas/Shapely operations - no SQL, no SpatiaLite, no PostGIS
 
         Features usage band prioritization (same as PostGIS version):
-        - Extracts usage band from ENC names (e.g., US5CA52M → band 5)
+        - Extracts usage band from ENC names (e.g., US5CA52M {ICONS['ARROW']} band 5)
         - Prioritizes: 6 (Berthing) > 5 (Harbour) > 4 (Approach) > 3 (Coastal) > 2 (General) > 1 (Overview)
         - Within same usage band, applies aggregation (min/max/mean)
 
@@ -4808,7 +4809,7 @@ class Weights:
                 logger.debug(f"No edge intersections for layer '{layer_name}'")
                 continue
 
-            # Extract usage band from dsid_dsnm if available (e.g., US5CA52M → 5)
+            # Extract usage band from dsid_dsnm if available (e.g., US5CA52M {ICONS['ARROW']} 5)
             # Usage band priority: 6 (Berthing) > 5 (Harbour) > 4 (Approach) > 3 (Coastal) > 2 (General) > 1 (Overview)
             if 'dsid_dsnm' in intersecting.columns:
                 intersecting['usage_band'] = intersecting['dsid_dsnm'].str[2:3].astype(int, errors='ignore')
@@ -4976,7 +4977,7 @@ class Weights:
                             pass
 
                     if updated_count > 0:
-                        logger.info(f"  ✓ {col_name}: propagated to {updated_count:,} reverse edges")
+                        logger.info(f"  {ICONS['OK']} {col_name}: propagated to {updated_count:,} reverse edges")
 
             # Save enriched GeoDataFrame back to GPKG
             logger.info(f"\n=== Saving Enriched Edges to GeoPackage ===")
@@ -5049,7 +5050,7 @@ class Weights:
             propagation_stats[col_name] = updated_count
 
             if updated_count > 0:
-                logger.debug(f"  ✓ {col_name}: propagated to {updated_count:,} reverse edges")
+                logger.debug(f"  {ICONS['OK']} {col_name}: propagated to {updated_count:,} reverse edges")
 
         return propagation_stats
 
@@ -5642,7 +5643,7 @@ class Weights:
                     propagation_stats[col_name] = rows_updated
 
                     if rows_updated > 0:
-                        logger.debug(f"  ✓ {col_name}: propagated to {rows_updated:,} reverse edges")
+                        logger.debug(f"  {ICONS['OK']} {col_name}: propagated to {rows_updated:,} reverse edges")
 
                 except Exception as e:
                     logger.error(f"Failed to propagate {col_name}: {e}")
@@ -5669,7 +5670,7 @@ class Weights:
         **Key Optimizations:**
 
         1. **Per-Layer Pre-Aggregation:** Each depth layer is pre-aggregated (GROUP BY fid)
-           to reduce data volume by ~10x (e.g., 48M rows → 2.9M rows for 1.6M edges).
+           to reduce data volume by ~10x (e.g., 48M rows {ICONS['ARROW']} 2.9M rows for 1.6M edges).
 
         2. **Parallel Materialization:** Depth layers are processed in parallel (up to 4 threads)
            using separate temp tables. Each thread writes to its own table, avoiding lock contention.
@@ -5683,7 +5684,7 @@ class Weights:
 
         **Performance vs Original V3:**
         - 3-3.5x faster depth layer processing (parallel + pre-aggregation)
-        - 93% memory reduction (1.7GB → 109MB for 1.6M edges)
+        - 93% memory reduction (1.7GB {ICONS['ARROW']} 109MB for 1.6M edges)
         - Guaranteed global precision (highest band across ALL depth layers)
 
         Args:
@@ -6101,7 +6102,7 @@ class Weights:
                                 # Exponential backoff: 0.5s, 1.5s, 3.5s (with jitter)
                                 wait_time = (2 ** attempt) * 0.5 + random.uniform(0, 0.5)
                                 logger.warning(
-                                    f"  ⚠ {layer_name}: Database locked (attempt {attempt + 1}/{max_retries}), "
+                                    f"  {ICONS['WARN']} {layer_name}: Database locked (attempt {attempt + 1}/{max_retries}), "
                                     f"retrying in {wait_time:.1f}s..."
                                 )
                                 time.sleep(wait_time)
@@ -6138,11 +6139,11 @@ class Weights:
                                 worker_databases[layer_name] = worker_db_path  # Store for aggregation
                                 throughput = rows / elapsed if elapsed > 0 else 0
                                 logger.info(
-                                    f"  ✓ {layer_name}: {rows:,} edges in {elapsed:.1f}s "
+                                    f"  {ICONS['OK']} {layer_name}: {rows:,} edges in {elapsed:.1f}s "
                                     f"({throughput:.0f} edges/sec)"
                                 )
                             except Exception as e:
-                                logger.error(f"  ✗ {layer_name}: Failed after retries - {e}")
+                                logger.error(f"  {ICONS['FAIL']} {layer_name}: Failed after retries - {e}")
                                 # Remove failed layer from processing
                                 temp_table_names = [(ln, tn) for ln, tn in temp_table_names if ln != layer_name]
 
@@ -6933,8 +6934,8 @@ class Weights:
         Applies static weights to graph edges based on lateral distance to maritime features.
 
         **Dual Input Mode:**
-        - **Mode 1 (Graph)**: Process in-memory NetworkX graph → return updated nx.Graph
-        - **Mode 2 (File)**: Load from GeoPackage, update weights in place → return None
+        - **Mode 1 (Graph)**: Process in-memory NetworkX graph {ICONS['ARROW']} return updated nx.Graph
+        - **Mode 2 (File)**: Load from GeoPackage, update weights in place {ICONS['ARROW']} return None
 
         **NEW Three-Tier System with Distance-Based Degradation:**
 
@@ -6947,19 +6948,19 @@ class Weights:
         Uses S57Classifier buffer distances to degrade features by proximity:
 
         1. **Outside buffer (> 100%)**: Base NavClass applies
-           - DANGEROUS → wt_static_blocking
-           - CAUTION → wt_static_penalty
-           - SAFE → wt_static_bonus
+           - DANGEROUS {ICONS['ARROW']} wt_static_blocking
+           - CAUTION {ICONS['ARROW']} wt_static_penalty
+           - SAFE {ICONS['ARROW']} wt_static_bonus
 
         2. **Within buffer (50% < distance ≤ 100%)**: Degrade one tier
-           - DANGEROUS → wt_static_blocking (amplified)
-           - CAUTION → wt_static_blocking (CAUTION → DANGEROUS)
-           - SAFE → wt_static_penalty * 2.0 (SAFE → CAUTION)
+           - DANGEROUS {ICONS['ARROW']} wt_static_blocking (amplified)
+           - CAUTION {ICONS['ARROW']} wt_static_blocking (CAUTION {ICONS['ARROW']} DANGEROUS)
+           - SAFE {ICONS['ARROW']} wt_static_penalty * 2.0 (SAFE {ICONS['ARROW']} CAUTION)
 
         3. **Very close (≤ 50% buffer)**: Further amplification
-           - DANGEROUS → wt_static_blocking (maximum)
-           - CAUTION → wt_static_blocking (maximum)
-           - SAFE → wt_static_penalty * 4.0 (severe caution)
+           - DANGEROUS {ICONS['ARROW']} wt_static_blocking (maximum)
+           - CAUTION {ICONS['ARROW']} wt_static_blocking (maximum)
+           - SAFE {ICONS['ARROW']} wt_static_penalty * 4.0 (severe caution)
 
         Priority for static_layers selection:
             1. Explicit parameter (if provided)
@@ -7425,14 +7426,14 @@ class Weights:
         Uses ST_DWithin() for fast spatial index-based queries:
 
         1. **Outside buffer**: Base NavClass applies
-           - DANGEROUS → wt_static_blocking
-           - CAUTION → wt_static_penalty
-           - SAFE → wt_static_bonus
+           - DANGEROUS {ICONS['ARROW']} wt_static_blocking
+           - CAUTION {ICONS['ARROW']} wt_static_penalty
+           - SAFE {ICONS['ARROW']} wt_static_bonus
 
         2. **Inside buffer (ST_DWithin)**: Degrade one tier
-           - DANGEROUS → wt_static_blocking (amplified)
-           - CAUTION → wt_static_blocking (CAUTION → DANGEROUS)
-           - SAFE → wt_static_penalty × 2.0 (SAFE → CAUTION)
+           - DANGEROUS {ICONS['ARROW']} wt_static_blocking (amplified)
+           - CAUTION {ICONS['ARROW']} wt_static_blocking (CAUTION {ICONS['ARROW']} DANGEROUS)
+           - SAFE {ICONS['ARROW']} wt_static_penalty × 2.0 (SAFE {ICONS['ARROW']} CAUTION)
 
         **Performance Advantages:**
         - ST_DWithin() uses GiST spatial indexes (10-100x faster than ST_Distance)
@@ -7995,7 +7996,7 @@ class Weights:
 
         logger.info(f"=== Dynamic Weight Calculation (PostGIS - Three-Tier System) ===")
         logger.info(f"Vessel: type={vessel_type}, draft={draft}m, height={vessel_height}m")
-        logger.info(f"Safety margin: {base_safety_margin}m → {safety_margin:.2f}m (adjusted)")
+        logger.info(f"Safety margin: {base_safety_margin}m {ICONS['ARROW']} {safety_margin:.2f}m (adjusted)")
         logger.info(f"Environment: weather={weather_factor}, visibility={visibility_factor}, time={time_of_day}")
         logger.info(f"Max penalty cap: {max_penalty}")
 
@@ -8059,7 +8060,7 @@ class Weights:
             # Depth penalties (4-band UKC system)
             # Uses ft_depth which is MIN(drval1) from depare/drgare layers
 
-            # Band 3: 0 < UKC <= safety_margin → 10.0
+            # Band 3: 0 < UKC <= safety_margin {ICONS['ARROW']} 10.0
             depth_penalty_band3_sql = text(f"""
                 UPDATE "{validated_edges_schema}"."{validated_edges_table}"
                 SET penalty_factor = penalty_factor * 10.0,
@@ -8071,7 +8072,7 @@ class Weights:
             conn.execute(depth_penalty_band3_sql, {'draft': draft, 'safety_margin': safety_margin})
             conn.commit()
 
-            # Band 2: safety_margin < UKC <= 0.5 * draft → 2.0
+            # Band 2: safety_margin < UKC <= 0.5 * draft {ICONS['ARROW']} 2.0
             depth_penalty_band2_sql = text(f"""
                 UPDATE "{validated_edges_schema}"."{validated_edges_table}"
                 SET penalty_factor = penalty_factor * 2.0,
@@ -8087,7 +8088,7 @@ class Weights:
             })
             conn.commit()
 
-            # Transitional band: 0.5 * draft < UKC <= draft → 1.5
+            # Transitional band: 0.5 * draft < UKC <= draft {ICONS['ARROW']} 1.5
             depth_penalty_transitional_sql = text(f"""
                 UPDATE "{validated_edges_schema}"."{validated_edges_table}"
                 SET penalty_factor = penalty_factor * 1.5,
@@ -8936,14 +8937,14 @@ class Weights:
         Uses ST_DWithin() for fast spatial index-based queries:
 
         1. **Outside buffer**: Base NavClass applies
-           - DANGEROUS → wt_static_blocking
-           - CAUTION → wt_static_penalty
-           - SAFE → wt_static_bonus
+           - DANGEROUS {ICONS['ARROW']} wt_static_blocking
+           - CAUTION {ICONS['ARROW']} wt_static_penalty
+           - SAFE {ICONS['ARROW']} wt_static_bonus
 
         2. **Inside buffer (ST_DWithin)**: Degrade one tier
-           - DANGEROUS → wt_static_blocking (amplified)
-           - CAUTION → wt_static_blocking (CAUTION → DANGEROUS)
-           - SAFE → wt_static_penalty × 2.0 (SAFE → CAUTION)
+           - DANGEROUS {ICONS['ARROW']} wt_static_blocking (amplified)
+           - CAUTION {ICONS['ARROW']} wt_static_blocking (CAUTION {ICONS['ARROW']} DANGEROUS)
+           - SAFE {ICONS['ARROW']} wt_static_penalty × 2.0 (SAFE {ICONS['ARROW']} CAUTION)
 
         **GeoPackage Naming Conventions:**
 
@@ -9651,7 +9652,7 @@ class Weights:
             dynamic_margin *= 1.2  # 20% increase for night navigation
 
         logger.debug(
-            f"Dynamic safety margin: {base_safety_margin:.2f}m → {dynamic_margin:.2f}m "
+            f"Dynamic safety margin: {base_safety_margin:.2f}m {ICONS['ARROW']} {dynamic_margin:.2f}m "
             f"(weather={weather_factor}, visibility={visibility_factor}, time={time_of_day})"
         )
 
@@ -9778,7 +9779,7 @@ class Weights:
 
         logger.info(f"=== Dynamic Weight Calculation (Three-Tier System) ===")
         logger.info(f"Vessel: type={vessel_type}, draft={draft}m, height={vessel_height}m")
-        logger.info(f"Safety margin: {base_safety_margin}m → {safety_margin:.2f}m (adjusted)")
+        logger.info(f"Safety margin: {base_safety_margin}m {ICONS['ARROW']} {safety_margin:.2f}m (adjusted)")
         logger.info(f"Environment: weather={weather_factor}, visibility={visibility_factor}, time={time_of_day}")
         logger.info(f"Max penalty cap: {max_penalty}")
 
@@ -9855,10 +9856,10 @@ class Weights:
 
         UKC = Water Depth - Vessel Draft
 
-        Band 4 (Grounding): UKC <= 0 → inf (impassable)
-        Band 3 (Restricted): 0 < UKC <= safety_margin → 100.0
-        Band 2 (Safe): safety_margin < UKC <= 0.5 * draft → 5.0
-        Band 1 (Deep): UKC > draft → 1.0
+        Band 4 (Grounding): UKC <= 0 {ICONS['ARROW']} inf (impassable)
+        Band 3 (Restricted): 0 < UKC <= safety_margin {ICONS['ARROW']} 100.0
+        Band 2 (Safe): safety_margin < UKC <= 0.5 * draft {ICONS['ARROW']} 5.0
+        Band 1 (Deep): UKC > draft {ICONS['ARROW']} 1.0
 
         Args:
             depth: Water depth in meters (from drval1, valsou, etc.)
@@ -10282,7 +10283,7 @@ class Weights:
 
         logger.info(f"=== Dynamic Weight Calculation (GeoPackage - Three-Tier System) ===")
         logger.info(f"Vessel: type={vessel_type}, draft={draft}m, height={vessel_height}m")
-        logger.info(f"Safety margin: {base_safety_margin}m → {safety_margin:.2f}m (adjusted)")
+        logger.info(f"Safety margin: {base_safety_margin}m {ICONS['ARROW']} {safety_margin:.2f}m (adjusted)")
         logger.info(f"Environment: weather={weather_factor}, visibility={visibility_factor}, time={time_of_day}")
         logger.info(f"Max penalty cap: {max_penalty}")
 
@@ -10357,7 +10358,7 @@ class Weights:
             logger.info("Tier 2: Calculating penalty factors...")
 
             # Depth penalties (4-band UKC system)
-            # Band 3: 0 < UKC <= safety_margin → ×10.0
+            # Band 3: 0 < UKC <= safety_margin {ICONS['ARROW']} ×10.0
             depth_penalty_band3_sql = f"""
                 UPDATE edges
                 SET penalty_factor = penalty_factor * 10.0,
@@ -10369,7 +10370,7 @@ class Weights:
             cursor.execute(depth_penalty_band3_sql)
             conn.commit()
 
-            # Band 2: safety_margin < UKC <= 0.5 * draft → ×2.0
+            # Band 2: safety_margin < UKC <= 0.5 * draft {ICONS['ARROW']} ×2.0
             depth_penalty_band2_sql = f"""
                 UPDATE edges
                 SET penalty_factor = penalty_factor * 2.0,
@@ -10381,7 +10382,7 @@ class Weights:
             cursor.execute(depth_penalty_band2_sql)
             conn.commit()
 
-            # Transitional band: 0.5 * draft < UKC <= draft → ×1.5
+            # Transitional band: 0.5 * draft < UKC <= draft {ICONS['ARROW']} ×1.5
             depth_penalty_transitional_sql = f"""
                 UPDATE edges
                 SET penalty_factor = penalty_factor * 1.5,
@@ -11208,7 +11209,7 @@ class Weights:
 
         This method handles:
         - Geometry conversion (node tuples to LineString)
-        - Infinity value conversion (inf → None for storage compatibility)
+        - Infinity value conversion (inf {ICONS['ARROW']} None for storage compatibility)
         - List/array serialization (to JSON strings)
         - Empty graph handling (returns properly structured GeoDataFrame)
 

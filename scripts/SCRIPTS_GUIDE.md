@@ -60,13 +60,13 @@ python scripts/import_s57.py --mode advanced --input-path data/ENC_SF_LA/ENC_ROO
 **Quick Start:**
 ```bash
 # Full workflow with PostGIS backend
-python scripts/maritime_graph_postgis_workflow.py
+python scripts/maritime_graph_postgis_workflow.py --config docs/maritime_workflow_config.yml
 
 # Skip base graph (already exists)
-python scripts/maritime_graph_postgis_workflow.py --skip-base
+python scripts/maritime_graph_postgis_workflow.py --config docs/maritime_workflow_config.yml --skip-base
 
 # Custom vessel draft
-python scripts/maritime_graph_postgis_workflow.py --vessel-draft 12.0
+python scripts/maritime_graph_postgis_workflow.py --config docs/maritime_workflow_config.yml --vessel-draft 12.0
 ```
 
 **Related Guide:** See `docs/WORKFLOW_POSTGIS_GUIDE.md` for detailed workflow documentation.
@@ -89,17 +89,17 @@ Same as PostGIS workflow (base → fine → weighting → pathfinding) but store
 **Quick Start:**
 ```bash
 # Full workflow with GeoPackage backend
-python scripts/maritime_graph_geopackage_workflow.py
+python scripts/maritime_graph_geopackage_workflow.py --config docs/maritime_workflow_config.yml
 
 # Use fine grid instead of H3
-python scripts/maritime_graph_geopackage_workflow.py --graph-mode fine
+python scripts/maritime_graph_geopackage_workflow.py --config docs/maritime_workflow_config.yml --graph-mode fine
 
 # INFO mode: Clean logs, ~1MB per file (default)
-python scripts/maritime_graph_geopackage_workflow.py --log-level INFO
+python scripts/maritime_graph_geopackage_workflow.py --config docs/maritime_workflow_config.yml --log-level INFO
 
 # DEBUG mode: Full debugging, ~5-10MB per file
 # Third-party verbose logging automatically suppressed
-python scripts/maritime_graph_geopackage_workflow.py --log-level DEBUG
+python scripts/maritime_graph_geopackage_workflow.py --config docs/maritime_workflow_config.yml --log-level DEBUG
 ```
 
 **Related Guide:** See `docs/WORKFLOW_GEOPACKAGE_GUIDE.md` for detailed workflow documentation.
@@ -241,7 +241,7 @@ cp .env.example .env
 - `--schema` - Custom schema/database name
 
 ### Workflow Scripts Specific:
-- `--config` - Custom configuration YAML file
+- `--config` - Custom configuration YAML file (default: `docs/maritime_workflow_config.yml`)
 - `--data-dir` - Override ENC data directory (default: data/)
 - `--skip-base` / `--skip-fine` / `--skip-weighting` / `--skip-pathfinding` - Skip steps
 - `--graph-mode` - Graph type: fine (grid) or h3 (hexagonal)

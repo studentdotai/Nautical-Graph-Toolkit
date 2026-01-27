@@ -52,7 +52,8 @@ def get_status_icons() -> Dict[str, str]:
             'OK': '[+]',
             'FAIL': '[x]',
             'WARN': '[!]',
-            'INFO': '[i]'
+            'INFO': '[i]',
+            'ARROW': '->'
         }
 
     try:
@@ -64,7 +65,8 @@ def get_status_icons() -> Dict[str, str]:
                 'OK': '✓',
                 'FAIL': '✗',
                 'WARN': '⚠',
-                'INFO': 'ℹ'
+                'INFO': 'ℹ',
+                'ARROW': '->'
             }
     except (UnicodeEncodeError, AttributeError, TypeError):
         pass
@@ -74,7 +76,8 @@ def get_status_icons() -> Dict[str, str]:
         'OK': '[+]',
         'FAIL': '[x]',
         'WARN': '[!]',
-        'INFO': '[i]'
+        'INFO': '[i]',
+        'ARROW': '->'
     }
 
 

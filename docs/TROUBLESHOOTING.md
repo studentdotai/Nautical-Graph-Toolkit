@@ -8,18 +8,19 @@ This guide covers common issues you may encounter when working with the Nautical
 
 1. [Windows PowerShell & Mamba Issues](#windows-powershell--mamba-issues) ⚠️ **Windows Users**
    - PyCharm Conda Integration Error
-2. [SQLite RTREE Issues](#sqlite-rtree-issues) ⚠️ **Most Common**
-3. [GeoPackage File I/O Issues](#geopackage-file-io-issues)
-4. [Environment Setup Issues](#environment-setup-issues)
-5. [GDAL/PROJ Database Warnings](#gdal-proj-database-warnings)
-6. [Port Selection Issues](#port-selection-issues)
-7. [Database Connection Issues](#database-connection-issues)
-8. [Data Source Issues](#data-source-issues)
-9. [S57Updater: File-Based Backend Safety](#s57updater-file-based-backend-safety) ⚠️ **Important**
-10. [Graph Creation Issues](#graph-creation-issues)
-11. [Performance Issues](#performance-issues)
-12. [Visualization Issues](#visualization-issues)
-13. [Pathfinding Issues](#pathfinding-issues)
+2. [Jupyter Kernel Issues](#jupyter-kernel-issues)
+3. [SQLite RTREE Issues](#sqlite-rtree-issues) ⚠️ **Most Common**
+4. [GeoPackage File I/O Issues](#geopackage-file-io-issues)
+5. [Environment Setup Issues](#environment-setup-issues)
+6. [GDAL/PROJ Database Warnings](#gdal-proj-database-warnings)
+7. [Port Selection Issues](#port-selection-issues)
+8. [Database Connection Issues](#database-connection-issues)
+9. [Data Source Issues](#data-source-issues)
+10. [S57Updater: File-Based Backend Safety](#s57updater-file-based-backend-safety) ⚠️ **Important**
+11. [Graph Creation Issues](#graph-creation-issues)
+12. [Performance Issues](#performance-issues)
+13. [Visualization Issues](#visualization-issues)
+14. [Pathfinding Issues](#pathfinding-issues)
 
 ---
 
@@ -273,6 +274,157 @@ To avoid this issue in the future:
 **See also:**
 - PyCharm documentation: [Configuring Conda](https://www.jetbrains.com/help/pycharm/conda.html)
 - Miniforge documentation: [Installation](https://github.com/conda-forge/miniforge)
+
+---
+
+## Jupyter Kernel Issues
+
+### Issue: "Nautical" kernel not found in Jupyter
+
+**Symptoms:**
+- Kernel "Nautical Toolkit" or "nautical" not available when creating notebooks
+- Jupyter shows only "Python 3" or "python3" kernel
+- IDE shows "No Python interpreter found" or wrong version
+
+**Cause:** Jupyter kernel not created or registered incorrectly.
+
+**Solution:**
+
+1. **Verify you're in the correct environment:**
+   ```bash
+   mamba info --envs
+   # Look for: nautical    * /path/to/envs/nautical (asterisk shows active)
+   ```
+
+2. **Verify Python path:**
+   ```bash
+   mamba activate nautical
+   python -c "import sys; print(sys.executable)"
+   ```
+
+   **Expected paths:**
+   - **Windows**: `C:\Users\<YourUser>\.local\share\mamba\envs\nautical\python.exe`
+   - **Linux**: `/home/<user>/miniforge3/envs/nautical/bin/python`
+   - **macOS**: `/Users/<user>/miniforge3/envs/nautical/bin/python`
+
+3. **Create the kernel:**
+   ```bash
+   mamba activate nautical
+   python -m ipykernel install --user --name nautical --display-name "Nautical Toolkit"
+   ```
+
+4. **Verify kernel installation:**
+   ```bash
+   jupyter kernelspec list
+   ```
+
+   Should show:
+   ```
+   nautical    C:\Users\<YourUser>\AppData\Roaming\jupyter\kernels\nautical    # Windows
+   nautical    ~/.local/share/jupyter/kernels/nautical                         # Linux/macOS
+   ```
+
+5. **If kernel still not found, remove and reinstall:**
+   ```bash
+   # Remove old kernel
+   jupyter kernelspec uninstall nautical -y
+
+   # Reinstall with full path (Windows example)
+   C:\Users\<YourUser>\.local\share\mamba\envs\nautical\python.exe -m ipykernel install --user --name nautical --display-name "Nautical Toolkit"
+   ```
+
+6. **Restart Jupyter:**
+   ```bash
+   # Stop any running Jupyter servers
+   jupyter notebook stop
+
+   # Start fresh
+   mamba activate nautical
+   jupyter notebook  # or jupyter lab
+   ```
+
+---
+
+### Issue: IDE shows wrong Python version for kernel
+
+**Symptoms:**
+- IDE Python interpreter points to system Python instead of Conda environment
+- Packages not found even though they're installed
+- Import errors: `ModuleNotFoundError: No module named 'nautical_graph_toolkit'`
+
+**Solution:**
+
+1. **Get the correct Python path:**
+   ```bash
+   mamba activate nautical
+   python -c "import sys; print(sys.executable)"
+   ```
+
+2. **Configure IDE with this path:**
+
+   **PyCharm:**
+   - File → Settings → Project → Python Interpreter
+   - Click gear icon → Add
+   - Select "Conda Environment" → "Existing"
+   - Paste the path from step 1
+   - Apply → OK
+
+   **VS Code:**
+   - Open Command Palette (Ctrl+Shift+P)
+   - "Python: Select Interpreter"
+   - "Enter interpreter path..."
+   - Paste the path from step 1
+   - Press Enter
+
+3. **Verify in IDE:**
+   - Create new Python file or notebook
+   - Run: `import sys; print(sys.executable)`
+   - Should match the path from step 1
+
+---
+
+### Issue: Kernel dies immediately when starting
+
+**Symptoms:**
+- Kernel starts but immediately disconnects
+- "Dead kernel" message in Jupyter
+- Notebook cells won't execute
+
+**Possible Causes & Solutions:**
+
+1. **Corrupted kernel specification:**
+   ```bash
+   jupyter kernelspec uninstall nautical -y
+   mamba activate nautical
+   python -m ipykernel install --user --name nautical --display-name "Nautical Toolkit"
+   jupyter kernelspec list  # Verify
+   ```
+
+2. **Missing ipykernel package:**
+   ```bash
+   mamba activate nautical
+   mamba list | grep ipykernel  # Check if installed
+
+   # If missing:
+   mamba install ipykernel -y
+   python -m ipykernel install --user --name nautical --display-name "Nautical Toolkit"
+   ```
+
+3. **Conflicting Jupyter installations:**
+   ```bash
+   # Uninstall all Jupyter packages
+   mamba remove jupyter jupyterlab notebook ipykernel --force -y
+
+   # Reinstall clean
+   mamba install jupyter jupyterlab ipykernel -y
+   python -m ipykernel install --user --name nautical --display-name "Nautical Toolkit"
+   ```
+
+4. **Check Jupyter logs for errors:**
+   ```bash
+   jupyter notebook --debug  # or jupyter lab --debug
+   # Look for error messages when kernel starts
+   ```
 
 ---
 

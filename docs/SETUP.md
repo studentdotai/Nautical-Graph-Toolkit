@@ -332,6 +332,105 @@ After setup, verify your backend contains the required data:
 # Verification code will be added from import_s57 notebook
 ```
 
+### Python Interpreter Path Verification
+
+To verify your Python environment location (required for IDE configuration and Jupyter kernels):
+
+```bash
+# Activate environment first
+mamba activate nautical
+
+# Check Python executable path
+python -c "import sys; print(f'Python executable: {sys.executable}')"
+```
+
+**Expected output by platform:**
+- **Windows**: `C:\Users\<YourUser>\.local\share\mamba\envs\nautical\python.exe`
+- **Linux**: `/home/<user>/miniforge3/envs/nautical/bin/python`
+- **macOS**: `/Users/<user>/miniforge3/envs/nautical/bin/python`
+
+Note the path from this command - you'll need it for IDE configuration and creating Jupyter kernels.
+
+---
+
+## Jupyter Notebook Configuration (Optional)
+
+If you plan to use Jupyter notebooks for interactive analysis, follow these steps to set up a Jupyter kernel for the `nautical` environment.
+
+### Creating a Jupyter Kernel
+
+The Jupyter kernel allows notebooks to use your `nautical` environment directly:
+
+```bash
+# Activate environment
+mamba activate nautical
+
+# Create kernel (works on all platforms)
+python -m ipykernel install --user --name nautical --display-name "Nautical Toolkit"
+
+# Verify kernel installation
+jupyter kernelspec list
+```
+
+**Expected output:**
+```
+Available kernels:
+  nautical    C:\Users\<YourUser>\AppData\Roaming\jupyter\kernels\nautical    # Windows
+  nautical    ~/.local/share/jupyter/kernels/nautical                         # Linux/macOS
+  python3     ...
+```
+
+### Using the Kernel in Jupyter
+
+**Jupyter Notebook:**
+```bash
+mamba activate nautical
+jupyter notebook
+
+# In browser: Kernel → Change Kernel → Nautical Toolkit
+```
+
+**Jupyter Lab:**
+```bash
+mamba activate nautical
+jupyter lab
+
+# In browser: Select "Nautical Toolkit" when creating new notebooks
+```
+
+**VS Code:**
+1. Open a `.ipynb` file
+2. Click kernel selector (top-right corner)
+3. Select "Nautical Toolkit" from the list
+
+**PyCharm Professional:**
+1. Open a notebook or Python file
+2. Run → Edit Configurations → Jupyter Server (if using notebooks)
+3. Select "existing" → Choose "nautical" kernel
+
+### IDE Python Interpreter Configuration
+
+**PyCharm:**
+1. File → Settings → Project: Nautical-Graph-Toolkit → Python Interpreter
+2. Click gear icon → Add
+3. Select "Conda Environment" → "Existing"
+4. Paste the Python path from the verification command above (e.g., `C:\Users\<YourUser>\.local\share\mamba\envs\nautical\python.exe`)
+5. Apply → OK
+
+**VS Code:**
+1. Open Command Palette (Ctrl+Shift+P / Cmd+Shift+P on macOS)
+2. Type "Python: Select Interpreter"
+3. Click "Enter interpreter path..."
+4. Paste the Python path from the verification command above
+5. Press Enter
+
+### Troubleshooting Jupyter Kernel Issues
+
+If you encounter issues with Jupyter kernels, see [TROUBLESHOOTING.md - Jupyter Kernel Issues](./TROUBLESHOOTING.md#jupyter-kernel-issues) for comprehensive solutions including:
+- Kernel not found in Jupyter
+- IDE shows wrong Python version
+- Kernel dies immediately when starting
+
 ---
 
 ## Configuration Files
