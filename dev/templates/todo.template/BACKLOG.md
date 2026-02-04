@@ -268,6 +268,6 @@ Last Updated: 2026-01-15
 
 - **Active TODO**: `/dev/todo/TODO.md` (current work items)
 - **Priorities**: `/dev/todo/PRIORITIES.md` (decision framework, weekly planning)
-- **Roadmap**: `/docs/ROADMAP.md` (project root - long-term vision)
+- **Roadmap**: `/docs/project/roadmap.md` (long-term vision)
 - **Milestones**: `/dev/progress/MILESTONES.md` (major achievements and goals)
 - **Task Index**: `/dev/tasks/TASK_INDEX.md` (active task tracking)

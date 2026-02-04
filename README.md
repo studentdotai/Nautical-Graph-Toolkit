@@ -3,7 +3,7 @@
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-blue)](https://www.python.org/downloads/)
 [![GitHub Release](https://img.shields.io/github/v/release/studentdotai/Nautical-Graph-Toolkit)](https://github.com/studentdotai/Nautical-Graph-Toolkit/releases)
-[![Changelog](https://img.shields.io/badge/changelog-keep%20a%20changelog-blue)](CHANGELOG.md)
+[![Changelog](https://img.shields.io/badge/changelog-keep%20a%20changelog-blue)](docs/project/changelog.md)
 [![Open Collective](https://img.shields.io/badge/Open%20Collective-vectornautical-blueviolet)](https://opencollective.com/vectornautical)
 
 A comprehensive maritime analysis toolkit for converting NOAA S-57 Electronic Navigational Charts (ENC) into analysis-ready geospatial formats, generating intelligent maritime routing networks, and performing advanced vessel route optimization.
@@ -70,7 +70,7 @@ This toolkit transforms raw S-57 chart data into production-ready geospatial dat
 - Git installed
   - Windows: https://git-scm.com/download/win
 
-**Note for Windows PowerShell users:** If you prefer PowerShell over Miniforge Prompt and encounter issues with `mamba` commands not being recognized, see [Windows PowerShell & Mamba Issues](docs/TROUBLESHOOTING.md#windows-powershell--mamba-issues) for the fix.
+**Note for Windows PowerShell users:** If you prefer PowerShell over Miniforge Prompt and encounter issues with `mamba` commands not being recognized, see [Windows PowerShell & Mamba Issues](docs/reference/troubleshooting.md#windows-powershell--mamba-issues) for the fix.
 
 #### Clone and Install
 
@@ -110,9 +110,9 @@ uv pip install -e .
 python -c "from nautical_graph_toolkit import S57Base; print('✓ Installation successful')"
 ```
 
-See [INSTALL.md](INSTALL.md) for detailed troubleshooting and platform-specific guides.
+See [INSTALL.md](docs/getting-started/install.md) for detailed troubleshooting and platform-specific guides.
 
-**⚠️ Windows Users:** If you encounter issues with Mamba/Conda commands in PowerShell (command not recognized, scripts disabled, etc.), see the [Windows PowerShell & Mamba Issues](docs/TROUBLESHOOTING.md#windows-powershell--mamba-issues) troubleshooting section.
+**⚠️ Windows Users:** If you encounter issues with Mamba/Conda commands in PowerShell (command not recognized, scripts disabled, etc.), see the [Windows PowerShell & Mamba Issues](docs/reference/troubleshooting.md#windows-powershell--mamba-issues) troubleshooting section.
 
 #### GDAL Installation
 
@@ -127,7 +127,7 @@ python -c "from osgeo import gdal; print(f'✓ GDAL {gdal.__version__} installed
 
 **⚠️ Important:** Do NOT install GDAL via pip (`pip install gdal`). This will conflict with the Conda installation and cause version mismatches.
 
-If you encounter GDAL issues, see [INSTALL.md](INSTALL.md) for troubleshooting.
+If you encounter GDAL issues, see [INSTALL.md](docs/getting-started/install.md) for troubleshooting.
 
 #### PostGIS Database Setup (Optional, for production workflows)
 
@@ -152,7 +152,7 @@ docker-compose up -d
 python -c "from sqlalchemy import create_engine; engine = create_engine('postgresql://postgres:postgres@localhost:5433/enc_db'); print('✓ PostGIS connected')"
 ```
 
-See [INSTALL.md Section 4](INSTALL.md#4-docker-postgis-setup) for complete platform-specific configuration and troubleshooting.
+See [INSTALL.md Section 4](docs/getting-started/install.md#4-docker-postgis-setup) for complete platform-specific configuration and troubleshooting.
 
 ### 5-Minute Example: Build a Route Graph
 
@@ -345,7 +345,7 @@ We have a comprehensive public roadmap that outlines our development journey fro
 
 **Development Note**: This is a part-time project developed between sea contracts. Timelines are flexible and availability-dependent. Community contributions welcome starting with v0.2.0!
 
-➡️ **[View the Full Project Roadmap](docs/ROADMAP.md)** for detailed version plans, dependencies, and contribution opportunities.
+➡️ **[View the Full Project Roadmap](docs/project/roadmap.md)** for detailed version plans, dependencies, and contribution opportunities.
 
 ---
 
@@ -359,11 +359,25 @@ We have a comprehensive public roadmap that outlines our development journey fro
 
 ## 📚 Documentation
 
-- **[Setup Guide](docs/SETUP.md)** - Detailed installation and configuration for all backends
-- **[Quick Start Workflow](docs/WORKFLOW_QUICKSTART.md)** - 5-minute introduction
-- **[PostGIS Guide](docs/WORKFLOW_POSTGIS_GUIDE.md)** - Production-scale setup
-- **[GeoPackage Guide](docs/WORKFLOW_GEOPACKAGE_GUIDE.md)** - Portable single-file setup
-- **[Jupyter Notebooks](docs/notebooks/)** - 12 interactive examples and tutorials
+**[View Live Documentation](https://studentdotai.github.io/Nautical-Graph-Toolkit)**
+
+Built with **MkDocs** using the Material theme.
+
+### User Guides
+- **[Setup Guide](docs/getting-started/setup.md)** - Detailed installation and configuration for all backends
+- **[Quick Start Workflow](docs/getting-started/workflow-quickstart.md)** - 5-minute introduction
+- **[PostGIS Guide](docs/user-guides/workflow-postgis-guide.md)** - Production-scale setup
+- **[GeoPackage Guide](docs/user-guides/workflow-geopackage-guide.md)** - Portable single-file setup
+- **[Jupyter Notebooks](docs/notebooks/)** - 13 interactive examples and tutorials
+
+### Preview Documentation Locally
+
+```bash
+mkdocs serve
+# Opens at http://127.0.0.1:8000
+```
+
+Deployment to GitHub Pages is automated via CI/CD on version tags.
 
 ## 🏗️ Architecture
 
@@ -516,7 +530,7 @@ Want to validate your installation or skip lengthy data processing? We provide a
 - ✅ Learn from production-quality examples
 - ✅ Benchmark performance against reference implementations
 
-See [data/DATA_GUIDE.md](data/DATA_GUIDE.md#-pre-generated-examples--large-datasets-pcloud-repository) for detailed file descriptions and download instructions.
+See [data/DATA_GUIDE.md](docs/user-guides/data-guide.md#-pre-generated-examples--large-datasets-pcloud-repository) for detailed file descriptions and download instructions.
 
 ## 📁 Project Structure
 
@@ -527,10 +541,11 @@ nautical-graph-toolkit/
       utils/               # Database connectors, utilities
       data/                # S-57 reference data & configs
    docs/                    # Documentation
+      getting-started/     # Setup, install, quickstart
+      user-guides/         # Workflow guides, data & scripts guides
       notebooks/           # Jupyter tutorials (15+)
-      SETUP.md
-      WORKFLOW_QUICKSTART.md
-      WORKFLOW_POSTGIS_GUIDE.md
+      project/             # Changelog, roadmap, contributing
+      reference/           # Technical specs, troubleshooting
    tests/                   # Unit & integration tests
    setup.py                 # Package metadata
    README.md                # This file
@@ -632,7 +647,7 @@ The maritime sector is built on strict regulations and certified "black box" sys
 ## 💬 Support
 
 - **Issues**: Report bugs or request features on [GitHub Issues](https://github.com/studentdotai/Nautical-Graph-Toolkit/issues)
-- **Changelog**: See [CHANGELOG.md](CHANGELOG.md) for release notes and version history
+- **Changelog**: See [CHANGELOG.md](docs/project/changelog.md) for release notes and version history
 - **Documentation**: See [docs/](docs/) for detailed guides
 - **Notebooks**: Check [docs/notebooks/](docs/notebooks/) for examples
 

@@ -16,9 +16,9 @@ BACKEND-SPECIFIC FILE:
     Universal configuration shared by all backends: maritime_workflow_config.yml
 
 DOCUMENTATION:
-    Backend-specific guide: docs/WORKFLOW_POSTGIS_GUIDE.md
-    Quick start guide: docs/WORKFLOW_QUICKSTART.md
-    Setup instructions: docs/SETUP.md
+    Backend-specific guide: docs/user-guides/workflow-postgis-guide.md
+    Quick start guide: docs/getting-started/workflow-quickstart.md
+    Setup instructions: docs/getting-started/setup.md
 
 CONFIGURATION FILES:
     Database credentials: .env file (DB_NAME, DB_USER, DB_PASSWORD, DB_HOST, DB_PORT)

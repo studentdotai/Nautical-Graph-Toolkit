@@ -7,7 +7,7 @@ This guide covers common issues you may encounter when working with the Nautical
 ## Table of Contents
 
 1. [Windows PowerShell & Mamba Issues](#windows-powershell--mamba-issues) ⚠️ **Windows Users**
-   - PyCharm Conda Integration Error
+    - PyCharm Conda Integration Error
 2. [Jupyter Kernel Issues](#jupyter-kernel-issues)
 3. [SQLite RTREE Issues](#sqlite-rtree-issues) ⚠️ **Most Common**
 4. [GeoPackage File I/O Issues](#geopackage-file-io-issues)
@@ -24,13 +24,14 @@ This guide covers common issues you may encounter when working with the Nautical
 
 ---
 
-## Windows PowerShell & Mamba Issues
+## Windows PowerShell & Mamba Issues {: #windows-powershell--mamba-issues}
 
 ### Issue: Mamba/Conda works in Command Prompt but fails in PowerShell
 
 **Platform:** Windows only
 
 **Symptoms:**
+
 - `mamba` commands work in Command Prompt (cmd.exe)
 - PowerShell shows: `The term 'mamba' is not recognized as the name of a cmdlet...`
 - Environment exists but `mamba activate` fails with prefix errors
@@ -87,6 +88,7 @@ at https:/go.microsoft.com/fwlink/?LinkID=135170.
 3. Type `Y` and press Enter if prompted
 
 **Why this is safe:**
+
 - `RemoteSigned` allows local scripts (like Mamba's) to run
 - Only scripts downloaded from the internet need signing
 - This is the recommended policy for development work
@@ -158,11 +160,11 @@ mamba activate nautical
 
 # Test 4: Python is available
 python --version
-# Expected: Python 3.11.x
+# Expected: Python {{ python_version }}.x
 
 # Test 5: GDAL is installed
 python -c "from osgeo import gdal; print(f'GDAL {gdal.__version__}')"
-# Expected: GDAL 3.10.3
+# Expected: GDAL {{ gdal_version }}
 ```
 
 ---
@@ -185,6 +187,7 @@ python -c "from osgeo import gdal; print(f'GDAL {gdal.__version__}')"
 The Miniforge installer creates a "Miniforge Prompt" shortcut that pre-loads Conda/Mamba. However, you can use standard PowerShell with the fixes above.
 
 **Recommendation:**
+
 - Use **Miniforge Prompt** for quick setup (works out of the box)
 - Use **PowerShell** for development (requires shell init, but better integration with Windows tools)
 
@@ -215,6 +218,7 @@ Enable long path support in Windows 10/11:
 **Platform:** Windows only
 
 **Symptoms:**
+
 - Error appears when launching PyCharm with Miniforge/Conda environment configured
 - `Loading personal and system profiles took 1635ms` followed by error
 - `FileNotFoundError: conda-hook.ps1` in temp directory (`_MEI160602`)
@@ -267,11 +271,13 @@ PyCharm's Conda integration attempts to use Conda hooks, but the PowerShell init
 **Prevention:**
 
 To avoid this issue in the future:
+
 - Always use Miniforge Prompt (not standard PowerShell) when running `conda init`
 - Ensure Miniforge is properly installed with full PATH access
 - Avoid modifying Conda environment variables manually in PyCharm settings
 
 **See also:**
+
 - PyCharm documentation: [Configuring Conda](https://www.jetbrains.com/help/pycharm/conda.html)
 - Miniforge documentation: [Installation](https://github.com/conda-forge/miniforge)
 
@@ -282,6 +288,7 @@ To avoid this issue in the future:
 ### Issue: "Nautical" kernel not found in Jupyter
 
 **Symptoms:**
+
 - Kernel "Nautical Toolkit" or "nautical" not available when creating notebooks
 - Jupyter shows only "Python 3" or "python3" kernel
 - IDE shows "No Python interpreter found" or wrong version
@@ -302,10 +309,11 @@ To avoid this issue in the future:
    python -c "import sys; print(sys.executable)"
    ```
 
-   **Expected paths:**
-   - **Windows**: `C:\Users\<YourUser>\.local\share\mamba\envs\nautical\python.exe`
-   - **Linux**: `/home/<user>/miniforge3/envs/nautical/bin/python`
-   - **macOS**: `/Users/<user>/miniforge3/envs/nautical/bin/python`
+    **Expected paths:**
+
+    - **Windows**: `C:\Users\<YourUser>\.local\share\mamba\envs\nautical\python.exe`
+    - **Linux**: `/home/<user>/miniforge3/envs/nautical/bin/python`
+    - **macOS**: `/Users/<user>/miniforge3/envs/nautical/bin/python`
 
 3. **Create the kernel:**
    ```bash
@@ -318,11 +326,11 @@ To avoid this issue in the future:
    jupyter kernelspec list
    ```
 
-   Should show:
-   ```
-   nautical    C:\Users\<YourUser>\AppData\Roaming\jupyter\kernels\nautical    # Windows
-   nautical    ~/.local/share/jupyter/kernels/nautical                         # Linux/macOS
-   ```
+    Should show:
+    ```
+    nautical    C:\Users\<YourUser>\AppData\Roaming\jupyter\kernels\nautical    # Windows
+    nautical    ~/.local/share/jupyter/kernels/nautical                         # Linux/macOS
+    ```
 
 5. **If kernel still not found, remove and reinstall:**
    ```bash
@@ -348,6 +356,7 @@ To avoid this issue in the future:
 ### Issue: IDE shows wrong Python version for kernel
 
 **Symptoms:**
+
 - IDE Python interpreter points to system Python instead of Conda environment
 - Packages not found even though they're installed
 - Import errors: `ModuleNotFoundError: No module named 'nautical_graph_toolkit'`
@@ -362,30 +371,34 @@ To avoid this issue in the future:
 
 2. **Configure IDE with this path:**
 
-   **PyCharm:**
-   - File → Settings → Project → Python Interpreter
-   - Click gear icon → Add
-   - Select "Conda Environment" → "Existing"
-   - Paste the path from step 1
-   - Apply → OK
+    **PyCharm:**
 
-   **VS Code:**
-   - Open Command Palette (Ctrl+Shift+P)
-   - "Python: Select Interpreter"
-   - "Enter interpreter path..."
-   - Paste the path from step 1
-   - Press Enter
+    - File → Settings → Project → Python Interpreter
+    - Click gear icon → Add
+    - Select "Conda Environment" → "Existing"
+    - Paste the path from step 1
+    - Apply → OK
+
+    **VS Code:**
+
+    - Open Command Palette (Ctrl+Shift+P)
+    - "Python: Select Interpreter"
+    - "Enter interpreter path..."
+    - Paste the path from step 1
+    - Press Enter
 
 3. **Verify in IDE:**
-   - Create new Python file or notebook
-   - Run: `import sys; print(sys.executable)`
-   - Should match the path from step 1
+
+    - Create new Python file or notebook
+    - Run: `import sys; print(sys.executable)`
+    - Should match the path from step 1
 
 ---
 
 ### Issue: Kernel dies immediately when starting
 
 **Symptoms:**
+
 - Kernel starts but immediately disconnects
 - "Dead kernel" message in Jupyter
 - Notebook cells won't execute
@@ -440,6 +453,7 @@ sqlite3.OperationalError: no such module: rtree
 ```
 
 **Cause:**
+
 - GeoPackage and SpatiaLite backends require SQLite with RTREE support
 - Conda's `sqlite` package may not be installed or environment not activated
 - SpatiaLite uses RTREE for spatial indexing (10-100x performance improvement)
@@ -476,23 +490,26 @@ This project uses Conda's `sqlite` package which provides RTREE support on all p
    ```
 
 **Why this happens:**
+
 - Python's built-in sqlite3 may not have RTREE compiled in
 - Conda's `sqlite` package provides RTREE-enabled SQLite on all platforms
 - The `sqlite` package is included in `environment.yml` for cross-platform support
 
 **Platform notes:**
+
 - **Linux**: Works with Conda's sqlite
 - **macOS (ARM & Intel)**: Works with Conda's sqlite (pysqlite3-binary has compatibility issues)
 - **Windows**: Works with Conda's sqlite (pysqlite3-binary has compatibility issues)
 
 **Affected operations:**
+
 - `enrich_edges_with_features_gpkg()`
 - `apply_static_weights_gpkg()`
 - `calculate_dynamic_weights_gpkg()`
 - `calculate_directional_weights_gpkg()`
 - All GeoPackage/SpatiaLite spatial queries
 
-**See also:** `docs/SETUP.md` - "SQLite RTREE Requirement" section
+**See also:** `docs/getting-started/setup.md` - "SQLite RTREE Requirement" section
 
 ---
 
@@ -511,21 +528,25 @@ RuntimeWarning: Value '(-118.212, 33.505)' of field edges.weight parsed incomple
 The codebase now uses the Fiona engine for GeoPackage read/write operations, which provides better fault tolerance than pyogrio:
 
 **What changed:**
+
 - All `gpd.read_file()` operations now use `engine='fiona'` for better reliability
 - Initial graph writes to GeoPackage use `engine='fiona'`
 - Append operations (`mode='a'`) continue using pyogrio (more stable for this operation)
 
 **Technical details:**
+
 - **Read operations** (10 locations): `gpd.read_file(path, layer=..., engine='fiona')`
 - **Write operations** (4 locations): `gdf.to_file(path, layer=..., engine='fiona')`
 - **Append operations** (6 locations): `gdf.to_file(path, layer=..., mode='a')` (pyogrio default)
 
 **Why this helps:**
+
 - Fiona provides direct GDAL/OGR interface without intermediate layers
 - Better handling of edge cases and type conversion
 - More robust field parsing
 
 **If you still see warnings:**
+
 1. Ensure you're using the latest version:
    ```bash
    cd /path/to/nautical_graph_toolkit
@@ -557,6 +578,7 @@ ModuleNotFoundError: No module named 'nautical_graph_toolkit'
 ```
 
 **Solutions:**
+
 1. Ensure you've installed the package:
    ```bash
    pip install -e .
@@ -579,6 +601,7 @@ KeyError: 'DB_NAME'
 ```
 
 **Solutions:**
+
 1. Copy `.env.example` to `.env`:
    ```bash
    cp .env.example .env
@@ -589,7 +612,7 @@ KeyError: 'DB_NAME'
 
 ---
 
-## GDAL/PROJ Database Warnings
+## GDAL/PROJ Database Warnings {: #gdal-proj-database-warnings}
 
 ### Issue: PROJ database path warning during GDAL operations
 
@@ -601,11 +624,13 @@ ERROR 1: PROJ: proj_create_from_database: Open of /home/vikont/miniforge3/envs/n
 **Status:** ✅ **NON-BLOCKING** - All operations complete successfully
 
 **Cause:**
+
 - GDAL 3.10.3 has stricter PROJ database path requirements
 - Conda/mamba environments may have multiple PROJ installations
 - The `PROJ_LIB` environment variable workaround in notebooks is incomplete for some internal GDAL operations
 
 **Impact:**
+
 - **No functional impact**: All notebooks run successfully despite warning
 - **Coordinate transformations work correctly**: GDAL falls back to built-in coordinate system definitions
 - **Warning appears repeatedly**: Once per GDAL/OGR initialization in notebook cells
@@ -614,9 +639,9 @@ ERROR 1: PROJ: proj_create_from_database: Open of /home/vikont/miniforge3/envs/n
 **Solution Options:**
 
 1. **Ignore the warning (Recommended)**:
-   - All operations complete successfully
-   - No data corruption or incorrect coordinate transformations
-   - Warning can be safely ignored for development and analysis work
+    - All operations complete successfully
+    - No data corruption or incorrect coordinate transformations
+    - Warning can be safely ignored for development and analysis work
 
 2. **Suppress warnings in notebooks** (if output noise is distracting):
    ```python
@@ -640,26 +665,30 @@ ERROR 1: PROJ: proj_create_from_database: Open of /home/vikont/miniforge3/envs/n
 4. **Reinstall GDAL/PROJ** (if needed for other reasons):
    ```bash
    mamba env update -f environment.yml --prune
-   mamba install -c conda-forge gdal=3.10.3 proj=9.3.0 --force-reinstall
+   mamba install -c conda-forge gdal={{ gdal_version }} proj=9.3.0 --force-reinstall
    ```
 
 **Why this happens:**
+
 - Conda environments may have multiple PROJ versions installed across different packages
 - GDAL's C library may link to system PROJ instead of Conda PROJ at runtime
 - The Python-level `os.environ['PROJ_LIB']` setting in notebooks doesn't affect C-level GDAL initialization
 
 **Affected operations:**
+
 - Initial GDAL/OGR driver registration during `from osgeo import ogr`
 - Coordinate reference system initialization in notebooks
 - All notebook import cells that load GDAL/GeoPandas
 
 **Version notes:**
+
 - **GDAL 3.10.3**: Warning appears consistently
 - **GDAL 3.11.3**: Warning not observed (stricter path requirements relaxed)
 - Upgrading to GDAL 3.11+ may eliminate warning if desired
 
 **See also:**
-- `docs/SETUP.md` - GDAL installation instructions
+
+- `docs/getting-started/setup.md` - GDAL installation instructions
 - GDAL Issue Tracker: https://github.com/OSGeo/gdal/issues
 
 ---
@@ -678,14 +707,17 @@ OSError: Cannot open Memory driver
 ```
 
 **Background:**
+
 - In GDAL 3.11+, the `Memory` driver is deprecated
 - Its functionality has been merged into the `MEM` driver
 - The S-57 conversion pipeline uses in-memory datasets for batch processing
 
 **Affected code locations:**
+
 - `src/nautical_graph_toolkit/core/s57_data.py:908` - `ogr.GetDriverByName('Memory')`
 
 **Solution (when upgrading to GDAL 3.11+):**
+
 1. Change all occurrences of `'Memory'` to `'MEM'`
 2. Replace:
    ```python
@@ -697,6 +729,7 @@ OSError: Cannot open Memory driver
    ```
 
 **Current status:**
+
 - Project currently uses GDAL 3.10.3 (Memory driver still available)
 - This is marked for v0.2.0+ release cycle
 - A reminder comment has been added to the code
@@ -713,6 +746,7 @@ ValueError: Could not find one or both ports. Please check the names.
 ```
 
 **Solutions:**
+
 1. **List all available ports** to verify the correct name:
    ```python
    port = PortData()
@@ -746,6 +780,7 @@ Empty GeoDataFrame returned
 ```
 
 **Solutions:**
+
 - The port was found but has missing geometry data
 - Try searching for an alternative nearby port
 - Check the custom_ports.csv file for data integrity
@@ -756,7 +791,7 @@ Empty GeoDataFrame returned
 
 ### Requirement: PostgreSQL Version
 
-The Nautical Graph Toolkit requires **PostgreSQL 16+** with PostGIS extension.
+The Nautical Graph Toolkit requires **PostgreSQL {{ pg_version }}+** with PostGIS extension.
 
 **Verify your PostgreSQL version:**
 ```bash
@@ -775,6 +810,7 @@ sqlalchemy.exc.OperationalError: connection refused
 ```
 
 **Solutions:**
+
 1. **Verify .env file contains correct credentials**:
    ```bash
    cat .env | grep DB_
@@ -812,6 +848,7 @@ ProgrammingError: schema "enc_west" does not exist
 ```
 
 **Solutions:**
+
 1. **List available schemas**:
    ```sql
    SELECT schema_name FROM information_schema.schemata;
@@ -862,7 +899,7 @@ pytest tests/core__real_data/ -v
 **Solution 3: Set up PostGIS for full integration test coverage**
 If you want to run the complete integration test suite including PostGIS:
 
-1. Set up PostGIS database (see [INSTALL.md Section 4](../INSTALL.md#4-docker-postgis-setup))
+1. Set up PostGIS database (see [INSTALL.md Section 4](../getting-started/install.md#4-docker-postgis-setup))
 2. Create a `.env` file with database credentials:
    ```bash
    DB_NAME=enc_db
@@ -877,6 +914,7 @@ If you want to run the complete integration test suite including PostGIS:
    ```
 
 **What tests run without PostGIS:**
+
 - ✅ All unit tests in `tests/core/`
 - ✅ Integration tests using GeoPackage backend
 - ✅ Integration tests using SpatiaLite backend
@@ -894,6 +932,7 @@ FileNotFoundError: [Errno 2] No such file or directory: '.../enc_west.gpkg'
 ```
 
 **Solutions:**
+
 1. **Verify the file exists**:
    ```bash
    ls -lh output/enc_west.gpkg
@@ -906,7 +945,7 @@ FileNotFoundError: [Errno 2] No such file or directory: '.../enc_west.gpkg'
    print(f"File exists: {data_file.exists()}")
    ```
 
-3. **Ensure you've run the S-57 conversion** first (see `docs/SETUP.md`)
+3. **Ensure you've run the S-57 conversion** first (see `docs/getting-started/setup.md`)
 
 ### Issue: Corrupted or incomplete data file
 
@@ -918,6 +957,7 @@ Empty results when querying data
 ```
 
 **Solutions:**
+
 1. **Check file integrity**:
    ```bash
    # For SQLite/SpatiaLite
@@ -954,15 +994,18 @@ DatabaseError: database disk image is malformed
 **Root Cause:**
 
 The `S57Updater` uses two separate database connection mechanisms that can conflict:
+
 1. **OGR/GDAL** (via `ogr2ogr`): Reads and writes spatial data
 2. **SQLAlchemy** (via `sqlite3` driver): Manages metadata and transactions
 
 When both connections access the same file simultaneously without coordination, the file can become corrupted due to:
+
 - Uncommitted write transactions from one connection being visible to the other
 - Locking conflicts between OGR and SQLAlchemy
 - Transaction isolation violations
 
 **Why PostGIS Doesn't Have This Issue:**
+
 - PostGIS uses a single client-server connection model
 - PostgreSQL handles concurrent access properly with MVCC (Multi-Version Concurrency Control)
 - All operations go through the same transactional interface
@@ -993,9 +1036,9 @@ When both connections access the same file simultaneously without coordination, 
    ```
 
 3. **Avoid concurrent access** to file-based databases:
-   - Close all QGIS, GIS software, or notebook connections before running S57Updater
-   - Do not access the database file while update is running
-   - Use separate output files for updates, then verify before replacing
+    - Close all QGIS, GIS software, or notebook connections before running S57Updater
+    - Do not access the database file while update is running
+    - Use separate output files for updates, then verify before replacing
 
 **Recovery from Corruption:**
 
@@ -1020,13 +1063,14 @@ If you encounter this error:
    ```
 
 3. **Prevent future corruption**:
-   - Always use PostGIS for production update workflows
-   - For file-based testing, ensure single-access pattern
-   - Consider using separate output files for each update cycle
+    - Always use PostGIS for production update workflows
+    - For file-based testing, ensure single-access pattern
+    - Consider using separate output files for each update cycle
 
 **See also:**
+
 - `docs/notebooks/import_s57.ipynb` - S57Updater section for usage examples
-- `docs/WORKFLOW_POSTGIS_GUIDE.md` - Setting up PostGIS for production use
+- `docs/user-guides/workflow-postgis-guide.md` - Setting up PostGIS for production use
 
 ---
 
@@ -1041,9 +1085,11 @@ INFO - Selected largest component with 359,814 nodes and 1,430,984 edges.
 ```
 
 **Is this normal?**
+
 ✅ **Yes, this is expected behavior!**
 
 **Explanation:**
+
 - Indicates some isolated water areas exist in the data (islands, separate water bodies)
 - The code automatically selects the largest connected component
 - This ensures pathfinding will work correctly
@@ -1060,6 +1106,7 @@ WARNING - Graph is very sparse or disconnected
 ```
 
 **Solutions:**
+
 1. **Check boundary covers water areas**:
    ```python
    # Visualize boundary on map to verify it covers ocean/sea
@@ -1093,9 +1140,11 @@ WARNING - Database-side graph creation failed: ... Falling back to memory-based 
 ```
 
 **Is this normal?**
+
 ✅ **Yes, for GeoPackage and SpatiaLite backends!**
 
 **Explanation:**
+
 - Database-side graph creation is currently only fully implemented for PostGIS
 - GeoPackage and SpatiaLite automatically fall back to in-memory creation
 - This may be slower but produces identical results
@@ -1120,6 +1169,7 @@ DETAIL: Cannot enlarge string buffer containing 1073741681 bytes by 188 more byt
 ```
 
 **Cause:**
+
 - PostGIS uses `json_agg()` to return graph results from database
 - For large regions, the JSON result (nodes + edges) exceeds PostgreSQL's `work_mem` limit (~1GB)
 - Even with 32GB system RAM, PostgreSQL's internal buffer limit can be hit
@@ -1195,13 +1245,16 @@ INFO - Processing region 2/9: ... (continues successfully)
    ```
 
 **Note on `max_subdivision_factor`:**
+
 - **Default: 4** (4×4 = 16 regions max)
 - **Range:** 2-4 recommended, 5-6 for very large areas with adequate RAM
 - **Warning:** Values > 4 trigger a warning about memory usage
 - **PostGIS-only:** GeoPackage and SpatiaLite don't use this parameter (accepted for API consistency)
 
 **Why increasing `work_mem` doesn't help:**
+
 The error is not about PostgreSQL's `work_mem` setting alone. The issue creates **three copies** of data simultaneously:
+
 1. PostgreSQL's JSON result buffer (~1GB limit)
 2. Python's parsed JSON/dict structure
 3. NetworkX graph object
@@ -1223,11 +1276,13 @@ WARNING - Graph is not connected. Many components found.
 The component bridging algorithm has been significantly improved to better handle subdivision seams:
 
 **Fixed Issues:**
+
 1. **Grid size detection**: Now correctly detects 4x4 grids for graphs with 250K+ nodes (was 2x2)
 2. **Boundary tolerance**: Increased from 2x to 6x spacing to catch nodes near actual subdivision seams
 3. **Connection tracking**: Global tracking prevents nodes from exceeding 8 bridge connections
 
 **Results for 0.05NM spacing:**
+
 | Metric | Before | After | Improvement |
 |--------|--------|-------|-------------|
 | Nodes retained | 721,907 (89.7%) | 803,784 (99.92%) | +81,877 nodes |
@@ -1235,7 +1290,9 @@ The component bridging algorithm has been significantly improved to better handl
 | Bridge edges | 8,091 | 14,664 | +81% |
 
 **Explanation:**
+
 When creating very fine grids (spacing <0.1 NM), you may encounter artificial gaps between components due to:
+
 - **Spatial subdivision boundaries**: For performance, PostGIS creates graphs using spatial subdivision (2x2, 4x4, or larger grids depending on node density). At ultra-fine resolutions (0.02 NM), this can create 16+ regions with visible seam lines between them.
 - **Numerical precision limits**: Floating-point arithmetic can create tiny gaps at subdivision boundaries
 - **Grid generation artifacts**: Regular rectangular grids may have alignment issues at region boundaries
@@ -1260,15 +1317,15 @@ These gaps typically appear as distinctive vertical or horizontal lines separati
    ```
 
 2. **How the bridging strategy works**:
-   - **Seam detection**: Automatically detects NxN subdivision grids based on actual node count:
-     - 4x4 grid (>250K nodes): 3 vertical + 3 horizontal seam lines
-     - 3x3 grid (>60K nodes): 2 vertical + 2 horizontal seam lines
-     - 2x2 grid (>25K nodes): 1 vertical + 1 horizontal seam line
-   - **Note**: Thresholds account for ~40-60% land exclusion (expected_points vs actual_nodes)
-   - **Two-tier bridging**:
-     - **Full seam bridging**: Nodes near subdivision boundaries get up to 8 connections (standard grid connectivity)
-     - **Sparse bridging**: Other boundary nodes get limited connections (1-3 edges)
-   - **Distance limit**: Bridge edges limited to `max_edge_factor * spacing` distance
+    - **Seam detection**: Automatically detects NxN subdivision grids based on actual node count:
+        - 4x4 grid (>250K nodes): 3 vertical + 3 horizontal seam lines
+        - 3x3 grid (>60K nodes): 2 vertical + 2 horizontal seam lines
+        - 2x2 grid (>25K nodes): 1 vertical + 1 horizontal seam line
+    - **Note**: Thresholds account for ~40-60% land exclusion (expected_points vs actual_nodes)
+    - **Two-tier bridging**:
+        - **Full seam bridging**: Nodes near subdivision boundaries get up to 8 connections (standard grid connectivity)
+        - **Sparse bridging**: Other boundary nodes get limited connections (1-3 edges)
+    - **Distance limit**: Bridge edges limited to `max_edge_factor * spacing` distance
 
 3. **Increase max_edge_factor** to allow slightly longer edges:
    ```python
@@ -1312,6 +1369,7 @@ INFO - Components reduced from 462 to 1
 ```
 
 **Performance impact:**
+
 - Adds <5% to total graph creation time
 - More efficient than increasing spacing significantly
 - Preserves fine-resolution detail while maintaining full connectivity
@@ -1332,22 +1390,26 @@ fine_graph_directed_20.gpkg: 722,084 edges ❌ 4x CORRUPTED
 ```
 
 **Explanation:**
+
 ❌ **This was a BUG in `save_graph_to_gpkg()` method** (fixed in v0.1.1)
 
 **Why this happened (before fix):**
+
 1. Nodes layer used default `'w'` mode (overwrite) ✅
 2. Edges layer used `mode='a'` (append) ❌
 3. Re-running notebook with same filename:
-   - Nodes: REPLACED (correct count)
-   - Edges: ACCUMULATED (doubled, tripled, etc.)
+    - Nodes: REPLACED (correct count)
+    - Edges: ACCUMULATED (doubled, tripled, etc.)
 4. Result: Mismatched node/edge counts and corrupted graph data
 
 **Fix Applied (v0.1.1):**
+
 - `save_graph_to_gpkg()` now deletes existing GeoPackage file before saving
 - Ensures clean overwrite on repeated notebook runs
 - Prevents edge accumulation bug
 
 **If you see this issue:**
+
 1. **Upgrade to v0.1.1+** - Bug is fixed
 2. **Delete corrupted graph files**:
    ```bash
@@ -1367,10 +1429,12 @@ print(f"Edge count: {len(edges):,}")
 ```
 
 **See also:**
+
 - `src/nautical_graph_toolkit/core/graph.py:1358` - Fix implementation
 - CHANGELOG.md - v0.1.1 release notes
 
 **Performance expectations:**
+
 - Small graphs (10K-50K nodes): No noticeable impact
 - Medium graphs (50K-200K nodes): 10-30% slower loading
 - Large graphs (200K-1M nodes): Consider optimization
@@ -1382,15 +1446,16 @@ print(f"Edge count: {len(edges):,}")
 ### Issue: Graph creation is very slow
 
 **Symptoms:**
+
 - Takes more than 5-10 minutes for moderate areas
 - CPU usage is high for extended periods
 
 **Solutions:**
 
 1. **Use PostGIS backend** for large areas:
-   - Database-side creation is significantly faster
-   - Better memory management
-   - Can handle larger graphs
+    - Database-side creation is significantly faster
+    - Better memory management
+    - Can handle larger graphs
 
 2. **Reduce graph density**:
    ```python
@@ -1463,11 +1528,13 @@ G = pg_bg.create_base_graph(grid["combined_grid"], 0.2)
 ### Issue: Mapbox maps not displaying
 
 **Symptoms:**
+
 - Blank map
 - Gray box where map should appear
 - Error: "Mapbox access token required"
 
 **Solutions:**
+
 1. **Verify MAPBOX_TOKEN is set**:
    ```python
    import os
@@ -1477,20 +1544,22 @@ G = pg_bg.create_base_graph(grid["combined_grid"], 0.2)
    ```
 
 2. **Get a free Mapbox token**:
-   - Visit: https://account.mapbox.com/access-tokens/
-   - Create a new token
-   - Add to `.env` file
+    - Visit: https://account.mapbox.com/access-tokens/
+    - Create a new token
+    - Add to `.env` file
 
 3. **Check token is valid**:
-   - Test at: https://api.mapbox.com/styles/v1/mapbox/streets-v11?access_token=YOUR_TOKEN
+    - Test at: https://api.mapbox.com/styles/v1/mapbox/streets-v11?access_token=YOUR_TOKEN
 
 ### Issue: Plotly maps not rendering in Jupyter
 
 **Symptoms:**
+
 - `<Figure size 640x480 with 0 Axes>`
 - No interactive map appears
 
 **Solutions:**
+
 1. **Set renderer**:
    ```python
    import plotly.io as pio
@@ -1523,6 +1592,7 @@ ValueError: Unable to find path
 ```
 
 **Solutions:**
+
 1. **Verify both ports are within the graph area**:
    ```python
    # Check if port coordinates are covered by boundary
@@ -1553,16 +1623,19 @@ ValueError: Unable to find path
 ### Issue: Route looks unrealistic
 
 **Symptoms:**
+
 - Route goes far from expected path
 - Unnecessary detours
 - Doesn't follow shipping lanes
 
 **Explanation:**
+
 - Base routing only considers distance
 - Does not account for shipping lanes, traffic, or maritime features
 - This is expected behavior for base graphs
 
 **Solutions:**
+
 - Use directed graph with weights (see advanced notebooks)
 - Apply traffic patterns and shipping lane preferences
 - See: `graph_weighted_directed_postgis_v2.ipynb`
@@ -1574,13 +1647,13 @@ ValueError: Unable to find path
 If you encounter an issue not covered here:
 
 1. **Check the documentation**:
-   - `docs/SETUP.md` - Initial setup and data conversion
-   - `docs/notebooks/` - Example notebooks
-   - `CLAUDE.md` - Project overview
+    - `docs/getting-started/setup.md` - Initial setup and data conversion
+    - `docs/notebooks/` - Example notebooks
+    - `CLAUDE.md` - Project overview
 
 2. **Review example notebooks**:
-   - Compare your code to working examples
-   - Check cell outputs for expected results
+    - Compare your code to working examples
+    - Check cell outputs for expected results
 
 3. **Enable debug logging**:
    ```python
@@ -1589,9 +1662,9 @@ If you encounter an issue not covered here:
    ```
 
 4. **Report an issue**:
-   - Include full error traceback
-   - Specify which notebook/backend you're using
-   - Provide system information (OS, Python version, package versions)
+    - Include full error traceback
+    - Specify which notebook/backend you're using
+    - Provide system information (OS, Python version, package versions)
 
 ---
 
@@ -1652,6 +1725,7 @@ print(f"GeoPackage: {'✓ Exists' if data_file.exists() else '✗ Not found'}")
 | Large area (finer subdiv) | 50 | 0.12 | 5 | 2.0 | False | 5 |
 
 **Note on `max_subdivision_factor`:**
+
 - **Default: 4** (4×4 = 16 regions) - works for most cases
 - **Use 5** (5×5 = 25 regions) for very large areas when you see memory errors
 - **Use 2** (2×2 = 4 regions) for small areas to reduce overhead

@@ -40,7 +40,7 @@ Significant changes and updates to the project.
   - SQLAlchemy QueuePool with configurable max_overflow
   - 12 performance benchmark tests
   - Connection pool monitoring utilities
-- Performance documentation in `/docs/PERFORMANCE_TUNING.md`
+- Performance documentation in `/docs/reference/technical-specs.md`
 
 ### Changed
 - Updated PostGIS connector initialization to use connection pooling by default

@@ -26,6 +26,7 @@ The Nautical Graph Toolkit (formerly Maritime Module) supports three backend opt
 | **Infrastructure** | PostgreSQL server | None | None |
 
 **Quick Decision Guide:**
+
 - Choose **PostGIS** if you have server infrastructure and need concurrent access or large datasets
 - Choose **GeoPackage** if you need portability and wide tool compatibility
 - Choose **SpatiaLite** if you want minimal setup and lightweight deployment
@@ -34,26 +35,29 @@ The Nautical Graph Toolkit (formerly Maritime Module) supports three backend opt
 
 ### Required Software
 
-- Python 3.11 or higher
-- GDAL 3.10.3 (exact version pinned)
+- Python {{ python_version }} or higher
+- GDAL {{ gdal_version }} (exact version pinned)
 - **SQLite with RTREE support** (see "SQLite RTREE Requirement" below)
 - For PostGIS backend:
-  - PostgreSQL 16+ with PostGIS extension
-  - psycopg2 Python package
+    - PostgreSQL {{ pg_version }}+ with PostGIS extension
+    - psycopg2 Python package
 
 ### SQLite RTREE Requirement
 
 **Critical:** GeoPackage and SpatiaLite backends require SQLite with RTREE (R-tree spatial indexing) support for spatial queries.
 
 **Automatic Solution:**
+
 This project includes `sqlite` in `environment.yml`, which provides SQLite with RTREE support enabled on all platforms.
 
 **How it works:**
+
 - Conda's `sqlite` package provides RTREE-enabled SQLite library
 - Python's built-in `sqlite3` module uses the Conda SQLite library when the Conda environment is activated
 - The `sqlite` package is included in `environment.yml` for cross-platform compatibility
 
 **Verification:**
+
 To verify RTREE support is available:
 ```python
 import sqlite3
@@ -72,6 +76,7 @@ mamba activate nautical
 ```
 
 **Platform Compatibility:**
+
 - **Linux**: ✅ Tested (AMD64)
 - **macOS ARM (M1/M4)**: ✅ Tested
 - **macOS Intel**: ⏸️ Expected to work (not tested, same as Linux AMD64)
@@ -80,6 +85,7 @@ mamba activate nautical
 **Note:** `pysqlite3-binary` package has compatibility issues on macOS ARM and Windows. Conda's `sqlite` package is used instead for consistent cross-platform support.
 
 **Why RTREE is required:**
+
 - SpatiaLite uses RTREE for spatial indexing (10-100x performance improvement)
 - GeoPackage format requires RTREE for geometry column indexing
 - Without RTREE, spatial queries will fail with "no such module: rtree" error
@@ -94,12 +100,14 @@ mamba activate nautical
 ### Option 1: PostGIS Backend
 
 **When to use:**
+
 - Large datasets (1000+ ENC files)
 - Server deployment with concurrent access
 - Advanced spatial queries and analysis
 - Multi-user environments
 
 **Key Features:**
+
 - Database-side spatial operations for optimal performance
 - ACID compliance with transactional integrity
 - Concurrent multi-user access with connection pooling
@@ -107,7 +115,8 @@ mamba activate nautical
 - Server-side graph creation for massive datasets
 
 **Prerequisites:**
-- PostgreSQL 12+ with PostGIS 3.0+ extension installed
+
+- PostgreSQL {{ pg_version }}+ with PostGIS {{ postgis_version }}+ extension installed
 - Network access to PostgreSQL server
 - `.env` file configured with database connection parameters
 - Sufficient disk space (estimate: ~2-3x raw ENC file size)
@@ -115,41 +124,20 @@ mamba activate nautical
 
 **Setup Steps:**
 
-1. **Select Platform-Specific Docker Compose Configuration**
-   ```bash
-   # Linux
-   cp docker-compose.linux.yml docker-compose.yml
+1. **Start Docker PostGIS** — Follow the [Installation Guide: Docker PostGIS Setup](install.md#4-docker-postgis-setup) for platform-specific instructions (Linux, macOS ARM, Windows).
 
-   # macOS ARM (M1/M4)
-   cp docker-compose.macos-arm.yml docker-compose.yml
-
-   # Windows
-   cp docker-compose.windows.yml docker-compose.yml
-   ```
-
-2. **Start Docker PostGIS Database**
-   ```bash
-   docker-compose up -d
-   ```
-
-3. **Verify Connection**
-   ```bash
-   docker exec -it postgis_nautical psql -U postgres -d enc_db -c "SELECT PostGIS_Version();"
-   ```
-
-4. **Configure Environment Variables**
+2. **Configure Environment Variables**
    ```bash
    # .env file configuration will be added
    ```
 
-5. **Import S-57 Data**
+3. **Import S-57 Data**
    ```bash
    # Import process will be documented from import_s57 notebook
    ```
 
-See [INSTALL.md Section 4](../INSTALL.md#4-docker-postgis-setup) for complete platform-specific configuration and troubleshooting.
-
 **Required Schema Structure:**
+
 - Main schema: `enc_west` (or your custom schema name)
 - Required layers: See "Required Layers" section below
 
@@ -158,12 +146,14 @@ See [INSTALL.md Section 4](../INSTALL.md#4-docker-postgis-setup) for complete pl
 ### Option 2: GeoPackage Backend
 
 **When to use:**
+
 - Moderate datasets (100-1000 ENC files)
 - Portable single-file database needed
 - Cross-platform compatibility required
 - Desktop/laptop development
 
 **Key Features:**
+
 - Single-file portability - easy backup and sharing
 - OGC standard format with wide tool support (QGIS, ArcGIS, etc.)
 - Built-in spatial indexing (R-tree)
@@ -171,7 +161,8 @@ See [INSTALL.md Section 4](../INSTALL.md#4-docker-postgis-setup) for complete pl
 - Cross-platform compatibility (Windows, Linux, macOS)
 
 **Prerequisites:**
-- GDAL 3.10.3 with GeoPackage driver
+
+- GDAL {{ gdal_version }} with GeoPackage driver
 - Write permissions to output directory
 - Sufficient disk space (estimate: ~1.5-2x raw ENC file size)
 - pyogrio or fiona Python package for I/O
@@ -189,6 +180,7 @@ See [INSTALL.md Section 4](../INSTALL.md#4-docker-postgis-setup) for complete pl
    ```
 
 **File Location:**
+
 - Default: `data/enc_west.gpkg`
 - Customizable via notebook configuration
 
@@ -197,12 +189,14 @@ See [INSTALL.md Section 4](../INSTALL.md#4-docker-postgis-setup) for complete pl
 ### Option 3: SpatiaLite Backend
 
 **When to use:**
+
 - Small to moderate datasets (< 500 ENC files)
 - Lightweight deployment
 - Minimal dependencies
 - Testing and development
 
 **Key Features:**
+
 - Minimal footprint - SQLite-based with spatial extensions
 - No server infrastructure required
 - Fast read performance for smaller datasets
@@ -210,7 +204,8 @@ See [INSTALL.md Section 4](../INSTALL.md#4-docker-postgis-setup) for complete pl
 - SQL spatial query support
 
 **Prerequisites:**
-- GDAL 3.10.3 with SQLite/SpatiaLite driver
+
+- GDAL {{ gdal_version }} with SQLite/SpatiaLite driver
 - Write permissions to output directory
 - Sufficient disk space (estimate: ~1.5-2x raw ENC file size)
 - pyspatialite or sqlite3 Python package
@@ -229,6 +224,7 @@ See [INSTALL.md Section 4](../INSTALL.md#4-docker-postgis-setup) for complete pl
    ```
 
 **File Location:**
+
 - Default: `data/enc_west.sqlite`
 - Customizable via notebook configuration
 
@@ -293,8 +289,8 @@ After importing S-57 data, your backend must contain the following layers:
    ```
 
 2. **Run the import notebook**
-   - Run `docs/notebooks/import_s57.ipynb` for any backend (PostGIS, GeoPackage, or SpatiaLite)
-   - Configure the notebook to select your desired backend
+    - Run `docs/notebooks/import_s57.ipynb` for any backend (PostGIS, GeoPackage, or SpatiaLite)
+    - Configure the notebook to select your desired backend
 
 3. **Verify the import**
    ```python
@@ -303,16 +299,7 @@ After importing S-57 data, your backend must contain the following layers:
 
 ### Alternative: Download Pre-Imported Data
 
-**Skip the import process** by downloading pre-processed ENC databases:
-
-- **enc_west.gpkg** (209 MB) - Western US Coast coverage
-- **us_enc_all.gpkg** (6.97 GB) - All US coastal waters
-
-**Download**: [ENC-Graph-test-files Repository](https://u.pcloud.link/publink/show?code=kZVUYM5Zm87H47h2G1XBANXHwhIfcJA681Oy)
-
-Place downloaded files in your chosen location and configure your notebooks or scripts to use them directly. See [data/DATA_GUIDE.md](../data/DATA_GUIDE.md#-pre-generated-examples--large-datasets-pcloud-repository) for complete details.
-
-**Time Saved**: ~40-60 minutes (no S-57 import processing)
+**Skip the import process** by downloading pre-processed ENC databases — see the [Data Guide](../user-guides/data-guide.md#-pre-generated-examples--large-datasets-pcloud-repository) for the full catalogue, download steps, and use-case recommendations. **Time saved: ~40-60 minutes.**
 
 ---
 
@@ -345,6 +332,7 @@ python -c "import sys; print(f'Python executable: {sys.executable}')"
 ```
 
 **Expected output by platform:**
+
 - **Windows**: `C:\Users\<YourUser>\.local\share\mamba\envs\nautical\python.exe`
 - **Linux**: `/home/<user>/miniforge3/envs/nautical/bin/python`
 - **macOS**: `/Users/<user>/miniforge3/envs/nautical/bin/python`
@@ -399,11 +387,13 @@ jupyter lab
 ```
 
 **VS Code:**
+
 1. Open a `.ipynb` file
 2. Click kernel selector (top-right corner)
 3. Select "Nautical Toolkit" from the list
 
 **PyCharm Professional:**
+
 1. Open a notebook or Python file
 2. Run → Edit Configurations → Jupyter Server (if using notebooks)
 3. Select "existing" → Choose "nautical" kernel
@@ -411,6 +401,7 @@ jupyter lab
 ### IDE Python Interpreter Configuration
 
 **PyCharm:**
+
 1. File → Settings → Project: Nautical-Graph-Toolkit → Python Interpreter
 2. Click gear icon → Add
 3. Select "Conda Environment" → "Existing"
@@ -418,6 +409,7 @@ jupyter lab
 5. Apply → OK
 
 **VS Code:**
+
 1. Open Command Palette (Ctrl+Shift+P / Cmd+Shift+P on macOS)
 2. Type "Python: Select Interpreter"
 3. Click "Enter interpreter path..."
@@ -426,7 +418,8 @@ jupyter lab
 
 ### Troubleshooting Jupyter Kernel Issues
 
-If you encounter issues with Jupyter kernels, see [TROUBLESHOOTING.md - Jupyter Kernel Issues](./TROUBLESHOOTING.md#jupyter-kernel-issues) for comprehensive solutions including:
+If you encounter issues with Jupyter kernels, see [TROUBLESHOOTING.md - Jupyter Kernel Issues](../reference/troubleshooting.md#jupyter-kernel-issues) for comprehensive solutions including:
+
 - Kernel not found in Jupyter
 - IDE shows wrong Python version
 - Kernel dies immediately when starting
@@ -463,11 +456,13 @@ The graph configuration file defines which layers to use for navigation:
 ### Basic Graph Creation Notebooks
 
 **Required for:**
+
 - `graph_PostGIS_v2.ipynb`
 - `graph_GeoPackage_v2.ipynb`
 - `graph_SpatiaLite_v2.ipynb`
 
 **Data Requirements:**
+
 - Imported S-57 data in chosen backend
 - Minimum layers: `seaare`, `lndare`, `fairwy`, `drgare`, `tsslpt`, `prcare`
 - Port data (included with package)
@@ -475,10 +470,12 @@ The graph configuration file defines which layers to use for navigation:
 ### Fine Graph Creation Notebooks
 
 **Required for:**
+
 - `graph_fine_GeoPackage_v2.ipynb`
 - `graph_fine_PostGIS_v2.ipynb`
 
 **Data Requirements:**
+
 - All basic graph requirements
 - Additional obstacle layers: `slcons`, `uwtroc`, `obstrn`
 - Higher resolution ENC data recommended
@@ -486,10 +483,12 @@ The graph configuration file defines which layers to use for navigation:
 ### H3 Graph Creation Notebooks
 
 **Required for:**
+
 - `graph_h3_GPKG_v2.ipynb` (future)
 - `graph_h3_PostGIS_v2.ipynb` (future)
 
 **Data Requirements:**
+
 - All basic graph requirements
 - H3 Python package installed
 - Sufficient memory for hexagon generation
@@ -561,6 +560,7 @@ After completing setup:
 ## Support
 
 For issues or questions:
+
 1. Check the troubleshooting section above
 2. Review the relevant notebook documentation
 3. Open an issue on the project repository

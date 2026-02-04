@@ -21,7 +21,12 @@ attrs==25.4.0
     #   jsonschema
     #   referencing
 babel==2.17.0
-    # via jupyterlab-server
+    # via
+    #   jupyterlab-server
+    #   mkdocs-git-revision-date-localized-plugin
+    #   mkdocs-material
+backrefs==6.1
+    # via mkdocs-material
 beautifulsoup4==4.13.4
     # via
     #   -r requirements.in
@@ -37,10 +42,18 @@ cffi==1.17.1
     # via argon2-cffi-bindings
 charset-normalizer==3.4.4
     # via requests
+click==8.3.1
+    # via mkdocs
+colorama==0.4.6
+    # via
+    #   griffe
+    #   mkdocs-material
 comm==0.2.2
     # via
     #   ipykernel
     #   ipywidgets
+csscompressor==0.9.5
+    # via mkdocs-minify-plugin
 debugpy==1.8.15
     # via ipykernel
 decorator==5.2.1
@@ -55,12 +68,22 @@ fqdn==1.5.1
     # via jsonschema
 geoalchemy2==0.18.0
     # via -r requirements.in
+ghp-import==2.1.0
+    # via mkdocs
+gitdb==4.0.12
+    # via gitpython
+gitpython==3.1.46
+    # via mkdocs-git-revision-date-localized-plugin
 greenlet==3.2.3
     # via sqlalchemy
+griffe==1.15.0
+    # via mkdocstrings-python
 h11==0.16.0
     # via httpcore
 h3==4.3.1
     # via -r requirements.in
+htmlmin2==0.1.13
+    # via mkdocs-minify-plugin
 httpcore==1.0.9
     # via httpx
 httpx==0.28.1
@@ -71,6 +94,10 @@ idna==3.11
     #   httpx
     #   jsonschema
     #   requests
+importlib-metadata==8.7.1
+    # via mike
+importlib-resources==6.5.2
+    # via mike
 iniconfig==2.1.0
     # via pytest
 ipykernel==7.1.0
@@ -96,7 +123,13 @@ jinja2==3.1.6
     #   jupyter-server
     #   jupyterlab
     #   jupyterlab-server
+    #   mike
+    #   mkdocs
+    #   mkdocs-material
+    #   mkdocstrings
     #   nbconvert
+jsmin==3.0.1
+    # via mkdocs-minify-plugin
 json5==0.12.1
     # via jupyterlab-server
 jsonpointer==3.0.0
@@ -155,16 +188,61 @@ jupyterlab-widgets==3.0.16
     # via ipywidgets
 lark==1.3.1
     # via rfc3987-syntax
+markdown==3.10.1
+    # via
+    #   mkdocs
+    #   mkdocs-autorefs
+    #   mkdocs-material
+    #   mkdocstrings
+    #   pymdown-extensions
 markupsafe==3.0.3
     # via
     #   jinja2
+    #   mkdocs
+    #   mkdocs-autorefs
+    #   mkdocstrings
     #   nbconvert
 matplotlib-inline==0.1.7
     # via
     #   ipykernel
     #   ipython
+mergedeep==1.3.4
+    # via
+    #   mkdocs
+    #   mkdocs-get-deps
+mike==2.1.3
+    # via -r requirements.in
 mistune==3.2.0
     # via nbconvert
+mkdocs==1.6.1
+    # via
+    #   -r requirements.in
+    #   mike
+    #   mkdocs-autorefs
+    #   mkdocs-git-revision-date-localized-plugin
+    #   mkdocs-material
+    #   mkdocs-minify-plugin
+    #   mkdocstrings
+mkdocs-autorefs==1.4.3
+    # via
+    #   mkdocstrings
+    #   mkdocstrings-python
+mkdocs-get-deps==0.2.0
+    # via mkdocs
+mkdocs-git-revision-date-localized-plugin==1.5.1
+    # via -r requirements.in
+mkdocs-material==9.7.1
+    # via -r requirements.in
+mkdocs-material-extensions==1.3.1
+    # via mkdocs-material
+mkdocs-minify-plugin==0.8.0
+    # via -r requirements.in
+mkdocstrings==1.0.2
+    # via
+    #   -r requirements.in
+    #   mkdocstrings-python
+mkdocstrings-python==2.0.1
+    # via mkdocstrings
 narwhals==2.5.0
     # via plotly
 nbclient==0.10.4
@@ -197,17 +275,24 @@ packaging==25.0
     #   jupyter-server
     #   jupyterlab
     #   jupyterlab-server
+    #   mkdocs
     #   nbconvert
     #   plotly
     #   pytest
+paginate==0.5.7
+    # via mkdocs-material
 pandocfilters==1.5.1
     # via nbconvert
 parso==0.8.4
     # via jedi
+pathspec==1.0.4
+    # via mkdocs
 pexpect==4.9.0
     # via ipython
 platformdirs==4.3.8
-    # via jupyter-core
+    # via
+    #   jupyter-core
+    #   mkdocs-get-deps
 plotly==6.3.0
     # via -r requirements.in
 pluggy==1.6.0
@@ -239,8 +324,15 @@ pygments==2.19.2
     #   ipython
     #   ipython-pygments-lexers
     #   jupyter-console
+    #   mkdocs-material
     #   nbconvert
     #   pytest
+pymdown-extensions==10.20.1
+    # via
+    #   mkdocs-material
+    #   mkdocstrings
+pyparsing==3.3.2
+    # via mike
 pytest==8.4.1
     # via
     #   -r requirements.in
@@ -250,13 +342,24 @@ pytest-mock==3.14.1
 python-dateutil==2.9.0.post0
     # via
     #   arrow
+    #   ghp-import
     #   jupyter-client
 python-dotenv==1.1.1
     # via -r requirements.in
 python-json-logger==4.0.0
     # via jupyter-events
 pyyaml==6.0.3
-    # via jupyter-events
+    # via
+    #   jupyter-events
+    #   mike
+    #   mkdocs
+    #   mkdocs-get-deps
+    #   pymdown-extensions
+    #   pyyaml-env-tag
+pyyaml-env-tag==1.1
+    # via
+    #   mike
+    #   mkdocs
 pyzmq==27.0.0
     # via
     #   ipykernel
@@ -269,7 +372,9 @@ referencing==0.36.2
     #   jsonschema-specifications
     #   jupyter-events
 requests==2.32.5
-    # via jupyterlab-server
+    # via
+    #   jupyterlab-server
+    #   mkdocs-material
 rfc3339-validator==0.1.4
     # via
     #   jsonschema
@@ -296,6 +401,8 @@ six==1.17.0
     # via
     #   python-dateutil
     #   rfc3339-validator
+smmap==5.0.2
+    # via gitdb
 soupsieve==2.7
     # via beautifulsoup4
 sqlalchemy==2.0.41
@@ -352,6 +459,10 @@ uri-template==1.3.0
     # via jsonschema
 urllib3==2.6.2
     # via requests
+verspec==0.1.0
+    # via mike
+watchdog==6.0.0
+    # via mkdocs
 wcwidth==0.2.13
     # via prompt-toolkit
 webcolors==25.10.0
@@ -364,3 +475,5 @@ websocket-client==1.9.0
     # via jupyter-server
 widgetsnbextension==4.0.15
     # via ipywidgets
+zipp==3.23.0
+    # via importlib-metadata

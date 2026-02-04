@@ -9,38 +9,42 @@ The **Maritime Graph Workflow** is a comprehensive Python script that orchestrat
 The workflow performs four major steps:
 
 1. **Base Graph Creation** (0.3 NM resolution)
-   - Defines geographic area of interest between two ports
-   - Filters ENC charts to the relevant region
-   - Creates navigable water grid from S-57 layers
-   - Generates initial graph structure
-   - Computes baseline route
+
+    - Defines geographic area of interest between two ports
+    - Filters ENC charts to the relevant region
+    - Creates navigable water grid from S-57 layers
+    - Generates initial graph structure
+    - Computes baseline route
 
 2. **Fine/H3 Graph Creation** (0.02-0.3 NM or hexagonal)
-   - Focuses on route buffer around base route
-   - Creates high-resolution graph for detailed routing
-   - Two modes: regular grid ("fine") or hexagonal ("h3")
-   - Supports multi-resolution optimization
+
+    - Focuses on route buffer around base route
+    - Creates high-resolution graph for detailed routing
+    - Two modes: regular grid ("fine") or hexagonal ("h3")
+    - Supports multi-resolution optimization
 
 3. **Graph Weighting** (dynamic weight calculation)
-   - Converts graph to directed edges
-   - Enriches edges with S-57 feature attributes
-   - Applies three-tier weighting system:
-     - **Static weights**: Distance-based penalties/bonuses from geographic features
-     - **Directional weights**: Traffic flow alignment rewards/penalties
-     - **Dynamic weights**: Vessel-specific constraints (draft, height)
-   - Creates final routing weights
+
+    - Converts graph to directed edges
+    - Enriches edges with S-57 feature attributes
+    - Applies three-tier weighting system:
+        - **Static weights**: Distance-based penalties/bonuses from geographic features
+        - **Directional weights**: Traffic flow alignment rewards/penalties
+        - **Dynamic weights**: Vessel-specific constraints (draft, height)
+    - Creates final routing weights
 
 4. **Pathfinding & Export**
-   - Loads weighted graph
-   - Calculates optimal route using A* algorithm
-   - Exports route to GeoJSON for visualization
-   - Optional: exports weighted graph to GeoPackage
+
+    - Loads weighted graph
+    - Calculates optimal route using A* algorithm
+    - Exports route to GeoJSON for visualization
+    - Optional: exports weighted graph to GeoPackage
 
 ## Prerequisites
 
 ### Required Software
-- Python 3.8+
-- GDAL/OGR (for S-57 conversion)
+- Python {{ python_version }}+
+- GDAL {{ gdal_version }} (for S-57 conversion)
 - All dependencies listed in `pyproject.toml`
 - No database server required (file-based storage)
 
@@ -78,6 +82,7 @@ uv pip install -e .
 
 ### 3. No Database Configuration Needed
 GeoPackage uses file-based storage - no server credentials required. Just ensure:
+
 - Output directory exists: `output/`
 - S-57 ENC data is available in GeoPackage format
 - (Optional) `.env` file may contain other tokens/config, not needed for GeoPackage workflow
@@ -230,6 +235,7 @@ python scripts/maritime_graph_geopackage_workflow.py --log-level DEBUG
 ```
 
 **Note:** Log files now include:
+
 - **Automatic rotation**: Max 50MB (INFO) or 500MB (DEBUG) per file, 3 backups
 - **Third-party suppression**: Fiona/GDAL DEBUG logs filtered out (99% size reduction)
 - **Project-level logs**: Full debug info for nautical_graph_toolkit modules
@@ -369,6 +375,7 @@ This is a **critical prerequisite** for Step 2 (fine graph creation needs to loa
 ```
 
 **Note:** Name automatically constructed from config: `{mode}_graph_{name_suffix}`
+
 - Example: `fine_graph.mode="h3"` + `fine_graph.name_suffix="20"` → `h3_graph_20.gpkg`
 
 **IMPORTANT:** Land and sea grid layers are **required** for weighting in Step 3. They are created by `create_fine_grid()` and saved using:
@@ -379,6 +386,7 @@ h3.save_grid_to_gpkg(fg_grid["combined_grid_geom"], layer_name="sea_grid", ...)
 ```
 
 **NOTE:** The fine grid (`create_fine_grid()`) is **always created** regardless of graph mode:
+
 - When `mode: "fine"`: Uses rectangular grid with specified spacing
 - When `mode: "h3"`: Creates hexagonal grid AND prerequisite rectangular fine grid for land/sea polygons
 
@@ -387,6 +395,7 @@ Both modes generate the land_grid and sea_grid layers used in weighting.
 #### Step 3: Weighted Graph (Weighting Prerequisites)
 
 **CRITICAL:** Before running weighting, the following MUST exist:
+
 1. **Undirected graph**: `h3_graph_20.gpkg` or `fine_graph_20.gpkg` (created in Step 2)
 2. **Land grid layer**: `land_grid` in the graph GeoPackage (created in Step 2)
 3. **Sea grid layer**: `sea_grid` in the graph GeoPackage (created in Step 2)
@@ -410,6 +419,7 @@ weighting:
 ```
 
 The `land_area_layer: "land_grid"` parameter is **essential** for optimization:
+
 - Enables efficient LNDARE (land area) feature detection
 - Prevents re-scanning all ENCs for land intersection
 - Reduces enrichment time by 10-20%
@@ -435,9 +445,9 @@ output/detailed_route_7.5m_draft.geojson
 
 - GeoJSON format with route segments
 - Each segment includes:
-  - Geometry (line segment)
-  - Edge attributes (weight, distance, features)
-  - Cumulative distance and weight
+    - Geometry (line segment)
+    - Edge attributes (weight, distance, features)
+    - Cumulative distance and weight
 
 ### Log Files
 ```
@@ -490,6 +500,7 @@ output/benchmark_graph_weighted_directed_gpkg.csv
 | Pathfinding | 8.1% | 9.0% | 7.8% | Graph loading dominates |
 
 **Key Insights:**
+
 - ⚠️ **Weighting bottleneck:** Accounts for 79-89% of total execution time
 - 📈 **Superlinear scaling:** 4× more nodes → 3.6× total time (0.1nm vs 0.2nm)
 - 📈 **Hexagonal overhead:** 12.5× total time for H3 vs FINE 0.2nm (similar detail levels)
@@ -508,12 +519,14 @@ output/benchmark_graph_weighted_directed_gpkg.csv
 | **Weighting (H3)** | 9,586s | 4,916s | **2.0× faster** |
 
 **PostGIS Performance Advantages:**
+
 - Server-based spatial indexing optimized for large datasets
 - Database-side geometry operations avoid Python/file I/O overhead
 - Concurrent query optimization for edge enrichment
 - Better memory management for multi-million edge graphs
 
 **When to Use GeoPackage:**
+
 - ✅ Single-user workflows without server infrastructure
 - ✅ Portable/offline deployments (USB drives, cloud sharing)
 - ✅ Moderate datasets (≤500K nodes)
@@ -521,6 +534,7 @@ output/benchmark_graph_weighted_directed_gpkg.csv
 - ✅ Quick setup without PostgreSQL installation
 
 **When PostGIS is Better:**
+
 - Production environments with >500K node graphs
 - Multi-user concurrent access scenarios
 - Time-critical workflows where weighting speed matters
@@ -539,6 +553,7 @@ output/benchmark_graph_weighted_directed_gpkg.csv
 | Route Calculation | ~9s | 0.3% | A* pathfinding (302 nodes, 61.77 NM) |
 
 **Optimization Strategies:**
+
 - Use `--skip-weighting` if graph already weighted (requires pre-weighted graph from previous run)
 - Reduce fine grid spacing to have fewer edges to enrich
 - Use FINE grid mode instead of H3 (fewer hexagons = fewer edges)
@@ -555,25 +570,29 @@ output/benchmark_graph_weighted_directed_gpkg.csv
 ### Factors Affecting Performance
 
 1. **Graph Resolution**
-   - H3 mode: Generates more edges (hexagonal connectivity)
-   - Fine mode: Generates fewer edges (rectangular connectivity)
-   - Finer spacing = more nodes = longer enrichment time
+
+    - H3 mode: Generates more edges (hexagonal connectivity)
+    - Fine mode: Generates fewer edges (rectangular connectivity)
+    - Finer spacing = more nodes = longer enrichment time
 
 2. **Buffer/Area Size**
-   - Larger buffers = more ENCs involved = longer processing
-   - Each additional ENC adds significant enrichment time
-   - Slicing buffer reduces area and ENCs significantly
+
+    - Larger buffers = more ENCs involved = longer processing
+    - Each additional ENC adds significant enrichment time
+    - Slicing buffer reduces area and ENCs significantly
 
 3. **Disk I/O**
-   - SSD storage critical for this workflow (highly I/O intensive)
-   - Network drives will severely impact weighting performance
-   - Multiple simultaneous GeoPackages may cause file locking issues
-   - GeoPackage SQLite backend handles concurrent reads well but sequential writes
+
+    - SSD storage critical for this workflow (highly I/O intensive)
+    - Network drives will severely impact weighting performance
+    - Multiple simultaneous GeoPackages may cause file locking issues
+    - GeoPackage SQLite backend handles concurrent reads well but sequential writes
 
 4. **ENC Complexity**
-   - Number of features in source ENCs directly impacts enrichment time
-   - Dense nautical charts with many S-57 features = longer weighting
-   - US coastal areas (heavily charted) take longer than open ocean
+
+    - Number of features in source ENCs directly impacts enrichment time
+    - Dense nautical charts with many S-57 features = longer weighting
+    - US coastal areas (heavily charted) take longer than open ocean
 
 ### Performance Tips
 
@@ -594,6 +613,7 @@ Error: Output directory not found
 ```
 
 **Solution:**
+
 - Create output directory: `mkdir -p docs/notebooks/output`
 - Ensure write permissions: `chmod 755 docs/notebooks/output`
 
@@ -603,8 +623,9 @@ Error: enc_west.gpkg not found
 ```
 
 **Solution:**
+
 - S-57 data not available in GeoPackage format
-- Convert S-57 ENCs to GeoPackage first: See `docs/SETUP.md`
+- Convert S-57 ENCs to GeoPackage first: See `docs/getting-started/setup.md`
 - Verify file path in code matches actual location
 
 #### 3. Port Not Found
@@ -613,6 +634,7 @@ Error: Could not find departure or arrival port
 ```
 
 **Solution:**
+
 - Check port names in config (must be in World Port Index or custom ports)
 - List available ports: Query `port_data.csv`
 - Add custom port in config with explicit coordinates
@@ -623,6 +645,7 @@ MemoryError during graph creation
 ```
 
 **Solution:**
+
 - Reduce fine grid spacing in config
 - Use H3 mode (more memory-efficient than fine grid)
 - Slice buffer to smaller area
@@ -635,6 +658,7 @@ Warning: H3 graph is not connected. Selecting the largest component.
 ```
 
 **Solution:**
+
 - Normal warning for multi-resolution graphs
 - Pathfinding may fail if start/end in different components
 - Try different vessel parameters or smaller area
@@ -645,6 +669,7 @@ Error: database disk image is malformed / database is locked
 ```
 
 **Solution:**
+
 - Ensure no other processes are using the GeoPackage file
 - Close QGIS or other tools that may have the file open
 - Delete temporary lock files (`.gpkg-wal`, `.gpkg-shm`)
@@ -769,6 +794,7 @@ base_graph:
 ```
 
 **NOTE:** Direct coordinates bypass port lookup and use values as-is. Useful for:
+
 - Testing specific locations
 - Non-standard waypoints
 - Dynamic coordinate generation
@@ -835,6 +861,7 @@ print(df[['timestamp', 'node_count', 'edge_count', 'total_pipeline_sec']])
 ## Recent Performance Metrics (2025-10-28 Production Run)
 
 **Test Configuration:**
+
 - Route: SF Bay Area (37.01°N, -122.78°W → 37.81°N, -122.40°W)
 - Final Graph: 50,457 nodes, 396,160 directed edges
 - Vessel: 7.5m draft, cargo
@@ -865,6 +892,7 @@ TOTAL WORKFLOW TIME:                    872.3s (14.5 min)
 ```
 
 **Time Distribution:**
+
 - Graph Weighting: 52.8% (460.5s) - Edge enrichment dominates
 - Graph Loading: 29.8% (259.8s) - Edge loading (254.7s) is bottleneck
 - Base Graph: 14.6% (127.4s)
@@ -872,6 +900,7 @@ TOTAL WORKFLOW TIME:                    872.3s (14.5 min)
 - Route Calculation: 0.1% (~1s)
 
 **Key Findings:**
+
 - Edge loading time scales with edge count and format
 - Pathfinding computation is negligible (<1 sec for 396K edges)
 - Weighting step includes all enrichment and weight application
@@ -891,6 +920,7 @@ TOTAL WORKFLOW TIME:                    872.3s (14.5 min)
 | **Typical Time** | ~14.5 min (50K nodes, 396K edges) | 25-45 minutes |
 
 **When to use GeoPackage:**
+
 - Single-user workflows
 - Portable/offline requirements
 - Quick prototyping and testing
@@ -899,6 +929,7 @@ TOTAL WORKFLOW TIME:                    872.3s (14.5 min)
 - No database server available
 
 **When to use PostGIS:**
+
 - Multi-user environments
 - Very large datasets (>1GB)
 - Need advanced spatial indexing
@@ -911,17 +942,12 @@ TOTAL WORKFLOW TIME:                    872.3s (14.5 min)
 - **Script**: `scripts/maritime_graph_geopackage_workflow.py`
 - **Configuration**: `docs/maritime_workflow_config.yml`
 - **Graph Config**: `src/nautical_graph_toolkit/data/graph_config.yml`
-- **Setup Guide**: `docs/SETUP.md`
-- **Quick Start**: `docs/WORKFLOW_QUICKSTART.md`
-- **PostGIS Guide**: `docs/WORKFLOW_POSTGIS_GUIDE.md`
+- **Setup Guide**: `docs/getting-started/setup.md`
+- **Quick Start**: `docs/getting-started/workflow-quickstart.md`
+- **PostGIS Guide**: `docs/user-guides/workflow-postgis-guide.md`
 
 ### Jupyter Notebooks (Reference)
 - Base graph creation: `docs/notebooks/graph_GeoPackage_v2.ipynb`
 - Fine graph creation: `docs/notebooks/graph_fine_GeoPackage_v2.ipynb`
 - Weighted graph: `docs/notebooks/graph_weighted_directed_GeoPackage_v2.ipynb`
 
-## License & Attribution
-
-This workflow is part of the Maritime Module, a comprehensive maritime analysis toolkit.
-
-For issues, questions, or contributions, refer to the project's GitHub repository.

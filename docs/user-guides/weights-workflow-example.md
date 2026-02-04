@@ -722,6 +722,7 @@ weighted2 = weights.calculate_dynamic_weights(clean, params2)
 ### ❌ Pitfall 3: Wrong Column Priority
 
 The enrichment uses this priority for depth:
+
 1. `ft_drgare` (dredged areas - most accurate)
 2. `ft_depth_min` (general depth - fallback)
 
