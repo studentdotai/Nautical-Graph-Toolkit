@@ -12,15 +12,16 @@ This guide covers common issues you may encounter when working with the Nautical
 3. [SQLite RTREE Issues](#sqlite-rtree-issues) ⚠️ **Most Common**
 4. [GeoPackage File I/O Issues](#geopackage-file-io-issues)
 5. [Environment Setup Issues](#environment-setup-issues)
-6. [GDAL/PROJ Database Warnings](#gdal-proj-database-warnings)
-7. [Port Selection Issues](#port-selection-issues)
-8. [Database Connection Issues](#database-connection-issues)
-9. [Data Source Issues](#data-source-issues)
-10. [S57Updater: File-Based Backend Safety](#s57updater-file-based-backend-safety) ⚠️ **Important**
-11. [Graph Creation Issues](#graph-creation-issues)
-12. [Performance Issues](#performance-issues)
-13. [Visualization Issues](#visualization-issues)
-14. [Pathfinding Issues](#pathfinding-issues)
+6. [Documentation Build Issues](#documentation-build-issues)
+7. [GDAL/PROJ Database Warnings](#gdal-proj-database-warnings)
+8. [Port Selection Issues](#port-selection-issues)
+9. [Database Connection Issues](#database-connection-issues)
+10. [Data Source Issues](#data-source-issues)
+11. [S57Updater: File-Based Backend Safety](#s57updater-file-based-backend-safety) ⚠️ **Important**
+12. [Graph Creation Issues](#graph-creation-issues)
+13. [Performance Issues](#performance-issues)
+14. [Visualization Issues](#visualization-issues)
+15. [Pathfinding Issues](#pathfinding-issues)
 
 ---
 
@@ -609,6 +610,117 @@ KeyError: 'DB_NAME'
 2. Edit `.env` and fill in your actual values
 3. Ensure `load_dotenv()` is called before accessing environment variables
 4. For Mapbox token, get one from: https://account.mapbox.com/access-tokens/
+
+---
+
+## Documentation Build Issues {: #documentation-build-issues}
+
+### Issue: MkDocs git-revision-date plugin errors
+
+**Symptoms:**
+```
+Error: Failed to load plugin 'git-revision-date-localized'
+fatal: not a git repository
+```
+
+**Root Cause:**
+The `mkdocs-git-revision-date-localized-plugin` queries Git history to show file modification dates. It fails when:
+
+- Building in non-Git directories (ZIP downloads, CI shallow clones)
+- Git history isn't available or is incomplete
+- Working in detached HEAD state or fresh clones
+
+**Impact:**
+- `mkdocs build` or `mkdocs serve` fails completely
+- Documentation cannot be previewed locally
+- CI/CD pipelines may break
+
+---
+
+### Solution 1: Disable the plugin (Quick Fix)
+
+Set the environment variable to disable Git revision dates:
+
+```bash
+# Linux/macOS
+ENABLE_GIT_REVISION=false mkdocs serve
+
+# Windows PowerShell
+$env:ENABLE_GIT_REVISION="false"; mkdocs serve
+
+# Windows Command Prompt
+set ENABLE_GIT_REVISION=false && mkdocs serve
+```
+
+---
+
+### Solution 2: Ensure Git history is available
+
+If you want to keep the plugin enabled:
+
+```bash
+# Check if you're in a Git repository
+git status
+
+# If not, initialize or clone properly
+git clone --depth=1 https://github.com/studentdotai/Nautical-Graph-Toolkit.git
+
+# For full history (needed for accurate dates):
+git fetch --unshallow
+```
+
+---
+
+### Solution 3: Configure MkDocs for fallback (Already Done)
+
+The `mkdocs.yml` has been configured with graceful fallback:
+
+```yaml
+- git-revision-date-localized:
+    enable_creation_date: true
+    type: date  # Static dates instead of dynamic "timeago"
+    fallback_to_build_date: true  # Uses build date when Git unavailable
+    enabled: !ENV [ENABLE_GIT_REVISION, true]  # Can disable via env var
+```
+
+**Benefits:**
+- Uses Git dates when available
+- Falls back to build date when Git is unavailable
+- Can be disabled entirely with `ENABLE_GIT_REVISION=false`
+- Uses static `date` format instead of dynamic "timeago" (prevents unnecessary rebuilds)
+
+---
+
+### Understanding the Configuration
+
+**Why `type: date` instead of `type: timeago`?**
+
+- `timeago`: Shows "2 days ago", "1 month ago" - changes on every build
+- `date`: Shows "January 15, 2025" - only changes when file is actually modified
+- `date` is better for documentation as it's stable and doesn't trigger unnecessary rebuilds
+
+**When does it use fallback dates?**
+
+- Non-Git directories
+- Shallow clones (common in CI/CD)
+- Files not tracked by Git
+- Git errors or unavailable history
+
+**Quick Commands:**
+
+```bash
+# Preview docs locally (with Git dates if available)
+mkdocs serve
+
+# Preview docs without Git dates (faster, no Git requirement)
+ENABLE_GIT_REVISION=false mkdocs serve
+
+# Build production docs with Git dates
+mkdocs build
+
+# Build without Git dates
+ENABLE_GIT_REVISION=false mkdocs build
+```
 
 ---
 

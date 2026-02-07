@@ -1,10 +1,10 @@
 # Contributing to Nautical Graph Toolkit
 
-Thank you for your interest in contributing to the Nautical Graph Toolkit! This project is currently in active development (v0.1.1), and we're preparing for community contributions starting with **v0.2.0**.
+Thank you for your interest in contributing to the Nautical Graph Toolkit! This project is currently in active development (v{{ project_version }}), and we're preparing for community contributions starting with **v0.2.0**.
 
 ## 📋 Project Status
 
-**Current Version**: v0.1.1 (2026-01-20)
+**Current Version**: v{{ project_version }} ({{ last_updated }})
 
 **Contribution Timeline**:
 

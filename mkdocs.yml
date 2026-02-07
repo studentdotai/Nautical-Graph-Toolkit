@@ -63,23 +63,23 @@ nav:
     - Setup Guide: getting-started/setup.md
     - Quick Start: getting-started/workflow-quickstart.md
   - User Guides:
-    - Data Guide: user-guides/data-guide.md
-    - PostGIS Workflow: user-guides/workflow-postgis-guide.md
-    - GeoPackage Workflow: user-guides/workflow-geopackage-guide.md
-    - S-57 Import Guide: user-guides/workflow-s57-import-guide.md
-    - Weights & Routing: user-guides/weights-workflow-example.md
-    - Database Backend Guide: user-guides/database-backend-guide.md
     - Scripts Guide: user-guides/scripts-guide.md
+    - S-57 Import Guide: user-guides/workflow-s57-import-guide.md
+    - GeoPackage Workflow: user-guides/workflow-geopackage-guide.md
+    - PostGIS Workflow: user-guides/workflow-postgis-guide.md
+    - Weights & Routing: user-guides/weights-workflow-example.md
+    - Data Guide: user-guides/data-guide.md
+    - Database Backend Guide: user-guides/database-backend-guide.md
   - Tutorials:
     - Jupyter Notebooks: notebooks/index.md
   - Reference:
     - Technical Specifications: reference/technical-specs.md
-    - Troubleshooting: reference/troubleshooting.md
     - API Documentation: api/index.md
+    - Troubleshooting: reference/troubleshooting.md
   - Project:
-    - Contributing: project/contributing.md
-    - Changelog: project/changelog.md
     - Roadmap: project/roadmap.md
+    - Changelog: project/changelog.md
+    - Contributing: project/contributing.md
 
 # Plugins
 plugins:
@@ -102,7 +102,9 @@ plugins:
 
   - git-revision-date-localized:
       enable_creation_date: true
-      type: timeago
+      type: date  # Static dates instead of dynamic "timeago"
+      fallback_to_build_date: true  # Graceful fallback when Git unavailable
+      enabled: !ENV [ENABLE_GIT_REVISION, true]  # Can disable: ENABLE_GIT_REVISION=false mkdocs build
 
   - minify:
       minify_html: true
@@ -168,6 +170,8 @@ extra:
   gdal_version: "3.10.3"
   pg_version: "16"
   postgis_version: "3.4"
+  project_version: "0.1.2"
+  last_updated: "2026-02-07"
 
 # Extra CSS
 extra_css:

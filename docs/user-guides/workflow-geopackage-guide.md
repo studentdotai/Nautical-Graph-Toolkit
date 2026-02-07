@@ -68,7 +68,7 @@ ogrinfo output/enc_west.gpkg
 
 ### 1. Clone/Download the Project
 ```bash
-cd ~/python_projects_wsl2/1_MaritimeModule_V1
+cd ~/Nautical-Graph-Toolkit  # or wherever you cloned the project
 ```
 
 ### 2. Install Dependencies
@@ -480,7 +480,7 @@ output/benchmark_graph_weighted_directed_gpkg.csv
 
 ### Typical Execution Times (Los Angeles - San Francisco)
 
-**Latest Performance Metrics (2025-11-03):** Comprehensive benchmark across three graph modes (47 S-57 ENCs)
+**Latest Performance Metrics:** Comprehensive benchmark across three graph modes (47 S-57 ENCs)
 
 | Graph Mode | Nodes | Edges | Step 1: Base | Step 2: Fine/H3 | Step 3: Weighting | Step 4: Pathfinding | **Total** |
 |-----------|-------|-------|--------------|-----------------|-------------------|---------------------|-----------|
@@ -858,7 +858,7 @@ print(df[['timestamp', 'node_count', 'edge_count', 'total_pipeline_sec']])
 "
 ```
 
-## Recent Performance Metrics (2025-10-28 Production Run)
+## Recent Performance Metrics (Production Run)
 
 **Test Configuration:**
 

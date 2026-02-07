@@ -116,7 +116,7 @@ Import the GeoJSON in QGIS or your preferred GIS tool.
 
 ## 🗺️ Roadmap
 
-**Current Status**: v0.1.1 Released ✅
+**Current Status**: v{{ project_version }} Released ✅
 
 **Near-term** (v0.2.0):
 

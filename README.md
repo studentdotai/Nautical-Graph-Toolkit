@@ -329,7 +329,7 @@ Comprehensive real-world performance analysis from production testing (Nov 2025)
 
 We have a comprehensive public roadmap that outlines our development journey from foundation to production-ready QGIS integration.
 
-**Current Status**: v0.1.1 Released ✅ (2026-01-20)
+**Current Status**: v{{ project_version }} Released ✅ ({{ last_updated }})
 
 **Near-term Goals** (v0.2.0 - Foundation & Polish):
 - PyPI distribution for easy installation
@@ -373,9 +373,15 @@ Built with **MkDocs** using the Material theme.
 ### Preview Documentation Locally
 
 ```bash
+# Standard preview (uses Git dates when available)
 mkdocs serve
 # Opens at http://127.0.0.1:8000
+
+# Fast preview without Git dates (if you encounter Git errors)
+ENABLE_GIT_REVISION=false mkdocs serve
 ```
+
+> **Note**: If you encounter `git-revision-date-localized` plugin errors, use the second command above or see [Documentation Build Issues](docs/reference/troubleshooting.md#documentation-build-issues) in the troubleshooting guide.
 
 Deployment to GitHub Pages is automated via CI/CD on version tags.
 
@@ -586,7 +592,7 @@ AGPL-3.0 means:
 
 ## 🤝 Contributing
 
-**Note:** This project is currently in active early development (v0.1.0). We will begin accepting community contributions starting with **v0.2.0** as the codebase stabilizes and comprehensive contribution guidelines are established. See the [Roadmap](#-roadmap) for timeline details.
+**Note:** This project is currently in active early development (v{{ project_version }}). We will begin accepting community contributions starting with **v0.2.0** as the codebase stabilizes and comprehensive contribution guidelines are established. See the [Roadmap](#-roadmap) for timeline details.
 
 In the meantime, you can:
 - Report bugs or request features on [GitHub Issues](https://github.com/studentdotai/Nautical-Graph-Toolkit/issues)
@@ -617,7 +623,7 @@ While the core development is a one-person effort carried out part-time (often a
 
 ### Flagship Product: Nautical Graph Toolkit
 
-Our first step toward this vision is the **Nautical Graph Toolkit (v0.1.0)**. It is an open-source engine designed to bridge the gap between raw hydrographic data (S-57 ENCs) and intelligent routing. It transforms static charts into vessel-aware, weighted graphs, allowing developers and mariners to analyze the marine environment without the barriers of legacy software.
+Our first step toward this vision is the **Nautical Graph Toolkit (v{{ project_version }})**. It is an open-source engine designed to bridge the gap between raw hydrographic data (S-57 ENCs) and intelligent routing. It transforms static charts into vessel-aware, weighted graphs, allowing developers and mariners to analyze the marine environment without the barriers of legacy software.
 
 ### Why We Need Your Support: The Hardware Fund
 

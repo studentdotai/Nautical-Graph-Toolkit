@@ -69,7 +69,7 @@ psql -h localhost -U postgres -d enc_db -c "SELECT * FROM information_schema.sch
 
 ### 1. Clone/Download the Project
 ```bash
-cd ~/python_projects_wsl2/1_MaritimeModule_V1
+cd ~/Nautical-Graph-Toolkit  # or wherever you cloned the project
 ```
 
 ### 2. Install Dependencies
@@ -87,7 +87,7 @@ Edit `.env` file:
 # .env
 DB_NAME="enc_db"
 DB_USER="postgres"
-DB_PASSWORD="your_password"
+DB_PASSWORD="your_secure_password"
 DB_HOST="127.0.0.1"
 DB_PORT="5432"
 MAPBOX_TOKEN="your_mapbox_token"
@@ -399,7 +399,7 @@ output/benchmark_graph_weighted_directed.csv
 
 ### Typical Execution Times (Los Angeles - San Francisco)
 
-**Latest Performance Metrics (2025-11-03):** Comprehensive benchmark across three graph modes (47 S-57 ENCs)
+**Latest Performance Metrics:** Comprehensive benchmark across three graph modes (47 S-57 ENCs)
 
 | Graph Mode | Nodes | Edges | Step 1: Base | Step 2: Fine/H3 | Step 3: Weighting | Step 4: Pathfinding | **Total** |
 |-----------|-------|-------|--------------|-----------------|-------------------|---------------------|-----------|

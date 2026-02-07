@@ -128,12 +128,32 @@ mamba activate nautical
 
 2. **Configure Environment Variables**
    ```bash
-   # .env file configuration will be added
+   # .env file configuration
+   # Copy from .env.example and customize:
+
+   # PostgreSQL/PostGIS Database Configuration
+   DB_NAME=enc_db
+   DB_USER=postgres
+   DB_PASSWORD=your_secure_password
+   DB_HOST=localhost
+   DB_PORT=5432
+
+   # Optional: Mapbox Token for Interactive Maps (get from https://account.mapbox.com/)
+   MAPBOX_TOKEN=your_mapbox_access_token_here
    ```
 
 3. **Import S-57 Data**
    ```bash
-   # Import process will be documented from import_s57 notebook
+   # Import S-57 data using the notebook
+
+   # Run: docs/notebooks/import_s57.ipynb
+   #   - Set backend = 'postgis'
+   #   - Set methods = {'S57_Advanced': True}
+   #   - Configure database schema name
+   #   - Run all cells
+
+   # The notebook includes detailed instructions and verification steps.
+   # For script-based imports, see: docs/user-guides/scripts-guide.md
    ```
 
 **Required Schema Structure:**
@@ -169,15 +189,18 @@ mamba activate nautical
 
 **Setup Steps:**
 
-1. **Prepare Output Directory**
-   ```bash
-   # Directory setup will be added
-   ```
+**Import S-57 Data**
+```bash
+# Import S-57 Data using the notebook
+# Run: docs/notebooks/import_s57.ipynb
+#   - Set backend = 'gpkg'
+#   - Set output filename to 'enc_west.gpkg'
+#   - Run all cells
 
-2. **Import S-57 Data**
-   ```bash
-   # Import process will be documented from import_s57 notebook
-   ```
+# Output directory and file are created automatically
+# Output: data/enc_west.gpkg
+# For script-based imports, see: docs/user-guides/scripts-guide.md
+```
 
 **File Location:**
 
@@ -213,15 +236,18 @@ mamba activate nautical
 
 **Setup Steps:**
 
-1. **Prepare Output Directory**
-   ```bash
-   # Directory setup will be added
-   ```
+**Import S-57 Data**
+```bash
+# Import S-57 Data using the notebook
+# Run: docs/notebooks/import_s57.ipynb
+#   - Set backend = 'spatialite'
+#   - Set output filename to 'enc_west.sqlite'
+#   - Run all cells
 
-2. **Import S-57 Data**
-   ```bash
-   # Import process will be documented from import_s57 notebook
-   ```
+# Output directory and file are created automatically
+# Output: data/enc_west.sqlite
+# For script-based imports, see: docs/user-guides/scripts-guide.md
+```
 
 **File Location:**
 
@@ -294,7 +320,23 @@ After importing S-57 data, your backend must contain the following layers:
 
 3. **Verify the import**
    ```python
-   # Verification steps will be added
+   # Verification after import
+
+   # The import_s57.ipynb notebook includes verification steps at the end.
+
+   # For comprehensive verification and testing:
+   #
+   #   docs/notebooks/enc_factory.ipynb - Quick verification
+   #     - ENC summary and metadata
+   #     - Layer feature counts
+   #     - NOAA version checking
+   #     - Bounding box visualization
+   #
+   #   docs/notebooks/import_deeptest.ipynb - Comprehensive integration testing
+   #     - Full pipeline testing across all backends
+   #     - Multi-backend validation and comparison
+   #     - Data integrity and DSID stamping verification
+   #     - Performance baseline tracking
    ```
 
 ### Alternative: Download Pre-Imported Data
@@ -310,13 +352,38 @@ After setup, verify your backend contains the required data:
 ### PostGIS Verification
 
 ```sql
--- Verification queries will be added from import_s57 notebook
+-- PostGIS Verification
+
+-- For verification queries and testing:
+--
+--   docs/notebooks/enc_factory.ipynb - Quick verification
+--     - Schema and table verification
+--     - Feature counts by layer
+--     - DSID stamping validation
+--     - Spatial extent checking
+--
+--   docs/notebooks/import_deeptest.ipynb - Comprehensive testing
+--     - Full S-57 pipeline testing
+--     - Cross-backend consistency validation
+--     - Integration test reports (JSON/CSV/TXT)
 ```
 
 ### GeoPackage/SpatiaLite Verification
 
 ```python
-# Verification code will be added from import_s57 notebook
+# GeoPackage/SpatiaLite Verification
+
+# For verification and testing:
+#
+#   docs/notebooks/enc_factory.ipynb - Quick verification
+#     - Supports all backends (PostGIS, GeoPackage, SpatiaLite)
+#     - Layer summaries and feature counts
+#     - Quick data quality checks
+#
+#   docs/notebooks/import_deeptest.ipynb - Comprehensive testing
+#     - Full integration testing across all backends
+#     - Cross-backend consistency validation
+#     - Test reports with detailed results
 ```
 
 ### Python Interpreter Path Verification
@@ -434,11 +501,12 @@ If you encounter issues with Jupyter kernels, see [TROUBLESHOOTING.md - Jupyter 
 # PostGIS Configuration
 DB_NAME=enc_db
 DB_USER=your_username
-DB_PASSWORD=your_password
+DB_PASSWORD=your_secure_password
 DB_HOST=localhost
 DB_PORT=5432
 
-# Additional configuration will be added
+# Optional: Mapbox Token for Interactive Maps
+MAPBOX_TOKEN=your_mapbox_access_token_here
 ```
 
 ### Graph Configuration (graph_config.yml)
@@ -446,7 +514,38 @@ DB_PORT=5432
 The graph configuration file defines which layers to use for navigation:
 
 ```yaml
-# Configuration details will be added
+# Graph Configuration (src/nautical_graph_toolkit/data/graph_config.yml)
+
+# Graph Type Selection
+graph_type: "h3"  # Options: "h3" (hexagonal) or "fine" (grid)
+
+# Output Configuration
+output_gpkg: "graphs/h3_graph.gpkg"
+
+# Layer Configuration (by usage band and resolution)
+layers:
+  navigable:
+    # Low-resolution layers (bands 1-2) for broad areas
+    - { layer: "seaare", bands: [1, 2], resolution: 6 }
+
+    # Medium-resolution layers (band 3) for approach areas
+    - { layer: "seaare", bands: [3], resolution: 9 }
+    - { layer: "fairwy", bands: [3], resolution: 9 }
+
+    # High-resolution layers (bands 4-6) for harbors and channels
+    - { layer: "drgare", bands: [3, 4, 5, 6], resolution: 11 }
+    - { layer: "fairwy", bands: [4, 5, 6], resolution: 11 }
+    - { layer: "tsslpt", bands: [3, 4, 5, 6], resolution: 11 }
+    - { layer: "prcare", bands: [3, 4, 5, 6], resolution: 11 }
+
+  obstacles:
+    # Obstacle layers (all bands, no resolution needed)
+    - { layer: "lndare", bands: [1, 2, 3, 4, 5, 6], resolution: null }
+    - { layer: "slcons", bands: [1, 2, 3, 4, 5, 6], resolution: null }
+    - { layer: "uwtroc", bands: [3, 4, 5, 6], resolution: null }
+    - { layer: "obstrn", bands: [3, 4, 5, 6], resolution: null }
+
+# Weighting Configuration (see docs/maritime_workflow_config.yml for details)
 ```
 
 ---
@@ -526,12 +625,29 @@ Solution:
 
 **PostGIS:**
 ```sql
--- Optimization queries will be added
+-- PostGIS Optimization
+
+-- Spatial indexes are automatically created during import.
+-- No additional optimization needed for typical notebook usage.
+
+-- For production optimization, see:
+--   docs/user-guides/scripts-guide.md
+--   docs/maritime_workflow_config.yml
 ```
 
 **GeoPackage/SpatiaLite:**
 ```python
-# Optimization tips will be added
+# GeoPackage/SpatiaLite Optimization
+
+# Spatial indexes are automatically created during import.
+
+# Tips for better notebook performance:
+# - Use fiona engine (default): geopandas.read_file(..., engine="fiona")
+# - Filter with bbox parameter to load only needed data
+# - Store files on SSD for best performance
+# - For large datasets (>500 ENCs), consider PostGIS backend
+
+# For production optimizations, see: docs/user-guides/scripts-guide.md
 ```
 
 ---
@@ -549,8 +665,8 @@ After completing setup:
 
 ## Additional Resources
 
-- **S-57 Standard Documentation**: [Link to be added]
-- **NOAA ENC Download**: [Link to be added]
+- **S-57 Standard Documentation**: https://iho.int/en/standards/s-57-ecdis
+- **NOAA ENC Download**: https://charts.noaa.gov/ENCs/ENCs.shtml
 - **PostGIS Documentation**: https://postgis.net/documentation/
 - **GeoPackage Specification**: https://www.geopackage.org/
 - **SpatiaLite Documentation**: https://www.gaia-gis.it/fossil/libspatialite/
@@ -564,7 +680,3 @@ For issues or questions:
 1. Check the troubleshooting section above
 2. Review the relevant notebook documentation
 3. Open an issue on the project repository
-
----
-
-*This document will be updated with detailed import instructions after completing the import_s57 notebook documentation.*

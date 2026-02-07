@@ -65,7 +65,7 @@ psql -h localhost -U postgres -d enc_db -c "CREATE EXTENSION IF NOT EXISTS postg
 
 ### 1. Clone/Download the Project
 ```bash
-cd ~/python_projects_wsl2/1_MaritimeModule_V1
+cd ~/Nautical-Graph-Toolkit  # or wherever you cloned the project
 ```
 
 ### 2. Install Dependencies
@@ -83,14 +83,14 @@ Create or edit `.env` file:
 # .env
 DB_NAME="enc_db"
 DB_USER="postgres"
-DB_PASSWORD="your_password"
+DB_PASSWORD="your_secure_password"
 DB_HOST="127.0.0.1"
 DB_PORT="5432"
 ```
 
 Or pass credentials via command-line arguments:
 ```bash
---db-name enc_db --db-user postgres --db-password xxx --db-host 127.0.0.1 --db-port 5432
+--db-name enc_db --db-user postgres --db-password your_secure_password --db-host 127.0.0.1 --db-port 5432
 ```
 
 ## Usage Guide
@@ -126,7 +126,7 @@ python scripts/import_s57.py \
   --output-format postgis \
   --db-host 127.0.0.1 \
   --db-user postgres \
-  --db-password xxx
+  --db-password your_secure_password
 ```
 
 **Output**: Separate schema/file for each ENC (US1WC01M, US1EEZ1M, etc.)
@@ -288,7 +288,7 @@ python scripts/import_s57.py \
   --benchmark-output benchmarks.csv \
   --db-host 127.0.0.1 \
   --db-user postgres \
-  --db-password secret
+  --db-password your_secure_password
 ```
 
 **Expected results**:

@@ -840,7 +840,7 @@ Project Root/
 
 ## Performance Expectations
 
-**Real-World Benchmarks (2025-11-03)** - SF Bay to LA Route (47 ENCs)
+**Real-World Benchmarks** - SF Bay to LA Route (47 ENCs)
 
 ### Total Processing Time Comparison
 

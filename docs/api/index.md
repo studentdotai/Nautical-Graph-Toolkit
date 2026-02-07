@@ -179,6 +179,6 @@ BaseClass
 
 ---
 
-**API last updated**: January 2025
+**API last updated**: {{ last_updated }}
 
-**Version**: 0.1.1
+**Version**: {{ project_version }}
