@@ -504,7 +504,7 @@ This project uses Conda's `sqlite` package which provides RTREE support on all p
 
 **Affected operations:**
 
-- `enrich_edges_with_features_gpkg()`
+- `enrich_edges_with_features_gpkg_v3()`
 - `apply_static_weights_gpkg()`
 - `calculate_dynamic_weights_gpkg()`
 - `calculate_directional_weights_gpkg()`
@@ -862,8 +862,10 @@ ValueError: Could not find one or both ports. Please check the names.
 1. **List all available ports** to verify the correct name:
    ```python
    port = PortData()
-   all_ports = port.get_all_ports()
-   print(all_ports[['PORT_NAME', 'COUNTRY']].to_string())
+   all_port_names = port.get_port_names()
+   for name in all_port_names:
+       port_info = port.get_port_by_name(name)
+       print(f"{port_info['PORT_NAME']}: {port_info['COUNTRY']}")
    ```
 
 2. **Check spelling and capitalization** - port names are case-sensitive:

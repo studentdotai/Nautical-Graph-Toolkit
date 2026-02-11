@@ -32,66 +32,133 @@ Our first release focuses on establishing the core functionality of the toolkit.
 
 ---
 
-## 🔧 Version 0.1.x - Maintenance & Patches
+## ✅ Version 0.1.1 - Production Polish
 
-**Status**: 🚧 Ongoing
+**Status**: ✅ Released (January 2026)
 
 **Depends on**: v0.1.0
 
-Continuous maintenance releases addressing critical bugs and minor improvements as reported by the community.
+Quality and performance improvements for production readiness.
 
-- **[ ] Cross-platform compatibility fixes** (Windows, macOS, Linux)
-- **[ ] Critical bug fixes** from user reports
-- **[ ] Minor documentation improvements**
-- **[ ] Dependency security updates**
+- **[x] Performance Optimization**: 68× improvement in graph creation times
+- **[x] Bug Fixes**: Critical issues reported by early adopters
+- **[x] Code Quality**: Refactoring for maintainability
 
 ---
 
-## 🎯 Version 0.2.0 - Foundation & Polish
+## ✅ Version 0.1.2 - Documentation Modernization
+
+**Status**: ✅ Released (February 2026)
+
+**Depends on**: v0.1.1
+
+Complete documentation overhaul with MkDocs and expanded learning resources.
+
+- **[x] MkDocs Integration**: Professional documentation site with Material theme
+  - Dark/light mode, search, mobile responsive
+  - Deployed at https://studentdotai.github.io/Nautical-Graph-Toolkit
+- **[x] Expanded Tutorials**: 13 Jupyter notebooks covering all major workflows
+- **[x] Contributor Guide**: Governance, contribution guidelines, and code standards
+- **[x] Technical Specifications**: Initial performance benchmarks (evolving document)
+- **[x] Documentation Reorganization**: Structured hierarchy (5 main sections, 14+ files)
+
+**Note**: API documentation framework is in early stage. Future architecture will involve FastAPI backend with QGIS as frontend UI, planned for v0.3.0+ (QGIS integration phase).
+
+---
+
+## 🔧 Version 0.1.x - Foundation Completion
+
+**Status**: 🚧 In Progress
+
+**Latest**: v0.1.2 (February 2026)
+
+**Goal**: Complete foundation work before PyTorch transition in v0.2.0
+
+**Prerequisite for v0.2.0**: All items below must be complete
+
+- **[ ] Security & Hardening**:
+    - **[ ] OWASP Top 10 Audit**: Address SQL injection, path traversal, command injection
+    - **[ ] Input Validation**: S-57 file signature verification, Pydantic config validation
+    - **[ ] Dependency Scanning**: Audit third-party libraries for CVEs
+
+- **[ ] Weights Class Refactor**:
+    - **[ ] Open weights format**: Prepare for PyTorch tensor migration
+    - **[ ] Serialization**: Save/load weights for model training
+
+- **[ ] Test Coverage**:
+    - **[ ] pytest 80% coverage**: Required before v0.2.0 development begins
+    - **[ ] Integration tests**: Real S-57 ENC datasets
+
+- **[ ] Documentation**:
+    - **[ ] Ongoing polishing**: Improve clarity and completeness
+    - **[ ] Code examples**: More usage patterns
+
+- **[ ] Bug Fixes**: Critical issues as they arise
+
+---
+
+## 🎯 Version 0.2.0 - PyTorch Integration & Production Readiness
 
 **Status**: 📋 Planned
 
-**Depends on**: v0.1.0
+**Depends on**: v0.1.x completion (80% test coverage, security audit, Weights class refactor)
 
-This release will focus on making the toolkit more robust, accessible, and secure for a wider audience.
+This release represents a major milestone: transitioning the toolkit to PyTorch for ML-powered maritime routing and production deployment.
 
-- **📦 Distribution**:
-    - **[ ] PyPI Release**: Package the toolkit for easy installation via `pip install nautical-graph-toolkit`.
-    - **[ ] Dependency Management**: Refine and lock dependencies for stable, reproducible installations.
+### 🔬 PyTorch Integration (Core Focus)
 
-- **📚 Documentation & Usability**:
-    - **[ ] API Reference**: Generate a complete, versioned API reference using Sphinx.
-    - **[ ] Expanded Tutorials**: Add more Jupyter Notebooks covering advanced use cases (e.g., custom weighting, H3 graph analysis).
+- **[ ] Weights Class Migration**: Refactor to PyTorch tensors with open weights format
+- **[ ] ML Infrastructure**: Setup PyTorch training pipeline for traffic pattern learning
+- **[ ] Model Architecture**: Design neural network for maritime route prediction (research phase)
+- **[ ] GPU Support**: CUDA acceleration for graph operations (experimental)
 
-- **⚡ Performance**:
-    - **[ ] Publish Official Benchmarks**: Finalize and publish the performance benchmark results in the `README.md` and documentation.
+### 📦 Distribution & Deployment
 
-- **🛡️ Security**:
-    - **[ ] OWASP Top 10 Audit**: Address SQL injection (parameterized queries), path traversal (file handling), command injection (GDAL/shell operations), and sensitive data exposure (credentials)
-    - **[ ] Input Validation**: S-57 file signature verification, Pydantic-based config validation, database connection string sanitization
-    - **[ ] Dependency Scanning**: Audit third-party libraries for known CVEs using safety/bandit
+- **[ ] PyPI Release**: Limited to non-GDAL features (routing utilities, data structures)
+    - **Note**: GDAL dependency makes full PyPI distribution impractical. Preferred installation: **Conda + uv** OR **Docker**
+- **[ ] Docker Packaging**: Complete toolkit in container for simplified installation
+    - PostGIS + GDAL + Toolkit + PyTorch (GPU option)
+    - Multi-platform images (linux/arm64/windows)
+- **[ ] Dependency Management**: Pin PyTorch versions, handle GDAL via Conda layer
+- **[x] Docker Compose**: Development environment setup (completed for PostGIS local server)
 
-- **🧪 Testing & CI/CD**:
-    - **[ ] Continuous Integration**: GitHub Actions for automated testing on every commit
-    - **[ ] Test Coverage**: Achieve >80% code coverage with pytest
+### 📚 Documentation
 
-- **🐳 Deployment & Distribution**:
-    - **[ ] Docker Images**: Official Docker images with PostGIS + toolkit pre-configured
-    - **[ ] Docker Compose**: Development environment setup with one command
-    - **[ ] Kubernetes Deployment**: Helm charts for enterprise-scale deployments
-    - **[ ] Cloud Deployment Guides**: Documentation for AWS, GCP, and Azure
+- **[ ] API Reference**: Generate with mkdocstrings (MkDocs integration, replacing Sphinx approach)
+- **[ ] PyTorch Tutorials**: New notebooks for ML-based routing workflows
+- **[ ] Migration Guide**: Upgrading from NumPy-based to PyTorch-based weights
+- **[x] Expanded Tutorials**: 13 Jupyter notebooks covering advanced use cases (✅ completed in v0.1.2)
+
+### 🧪 Testing & Quality
+
+- **[ ] Test Coverage**: Achieve 80% coverage (inherited from v0.1.x requirement)
+- **[ ] CI/CD Pipeline**: GitHub Actions for automated testing
+- **[ ] Performance Benchmarks**: PyTorch vs NumPy comparison for weighting operations
+- **[x] Publish Official Benchmarks**: Initial version published in `docs/reference/technical-specs.md` (🔄 evolving document)
+
+### 🛡️ Security & Stability
+
+- **[ ] OWASP Top 10 Audit**: SQL injection, path traversal, command injection
+- **[ ] Input Validation**: Pydantic-based config validation, S-57 signature verification
+- **[ ] Dependency Scanning**: Safety/bandit for CVE checking
+
+### 🚀 Production Readiness
+
+- **[ ] Cloud Deployment Guides**: AWS/GCP/Azure with GPU instances
+- **[ ] Monitoring & Logging**: Structured logging for PyTorch model training
+- **[ ] API Stability**: Semantic versioning commitment begins
 
 ---
 
 ## 🔌 Version 0.3.0 - QGIS Integration (Proof of Concept)
 
-**Status**: 🔒 Blocked (awaiting QGIS 4.0 - Feb 2026)
+**Status**: 🔒 Blocked (awaiting QGIS 4.0 - February 20, 2026)
 
 **Depends on**: v0.2.0, QGIS 4.0 release
 
 This release marks the beginning of our journey to integrate the toolkit with QGIS. Development will be closely tied to the QGIS major release schedule.
 
-- **📌 Key Dependency**: This work will commence after the official release of **QGIS 4.0** (scheduled for February 2026), which will be the first stable release with **Qt6** support.
+- **📌 Key Dependency**: This work will commence after the official release of **QGIS 4.0** (scheduled for **February 20, 2026**), which will be the first stable release with **Qt6** support.
     - **Rationale**: While Qt6 packages are available with QGIS 3.44 on Linux and Windows, dedicating development time to the pre-4.0 development cycle would require rework upon QGIS 4.0 stable release. Given this is a part-time project, the strategic choice is to wait for the stable release rather than invest time rebuilding.
     - **Early Prototyping Option**: If time permits, lightweight proof-of-concept experiments may be conducted with QGIS 3.44 Qt6 packages (Linux/Windows) to validate integration approaches, with the understanding that code will be rebuilt for QGIS 4.0 stable.
 
@@ -150,9 +217,9 @@ The journey from version 0.5.0 to 1.0.0 will focus on maturing the toolkit into 
 - **[ ] New Pathfinding Module**: Design and implement advanced algorithms (e.g., time-dependent pathfinding for tides and currents)
 - **[ ] Advanced Weighting Models**: Vessel performance models, fuel consumption, and emissions
 
-### Phase 2: Experimental Features (Research Track)
-- **[ ] ML-Powered Weighting**: Research and implement ML models for traffic patterns and route optimization (availability and feasibility TBD)
-- **[ ] GPU Acceleration (CUDA)**: Exploratory research for graph creation, weighting, and pathfinding (long-term research goal)
+### Phase 2: Advanced ML Features (Research Track)
+- **[ ] Advanced ML Models**: Build upon PyTorch foundation from v0.2.0 for traffic prediction and route optimization
+- **[ ] GPU Optimization**: Expand CUDA acceleration beyond experimental phase for production graph operations
 
 ### Phase 3: Production Readiness (v1.0.0 Criteria)
 - **[ ] API Stability Guarantee**: Semantic versioning and backward compatibility promise

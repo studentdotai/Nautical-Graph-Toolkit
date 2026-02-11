@@ -759,10 +759,12 @@ List available WPI ports:
 ```bash
 # Query the port database
 python -c "
-from src.nautical_graph_toolkit.utils.port_utils import PortUtils
-ports = PortUtils.load_wpi_ports()
-for port in ports[ports['NAME'].str.contains('Francisco|Angeles')]:
-    print(f\"{port['NAME']}: {port['LATITUDE']}, {port['LONGITUDE']}\")
+from nautical_graph_toolkit.utils.port_utils import PortData
+ports = PortData()
+for port_name in ports.get_port_names():
+    if 'Francisco' in port_name or 'Angeles' in port_name:
+        port_info = ports.get_port_by_name(port_name)
+        print(f\"{port_info['PORT_NAME']}: {port_info['LATITUDE']}, {port_info['LONGITUDE']}\")
 "
 ```
 

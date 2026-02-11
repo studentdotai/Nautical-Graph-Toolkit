@@ -154,36 +154,25 @@ python -c "from sqlalchemy import create_engine; engine = create_engine('postgre
 
 See [INSTALL.md Section 4](docs/getting-started/install.md#4-docker-postgis-setup) for complete platform-specific configuration and troubleshooting.
 
-### 5-Minute Example: Build a Route Graph
+### Quick Start Example
 
-```python
-from nautical_graph_toolkit.core.graph import FineGraph
-from nautical_graph_toolkit.data import world_ports
+The toolkit provides comprehensive workflow scripts and Jupyter notebooks for building maritime routing graphs.
 
-# Initialize graph from GeoPackage with auto-download of missing ENCs
-graph = FineGraph(
-    db_path="maritime.gpkg",
-    region="us_west_coast",  # Auto-downloads relevant NOAA ENCs
-    auto_update=True
-)
+**Interactive Examples**: See the [Jupyter Notebooks](docs/notebooks/) for 13+ working examples covering:
+- ENC data import and conversion
+- Graph creation (BaseGraph, FineGraph, H3Graph)
+- Route optimization with A* pathfinding
+- Weighted graph construction and vessel constraints
 
-# Define vessel constraints
-constraints = {
-    "draft": 8.5,      # meters
-    "height": 45.0,    # meters
-    "vessel_type": "general_cargo"
-}
+**Complete Workflow**: For a step-by-step walkthrough, see the [Quick Start Workflow Guide](docs/getting-started/workflow-quickstart.md).
 
-# Find optimal route from Long Beach to San Francisco
-route = graph.find_route(
-    start=(33.74, -118.21),
-    end=(37.81, -122.41),
-    constraints=constraints,
-    method="weighted_a*"
-)
+**Command-line Workflows**:
+```bash
+# PostGIS backend (recommended for production)
+python scripts/maritime_graph_postgis_workflow.py
 
-# Export for visualization
-route.to_geojson("route.geojson")
+# GeoPackage backend (portable, single-file)
+python scripts/maritime_graph_geopackage_workflow.py
 ```
 
 ## ⚡ Performance Benchmarks
@@ -329,19 +318,17 @@ Comprehensive real-world performance analysis from production testing (Nov 2025)
 
 We have a comprehensive public roadmap that outlines our development journey from foundation to production-ready QGIS integration.
 
-**Current Status**: v{{ project_version }} Released ✅ ({{ last_updated }})
+**Current Status**: v0.1.2 Released ✅ (February 2026)
 
-**Near-term Goals** (v0.2.0 - Foundation & Polish):
-- PyPI distribution for easy installation
-- Security audit and comprehensive API documentation
-- Docker/Kubernetes deployment support
-- CI/CD pipeline with >80% test coverage
+**Near-term Goals** (v0.1.x Foundation Completion → v0.2.0 PyTorch Integration):
+- **v0.1.x**: Security audit, Weights class refactor (PyTorch prep), 80% test coverage
+- **v0.2.0**: PyTorch integration, limited PyPI distribution (no GDAL), full Docker packaging, mkdocstrings API docs
 
 **Long-term Vision**:
-- **QGIS 4.0 Plugin Integration** (2026) - Native QGIS plugin for maritime route planning
-- **Advanced Pathfinding** - Time-dependent routing with tidal currents
-- **ML-Powered Optimization** - Traffic prediction and route optimization models
-- **GPU Acceleration** - CUDA-based graph processing (research track)
+- **QGIS 4.0 Plugin Integration** (February 20, 2026) - Native QGIS plugin for maritime route planning
+- **Advanced Pathfinding** - Time-dependent routing with tidal currents (post-QGIS MVP)
+- **Advanced ML Models** - Build on PyTorch foundation for traffic amd weather optimization (post-v0.2.0)
+- **GPU Production Support** - Expand CUDA acceleration beyond experimental (post-v0.2.0)
 
 **Development Note**: This is a part-time project developed between sea contracts. Timelines are flexible and availability-dependent. Community contributions welcome starting with v0.2.0!
 
@@ -391,20 +378,29 @@ The toolkit uses a clean, layered architecture:
 
 ```
 nautical_graph_toolkit/
-   core/              # Main conversion and routing classes
-      graph.py       # Graph classes (BaseGraph, FineGraph, H3Graph)
-      s57_converter.py   # S-57 conversion classes
-      router.py      # Route optimization engine
-   utils/             # Database and utility connectors
-      db_utils.py    # Database operations
-      s57_utils.py   # S-57 attribute lookups
-      port_utils.py  # World Port Index integration
-      noaa_database.py # NOAA ENC scraper
-   data/              # S-57 reference data and configurations
-      graph_config.yml   # Graph layer definitions
-      s57_objects.csv    # S-57 object class lookup
-      custom_ports.csv   # User-defined ports
-   __init__.py
+   core/                    # Main conversion and routing classes
+      graph.py             # Graph classes (BaseGraph, FineGraph, H3Graph, Weights)
+      s57_data.py          # S-57 conversion classes and database managers
+      pathfinding_lite.py  # A* pathfinding engine
+   utils/                   # Database and utility connectors
+      db_utils.py          # Database operations (PostGIS, GeoPackage, SpatiaLite)
+      s57_utils.py         # S-57 attribute lookups and NOAA database
+      port_utils.py        # World Port Index integration
+      s57_classification.py # S-57 feature classification
+      geometry_utils.py    # Geometric operations (buffer, slice)
+      misc_utils.py        # Coordinate conversion and helpers
+      plot_utils.py        # Plotly visualization utilities
+      notebook_utils.py    # Jupyter notebook benchmarking
+      logging_utils.py     # Enhanced logging utilities
+   data/                    # S-57 reference data and configurations
+      graph_config.yml      # Graph layer definitions
+      s57objectclasses.csv  # S-57 object class lookup
+      s57attributes.csv     # S-57 attribute definitions
+      s57expectedinput.csv  # S-57 expected input specifications
+      WorldPortIndex_2019Shapefile/ # Port locations
+      custom_ports.csv      # User-defined ports
+      noaa_database.csv     # NOAA ENC catalog cache
+   __init__.py              # Main package exports
 ```
 
 ### Core Classes
@@ -414,10 +410,18 @@ nautical_graph_toolkit/
 | `S57Base` | Bulk conversion | Import large ENC datasets quickly |
 | `S57Advanced` | Feature-level conversion | Detailed analysis with source attribution |
 | `S57Updater` | Incremental updates | Keep PostGIS in sync with new charts |
+| `ENCDataFactory` | Database connector factory | Multi-backend data access |
+| `PostGISManager` | PostGIS operations | Spatial analysis and server deployment |
+| `GPKGManager` | GeoPackage operations | Portable single-file database |
+| `SpatiaLiteManager` | SpatiaLite operations | Lightweight file-based database |
 | `BaseGraph` | Coarse routing network | Large-scale maritime analysis |
 | `FineGraph` | Detailed routing network | Coastal route planning |
 | `H3Graph` | Hexagonal routing network | Multi-resolution flexibility |
-| `PostGISManager` | Database queries | Spatial analysis and reporting |
+| `Weights` | Edge weight calculation | Vessel-specific routing costs |
+| `Astar` | A* pathfinding | Route computation |
+| `Route` | Route management | Export and analysis |
+| `NoaaDatabase` | NOAA ENC catalog | Chart metadata and updates |
+| `PortData` | Port information | World Port Index integration |
 
 ## 💼 Common Workflows
 
@@ -433,54 +437,66 @@ converter = S57Base(
 converter.convert_by_enc()
 ```
 
-### Build a Production Maritime Graph on PostGIS
-```python
-from nautical_graph_toolkit.core import FineGraph
+### Build a Maritime Routing Graph
 
-graph = FineGraph(
-    backend="postgis",
-    db_config={
-        "host": "localhost",
-        "user": "maritime",
-        "password": "secure_pass",
-        "dbname": "maritime_prod"
-    },
-    resolution="fine"  # 0.02-0.3 NM
-)
-graph.build()  # Builds all routing layers
+For complete step-by-step guides, see:
+- [PostGIS Workflow Guide](docs/user-guides/workflow-postgis-guide.md)
+- [GeoPackage Workflow Guide](docs/user-guides/workflow-geopackage-guide.md)
+
+Graph creation is done via the workflow scripts:
+```bash
+# PostGIS backend (recommended for production)
+python scripts/maritime_graph_postgis_workflow.py
+
+# GeoPackage backend (portable, single-file)
+python scripts/maritime_graph_geopackage_workflow.py
 ```
 
 ### Find Optimal Vessel Route
-```python
-# Vessel with 9m draft approaching restricted channel
-route = graph.find_route(
-    start=(47.60, -122.33),  # Seattle
-    end=(46.75, -122.92),    # Astoria
-    constraints={"draft": 9.0, "vessel_type": "container_ship"},
-    avoid_zones=["restricted", "military"]
-)
 
-# Export with metadata
-route.to_geojson(
-    "optimized_route.geojson",
-    include_attributes=["depth", "current", "traffic"]
+The toolkit provides A* pathfinding via the `Astar` class. See the [Weighted Workflow Example](docs/user-guides/weights-workflow-example.md) for a complete working example.
+
+```python
+from nautical_graph_toolkit.core.pathfinding_lite import Astar
+from shapely.geometry import Point
+
+# Load your graph (from PostGIS, GeoPackage, etc.)
+# graph = ... (load from your data source)
+
+# Create pathfinder
+pathfinder = Astar(graph)
+
+# Compute route
+route = pathfinder.compute_route(
+    start_point=Point(-122.33, 47.60),  # Seattle
+    end_point=Point(-122.92, 46.75),    # Astoria
+    weight_key='adjusted_weight'
 )
 ```
+
+For vessel-specific constraints and weighted routing, see the complete guides above.
 
 ### Synchronize Local Charts with NOAA
+
 ```python
-from nautical_graph_toolkit.utils import NoaaDatabase
+from nautical_graph_toolkit.utils.s57_utils import NoaaDatabase
 
 noaa = NoaaDatabase()
-updates = noaa.check_updates(local_enc_dir="/data/encs")
 
-# Lists all outdated charts
-for chart in updates["outdated"]:
-    print(f"Update available: {chart.name} (v{chart.edition})")
+# Get current NOAA ENC catalog
+charts = noaa.get_charts()  # Returns list of NoaaChart objects
 
-# Auto-download updates
-noaa.download_updates(updates, destination="/data/encs")
+# Or get as DataFrame
+df = noaa.get_dataframe()
+
+# Save to CSV for reference
+noaa.save_to_csv("my_enc_catalog.csv")
+
+# Force refresh from live NOAA website
+charts = noaa.get_charts(force_refresh=True)
 ```
+
+**Note**: Download charts directly from NOAA: https://charts.noaa.gov/ENCs/ENCs.shtml
 
 ## 📦 Installation & Dependencies
 
