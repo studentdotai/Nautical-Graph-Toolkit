@@ -8,6 +8,7 @@ This directory contains test datasets and compressed archives for development an
 **Purpose**: Test S-57 Update Functionality
 
 **Contents**:
+
 - `ENC_ROOT/` - Base ENC dataset
 - `ENC_ROOT_UPDATE/` - Updated version of ENC charts for testing incremental updates
 
@@ -24,7 +25,7 @@ p7zip -d ENC_ROOT_UPDATE_SET.7z
 
 **Example Usage**:
 ```python
-from nautical_graph_toolkit.core import S57Advanced, S57Updater
+from nautical_graph_toolkit.core.s57_data import S57Advanced, S57Updater
 
 # 1. Initial import from ENC_ROOT
 converter = S57Advanced(
@@ -48,9 +49,11 @@ updater.update_from_directory("data/ENC_ROOT_UPDATE")
 **Purpose**: Full Graph Workflow Testing (SF Bay to Los Angeles)
 
 **Contents**:
+
 - 47 S-57 ENC files covering the region from Los Angeles to San Francisco Bay (~400km coastal route)
 
 **Use Case**:
+
 - Testing `S57Advanced` for creating comprehensive ENC databases
 - Running complete graph generation workflows (`BaseGraph`, `FineGraph`, `H3Graph`)
 - Performance benchmarking and route optimization testing
@@ -63,7 +66,8 @@ updater.update_from_directory("data/ENC_ROOT_UPDATE")
 
 **Example Usage**:
 ```python
-from nautical_graph_toolkit.core import S57Advanced, FineGraph
+from nautical_graph_toolkit.core.s57_data import S57Advanced
+from nautical_graph_toolkit.core.graph import FineGraph
 
 # 1. Convert ENCs to database
 converter = S57Advanced(
@@ -76,7 +80,7 @@ converter.convert()
 # 2. Generate routing graph
 graph = FineGraph(
     db_path="sf_la_maritime.gpkg",
-    resolution=0.1  # 0.1 nautical miles
+    fine_spacing_nm=0.1  # 0.1 nautical miles
 )
 graph.build()
 
@@ -84,14 +88,15 @@ graph.build()
 route = graph.find_route(
     start=(33.74, -118.21),  # Long Beach
     end=(37.81, -122.41),     # San Francisco
-    constraints={"draft": 8.5, "vessel_type": "general_cargo"}
+    vessel_draft=8.5,         # meters
+    vessel_type="general_cargo"
 )
-route.to_geojson("la_to_sf_route.geojson")
+graph.export_route_geojson(route, "la_to_sf_route.geojson")
 ```
 
 ---
 
-## 🌐 Pre-Generated Examples & Large Datasets (pCloud Repository)
+## 🌐 Pre-Generated Examples & Large Datasets (pCloud Repository) {: #-pre-generated-examples--large-datasets-pcloud-repository}
 
 For users who want to skip lengthy data processing or validate their outputs against known-good examples, we provide a comprehensive collection of pre-generated outputs and source databases.
 
@@ -111,12 +116,13 @@ Ready-to-use ENC databases that can be directly queried for graph generation wit
 | **us_enc_all.gpkg** | 6.97 GB | All US coastal waters | Complete | Production-scale testing, comprehensive coverage |
 
 **Usage Example** (Skip the import step entirely):
+
 ```python
-from nautical_graph_toolkit.core import FineGraph
+from nautical_graph_toolkit.core.graph import FineGraph
 
 # Use pre-processed database directly (no import needed!)
 graph = FineGraph(
-    db_path="enc_west.gpkg",  # Downloaded from pCloud
+    db_path="data/enc_west.gpkg",  # Downloaded from pCloud
     fine_spacing_nm=0.1
 )
 graph.build()
@@ -129,6 +135,7 @@ graph.build()
 ### 📈 Pre-Generated Maritime Graphs
 
 These are production-quality graphs generated from the SF→LA test dataset (47 ENCs, 400km route). Use them to:
+
 - **Validate** your installation produces similar outputs
 - **Compare** performance against known benchmarks
 - **Learn** from example graph structures before generating your own
@@ -145,6 +152,7 @@ These are production-quality graphs generated from the SF→LA test dataset (47 
 | **h3_graph_wt_gpkg_6_11_v2.gpkg** | GeoPackage | Yes | ~768K | 6-11 | 1.90 GB | ~180 min |
 
 **Naming Convention:**
+
 - `_pg_` = Generated from PostGIS backend (2.0-2.4× faster)
 - `_gpkg_` = Generated from GeoPackage backend
 - `_wt_` = Includes weight calculations (static, directional, dynamic)
@@ -162,6 +170,7 @@ Optimal balance of detail and performance for production routing:
 | **fine_graph_wt_gpkg_10_v2.gpkg** | GeoPackage | Yes | ~174K | 0.1 NM | 655 MB | ~52 min |
 
 **Naming Convention:**
+
 - `10` = fine_spacing_nm coefficient (10 × 0.01 = 0.1 NM spacing)
 
 #### Fine Grid Graphs (0.2 NM Spacing) - Fast Prototyping
@@ -176,6 +185,7 @@ Coarser grid for rapid testing and proof-of-concept work:
 | **fine_graph_wt_gpkg_20_v2.gpkg** | GeoPackage | Yes | ~43K | 0.2 NM | 162 MB | ~14 min |
 
 **Naming Convention:**
+
 - `20` = fine_spacing_nm coefficient (20 × 0.01 = 0.2 NM spacing)
 
 ---
@@ -183,37 +193,42 @@ Coarser grid for rapid testing and proof-of-concept work:
 ### 🎯 Use Case Recommendations
 
 **Installation Validation & Quick Start:**
+
 1. Download `enc_west.gpkg` (209 MB) - manageable for most users
 2. Download 1-2 `fine_graph_pg_10` variants (500-550 MB)
 3. Load in QGIS to compare your outputs
-4. See [Performance Benchmarks](../README.md#-performance-benchmarks) for timing comparison
+4. Compare your outputs against the [reference data](../reference/technical-specs.md)
 
 **Skip Initial Processing (Development/Testing):**
+
 1. Download `us_enc_all.gpkg` (6.97 GB) for comprehensive coverage
 2. Use directly in graph workflows without import step
 3. Saves 40-60 minutes vs extracting and importing ENCs
 4. Ideal when prototyping graph algorithms
 
 **Performance Benchmarking:**
+
 1. Download matching graph types you're testing
 2. Compare your generation times against reference data
 3. Verify node/edge counts match expectations
 4. Identify performance bottlenecks (weighting dominates 37-89% of time)
 
 **Learn Graph Structure:**
+
 1. Download weighted (`_wt_`) vs non-weighted versions
 2. Examine in QGIS to understand:
-   - Node placement patterns and density
-   - Edge connectivity and directionality
-   - Weight distribution across graph
-   - Feature enrichment with S-57 data
+    - Node placement patterns and density
+    - Edge connectivity and directionality
+    - Weight distribution across graph
+    - Feature enrichment with S-57 data
 3. Compare fine grid (0.1 vs 0.2 NM) to understand trade-offs
 4. Compare PostGIS vs GeoPackage outputs (should be identical)
 
 **Backend Comparison:**
+
 1. Download same graph from both PostGIS (`_pg_`) and GeoPackage (`_gpkg_`)
 2. Compare in QGIS (should be visually identical)
-3. Reference [Performance Benchmarks](../README.md#-performance-benchmarks) for timing details
+3. Reference [performance](../reference/technical-specs.md) for timing details
 4. PostGIS is 2.0-2.4× faster overall; GeoPackage is more portable
 
 ---
@@ -221,6 +236,7 @@ Coarser grid for rapid testing and proof-of-concept work:
 ### 📥 Download Instructions
 
 **Step 1: Access Repository**
+
 - Click: [ENC-Graph-test-files on pCloud](https://u.pcloud.link/publink/show?code=kZVUYM5Zm87H47h2G1XBANXHwhIfcJA681Oy)
 - No account required (public link)
 
@@ -260,6 +276,7 @@ qgis &
 ### ⚠️ Important Notes
 
 **File Sizes & Bandwidth:**
+
 - **Small graphs** (FINE 0.2nm): 70-162 MB per file
 - **Medium graphs** (FINE 0.1nm): 249-655 MB per file
 - **Large graphs** (H3 hexagonal): 791 MB - 2.22 GB per file
@@ -268,18 +285,22 @@ qgis &
 Download selectively based on your bandwidth and storage constraints. Start with enc_west.gpkg (209 MB) and one FINE graph example.
 
 **Version Compatibility:**
-These graphs were generated with toolkit v0.1.0. If using a different version:
+
+These graphs were generated with toolkit v0.1.1. If using a different version:
+
 - Minor differences in output structure are expected
 - Overall graph topology should match
 - Performance characteristics should be similar
 - Node/edge counts may differ slightly due to algorithm refinements
 
 **Data Currency:**
+
 - ENC data reflects chart editions available as of November 2025
 - For current navigational use, always download latest charts from NOAA: https://charts.noaa.gov/ENCs/ENCs.shtml
 - These files are for testing/validation, not production navigation
 
 **RTREE Requirement:**
+
 GeoPackage and SpatiaLite graphs require SQLite with RTREE support. Verify with:
 ```python
 try:
@@ -296,12 +317,12 @@ print("✓ RTREE support available")
 
 ### 📚 Related Documentation
 
-- **Performance Benchmarks**: [README.md](../README.md#-performance-benchmarks) - Detailed timing analysis by backend and graph mode
+- **Performance Benchmarks**: [technical-specs.md](../reference/technical-specs.md)- Detailed timing analysis by backend and graph mode
 - **Workflow Guides**:
-  - [WORKFLOW_QUICKSTART.md](../docs/WORKFLOW_QUICKSTART.md) - End-to-end examples
-  - [WORKFLOW_POSTGIS_GUIDE.md](../docs/WORKFLOW_POSTGIS_GUIDE.md) - PostGIS backend setup
-  - [WORKFLOW_GEOPACKAGE_GUIDE.md](../docs/WORKFLOW_GEOPACKAGE_GUIDE.md) - GeoPackage backend setup
-- **Weights Documentation**: [WEIGHTS_WORKFLOW_EXAMPLE.md](../docs/WEIGHTS_WORKFLOW_EXAMPLE.md) - Static, directional, and dynamic weighting
+    - [Quick Start](../getting-started/workflow-quickstart.md) - End-to-end examples
+    - [PostGIS Backend Setup](../user-guides/workflow-postgis-guide.md) - PostGIS backend configuration
+    - [GeoPackage Backend Setup](../user-guides/workflow-geopackage-guide.md) - GeoPackage backend configuration
+- **Weights Documentation**: [Weights & Routing](../user-guides/weights-workflow-example.md) - Static, directional, and dynamic weighting
 
 ---
 
@@ -314,8 +335,7 @@ data/
 ├── ENC_SF_LA/                   # SF to LA ENCs (extracted)
 ├── ENC_ROOT_UPDATE_SET.7z       # Compressed update test dataset
 ├── ENC_SF_LA_SET.7z             # Compressed SF-LA dataset
-├── enc_west.gpkg                # Example GeoPackage output
-└── DATA_GUIDE.md                # This file
+└── enc_west.gpkg                # Example GeoPackage output
 ```
 
 ## 🔧 Installing 7zip
@@ -344,7 +364,7 @@ The compressed archives are included in the repository for convenience during de
 You can also use the `NoaaDatabase` utility class to check for chart updates:
 
 ```python
-from nautical_graph_toolkit.utils import NoaaDatabase
+from nautical_graph_toolkit.utils.s57_utils import NoaaDatabase
 
 # Check which charts need updates
 noaa = NoaaDatabase()
@@ -357,4 +377,4 @@ for chart in updates["outdated"]:
 
 ## 📊 Performance Reference
 
-The ENC_SF_LA dataset is used in the project's benchmark tests. See [Performance Benchmarks](../README.md#-performance-benchmarks) for detailed timing results across different backends and graph modes.
+The ENC_SF_LA dataset is used in the project's benchmark tests. See [Performance Benchmarks](../reference/technical-specs.md) for detailed timing results across different backends and graph modes.

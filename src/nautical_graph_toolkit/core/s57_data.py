@@ -907,7 +907,7 @@ class S57Advanced:
                 # Create memory dataset
                 # NOTE: GDAL 3.11+ deprecates 'Memory' driver in favor of 'MEM'
                 # When upgrading to GDAL 3.11.3+, change 'Memory' to 'MEM'
-                # See docs/TROUBLESHOOTING.md - "GDAL 3.11+ Driver Deprecations"
+                # See docs/reference/troubleshooting.md - "GDAL 3.11+ Driver Deprecations"
                 mem_driver = ogr.GetDriverByName('Memory')
                 mem_ds = mem_driver.CreateDataSource(f'batch_{enc_name}_{layer_name}')
                 

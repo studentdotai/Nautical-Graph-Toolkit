@@ -2,7 +2,7 @@
 
 The Nautical Graph Toolkit supports three database backends for storing S-57 ENC data and navigation graphs. Choosing the right backend depends on your operational requirements, scale, and infrastructure.
 
-**Before getting started:** See [SETUP.md](./SETUP.md) for software prerequisites, GDAL version requirements, and backend installation instructions.
+**Before getting started:** See [SETUP.md](../getting-started/setup.md) for software prerequisites, GDAL version requirements, and backend installation instructions.
 
 ## 1. PostGIS (Recommended for Production)
 **Use when:** Building enterprise-grade applications, requiring multi-user concurrent access, handling large datasets (e.g., full NOAA catalog), or performing frequent incremental updates.
@@ -12,7 +12,7 @@ The Nautical Graph Toolkit supports three database backends for storing S-57 ENC
     *   **Performance:** Enables server-side processing for graph weighting and parallel processing for data imports.
     *   **Reliability:** Transactional integrity (ACID) ensures data safety during updates (S57Updater).
 *   **Trade-offs:** Requires a running PostgreSQL instance and network connectivity.
-*   **Requirements:** PostgreSQL with PostGIS extension (see [SETUP.md](./SETUP.md) for installation)
+*   **Requirements:** PostgreSQL with PostGIS extension (see [SETUP.md](../getting-started/setup.md) for installation)
 
 ## 2. GeoPackage (Recommended for Portability)
 **Use when:** Sharing data between teams, working offline, archiving project snapshots, or visualizing directly in GIS desktop software (QGIS, ArcGIS).
@@ -51,9 +51,9 @@ The Nautical Graph Toolkit supports three database backends for storing S-57 ENC
 
 Once you've chosen your backend:
 
-1. **Review prerequisites**: See [SETUP.md](./SETUP.md) for software requirements and installation steps
+1. **Review prerequisites**: See [SETUP.md](../getting-started/setup.md) for software requirements and installation steps
 2. **Follow the workflow guide** for your backend:
-   - **PostGIS**: [WORKFLOW_POSTGIS_GUIDE.md](./WORKFLOW_POSTGIS_GUIDE.md)
-   - **GeoPackage**: [WORKFLOW_GEOPACKAGE_GUIDE.md](./WORKFLOW_GEOPACKAGE_GUIDE.md)
-   - **S-57 Import Process**: [WORKFLOW_S57_IMPORT_GUIDE.md](./WORKFLOW_S57_IMPORT_GUIDE.md) (applies to all backends)
-3. **Start with quickstart**: [WORKFLOW_QUICKSTART.md](./WORKFLOW_QUICKSTART.md) for first-time setup
+    - **PostGIS**: [WORKFLOW_POSTGIS_GUIDE.md](workflow-postgis-guide.md)
+    - **GeoPackage**: [WORKFLOW_GEOPACKAGE_GUIDE.md](workflow-geopackage-guide.md)
+    - **S-57 Import Process**: [WORKFLOW_S57_IMPORT_GUIDE.md](workflow-s57-import-guide.md) (applies to all backends)
+3. **Start with quickstart**: [WORKFLOW_QUICKSTART.md](../getting-started/workflow-quickstart.md) for first-time setup

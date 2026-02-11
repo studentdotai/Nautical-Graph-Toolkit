@@ -9,39 +9,43 @@ The **Maritime Graph Workflow** is a comprehensive Python script that orchestrat
 The workflow performs four major steps:
 
 1. **Base Graph Creation** (0.3 NM resolution)
-   - Defines geographic area of interest between two ports
-   - Filters ENC charts to the relevant region
-   - Creates navigable water grid from S-57 layers
-   - Generates initial graph structure
-   - Computes baseline route
+
+    - Defines geographic area of interest between two ports
+    - Filters ENC charts to the relevant region
+    - Creates navigable water grid from S-57 layers
+    - Generates initial graph structure
+    - Computes baseline route
 
 2. **Fine/H3 Graph Creation** (0.02-0.3 NM or hexagonal)
-   - Focuses on route buffer around base route
-   - Creates high-resolution graph for detailed routing
-   - Two modes: regular grid ("fine") or hexagonal ("h3")
-   - Supports multi-resolution optimization
+
+    - Focuses on route buffer around base route
+    - Creates high-resolution graph for detailed routing
+    - Two modes: regular grid ("fine") or hexagonal ("h3")
+    - Supports multi-resolution optimization
 
 3. **Graph Weighting** (dynamic weight calculation)
-   - Converts graph to directed edges
-   - Enriches edges with S-57 feature attributes
-   - Applies three-tier weighting system:
-     - **Static weights**: Distance-based penalties/bonuses from geographic features
-     - **Directional weights**: Traffic flow alignment rewards/penalties
-     - **Dynamic weights**: Vessel-specific constraints (draft, height)
-   - Creates final routing weights
+
+    - Converts graph to directed edges
+    - Enriches edges with S-57 feature attributes
+    - Applies three-tier weighting system:
+        - **Static weights**: Distance-based penalties/bonuses from geographic features
+        - **Directional weights**: Traffic flow alignment rewards/penalties
+        - **Dynamic weights**: Vessel-specific constraints (draft, height)
+    - Creates final routing weights
 
 4. **Pathfinding & Export**
-   - Loads weighted graph
-   - Calculates optimal route using A* algorithm
-   - Exports route to GeoJSON for visualization
-   - Optional: exports weighted graph to GeoPackage
+
+    - Loads weighted graph
+    - Calculates optimal route using A* algorithm
+    - Exports route to GeoJSON for visualization
+    - Optional: exports weighted graph to GeoPackage
 
 ## Prerequisites
 
 ### Required Software
-- Python 3.8+
+- Python {{ python_version }}+
 - PostgreSQL with PostGIS extension
-- GDAL/OGR (for S-57 conversion - see WORKFLOW_QUICKSTART.md for pinned version)
+- GDAL {{ gdal_version }} (for S-57 conversion)
 - All dependencies listed in `pyproject.toml`
 
 ### Required Data
@@ -50,22 +54,10 @@ The workflow performs four major steps:
 - `.env` file with database credentials
 
 ### Database Setup
-Ensure PostGIS database is running and populated with S-57 data:
+
+Start Docker PostGIS following the [Installation Guide](../getting-started/install.md#4-docker-postgis-setup), then verify:
 
 ```bash
-# Select platform-specific docker-compose file
-# Linux
-cp docker-compose.linux.yml docker-compose.yml
-
-# macOS ARM (M1/M4)
-cp docker-compose.macos-arm.yml docker-compose.yml
-
-# Windows
-cp docker-compose.windows.yml docker-compose.yml
-
-# Start database
-docker-compose up -d
-
 # Check connection
 psql -h localhost -U postgres -d enc_db -c "SELECT version();"
 
@@ -73,13 +65,11 @@ psql -h localhost -U postgres -d enc_db -c "SELECT version();"
 psql -h localhost -U postgres -d enc_db -c "SELECT * FROM information_schema.schemata WHERE schema_name = 'enc_west';"
 ```
 
-See [INSTALL.md Section 4](../INSTALL.md#4-docker-postgis-setup) for complete platform-specific configuration and troubleshooting.
-
 ## Installation & Setup
 
 ### 1. Clone/Download the Project
 ```bash
-cd ~/python_projects_wsl2/1_MaritimeModule_V1
+cd ~/Nautical-Graph-Toolkit  # or wherever you cloned the project
 ```
 
 ### 2. Install Dependencies
@@ -97,7 +87,7 @@ Edit `.env` file:
 # .env
 DB_NAME="enc_db"
 DB_USER="postgres"
-DB_PASSWORD="your_password"
+DB_PASSWORD="your_secure_password"
 DB_HOST="127.0.0.1"
 DB_PORT="5432"
 MAPBOX_TOKEN="your_mapbox_token"
@@ -247,6 +237,7 @@ python scripts/maritime_graph_postgis_workflow.py --log-level DEBUG
 ```
 
 **Note:** Log files now include:
+
 - **Automatic rotation**: Max 50MB (INFO) or 500MB (DEBUG) per file, 3 backups
 - **Third-party suppression**: Fiona/GDAL DEBUG logs filtered out (99% size reduction)
 - **Project-level logs**: Full debug info for nautical_graph_toolkit modules
@@ -338,6 +329,7 @@ graph.{mode}_graph_{suffix}_edges   - High-resolution edge geometries
 ```
 
 **Note:** Names automatically constructed from config: `{mode}_graph_{name_suffix}`
+
 - Example: `fine_graph.mode="h3"` + `fine_graph.name_suffix="20"` → `h3_graph_20`
 
 #### Step 3: Weighted Graph
@@ -372,9 +364,9 @@ output/detailed_route_7.5m_draft.geojson
 
 - GeoJSON format with route segments
 - Each segment includes:
-  - Geometry (line segment)
-  - Edge attributes (weight, distance, features)
-  - Cumulative distance and weight
+    - Geometry (line segment)
+    - Edge attributes (weight, distance, features)
+    - Cumulative distance and weight
 
 ### Log Files
 ```
@@ -407,7 +399,7 @@ output/benchmark_graph_weighted_directed.csv
 
 ### Typical Execution Times (Los Angeles - San Francisco)
 
-**Latest Performance Metrics (2025-11-03):** Comprehensive benchmark across three graph modes (47 S-57 ENCs)
+**Latest Performance Metrics:** Comprehensive benchmark across three graph modes (47 S-57 ENCs)
 
 | Graph Mode | Nodes | Edges | Step 1: Base | Step 2: Fine/H3 | Step 3: Weighting | Step 4: Pathfinding | **Total** |
 |-----------|-------|-------|--------------|-----------------|-------------------|---------------------|-----------|
@@ -427,6 +419,7 @@ output/benchmark_graph_weighted_directed.csv
 | Pathfinding | 11.0% | 17.3% | 12.7% | Graph loading + A* route |
 
 **Key Insights:**
+
 - 🚀 **Database-side operations:** PostGIS spatial indexing provides 2.0-4.2× speedup vs GeoPackage
 - 📊 **Weighting efficiency:** Database-side spatial queries dramatically reduce enrichment time
 - ⚡ **Best for production:** Optimal performance for large-scale deployments (>500K nodes)
@@ -445,6 +438,7 @@ output/benchmark_graph_weighted_directed.csv
 | **Total (H3)** | 6,393s (106.6min) | 10,801s (180.0min) | **1.7× faster** | Large graph handling |
 
 **Why PostGIS Outperforms GeoPackage:**
+
 - **Server-based spatial indexing:** R-tree indexes optimized for large datasets
 - **Database-side operations:** Geometry operations avoid Python/file I/O overhead
 - **Concurrent queries:** Parallel edge enrichment processing
@@ -460,6 +454,7 @@ output/benchmark_graph_weighted_directed.csv
 | **Research** | H3 Hexagonal | 106.6 min | 894K | Multi-resolution analysis, academic studies |
 
 **Mode Selection Guide:**
+
 - **FINE 0.2nm:** Best for rapid iteration, testing workflow changes, demonstrations
 - **FINE 0.1nm:** Production sweet spot - detailed enough for safe routing, fast enough for regular updates
 - **H3 Hexagonal:** When you need multi-resolution capabilities or uniform cell sizes for analysis
@@ -467,11 +462,13 @@ output/benchmark_graph_weighted_directed.csv
 ### Performance Scaling Analysis
 
 **Time per Million Nodes:**
+
 - FINE 0.2nm: 9.54 ms/node (smallest graph, less efficient)
 - FINE 0.1nm: 6.92 ms/node (**most efficient**)
 - H3 Hexagonal: 7.15 ms/node (good efficiency at scale)
 
 **Weighting Step Scaling:**
+
 - FINE 0.2nm → 0.1nm: 4× nodes → 4.7× weighting time
 - FINE 0.1nm → H3: 4.8× nodes → 6.4× weighting time
 - **Conclusion:** Superlinear scaling, but PostGIS handles it efficiently
@@ -479,6 +476,7 @@ output/benchmark_graph_weighted_directed.csv
 ### When to Use PostGIS vs GeoPackage
 
 **Choose PostGIS when:**
+
 - ✅ Production deployment with server infrastructure
 - ✅ Multi-user environment (concurrent route calculations)
 - ✅ Large datasets (>500K nodes, frequent updates)
@@ -486,6 +484,7 @@ output/benchmark_graph_weighted_directed.csv
 - ✅ Professional deployment (reliability, scalability)
 
 **Choose GeoPackage when:**
+
 - ✅ Single-user or testing environment
 - ✅ Portable/offline operation required
 - ✅ No server infrastructure available
@@ -505,6 +504,7 @@ output/benchmark_graph_weighted_directed.csv
 | Route Calculation | ~1s | 0.1% | A* pathfinding (negligible) |
 
 **Optimization Strategies:**
+
 - Use `--skip-base` to resume from fine graph (saves ~3.2 min)
 - Use `--skip-base --skip-fine` to resume from weighting (saves ~5 min)
 - FINE 0.2nm mode if weighting time is critical constraint
@@ -529,6 +529,7 @@ Error: Failed to initialize database: could not connect to server
 ```
 
 **Solution:**
+
 - Check PostgreSQL is running: `sudo systemctl status postgresql`
 - Verify credentials in `.env` file
 - Test connection: `psql -h localhost -U postgres -d ENC_db`
@@ -539,8 +540,9 @@ Error: schema "enc_west" does not exist
 ```
 
 **Solution:**
+
 - S-57 data not loaded into PostGIS
-- Convert S-57 ENCs first: See `docs/SETUP.md`
+- Convert S-57 ENCs first: See `docs/getting-started/setup.md`
 - Verify schema name in `maritime_workflow_config.yml`
 
 #### 3. Port Not Found
@@ -549,6 +551,7 @@ Error: Could not find departure or arrival port
 ```
 
 **Solution:**
+
 - Check port names in config (must be in World Port Index or custom ports)
 - List available ports: Query `port_data.csv`
 - Add custom port in config with explicit coordinates
@@ -559,6 +562,7 @@ MemoryError during graph creation
 ```
 
 **Solution:**
+
 - Reduce fine grid spacing in config
 - Use H3 mode (more memory-efficient than fine grid)
 - Slice buffer to smaller area
@@ -570,6 +574,7 @@ Warning: H3 graph is not connected. Selecting the largest component.
 ```
 
 **Solution:**
+
 - Normal warning for multi-resolution graphs
 - Pathfinding may fail if start/end in different components
 - Try different vessel parameters or smaller area
@@ -597,8 +602,9 @@ Warning: H3 graph is not connected. Selecting the largest component.
    ```
 
 5. **Check intermediate outputs:**
-   - Base graph in PostGIS: `SELECT COUNT(*) FROM graph.base_graph_PG_nodes;`
-   - Routes saved: `SELECT COUNT(*) FROM routes.base_routes;`
+
+    - Base graph in PostGIS: `SELECT COUNT(*) FROM graph.base_graph_PG_nodes;`
+    - Routes saved: `SELECT COUNT(*) FROM routes.base_routes;`
 
 ## Advanced Topics
 
@@ -683,16 +689,11 @@ print(df[['timestamp', 'node_count', 'edge_count', 'total_pipeline_sec']])
 - **Script**: `scripts/maritime_graph_postgis_workflow.py`
 - **Configuration**: `docs/maritime_workflow_config.yml`
 - **Graph Config**: `src/nautical_graph_toolkit/data/graph_config.yml`
-- **Setup Guide**: `docs/SETUP.md`
-- **Troubleshooting**: `docs/TROUBLESHOOTING.md`
+- **Setup Guide**: `docs/getting-started/setup.md`
+- **Troubleshooting**: `docs/reference/troubleshooting.md`
 
 ### Jupyter Notebooks (Reference)
 - Base graph creation: `docs/notebooks/graph_PostGIS_v2.ipynb`
 - Fine graph creation: `docs/notebooks/graph_fine_PostGIS_v2.ipynb`
 - Weighted graph: `docs/notebooks/graph_weighted_directed_postgis_v2.ipynb`
 
-## License & Attribution
-
-This workflow is part of the Maritime Module, a comprehensive maritime analysis toolkit.
-
-For issues, questions, or contributions, refer to the project's GitHub repository.

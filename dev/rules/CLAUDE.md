@@ -17,13 +17,17 @@ This file provides **project-specific technical knowledge** about the Nautical G
 
 ## Project Identity
 
-- **Name**: Nautical Graph Toolkit
+- **Company**: Vector Nautical (OpenCollective organization)
+- **Product Name**: Nautical-Graph-Toolkit (NGT)
+- **Future Vision**: Route Assistant (NGT 1.0 - Backend + UI + ML)
+- **Version**: 0.1.1 (released January 2026)
 - **Purpose**: Comprehensive maritime analysis toolkit for converting NOAA S-57 Electronic Navigational Charts (ENC) into analysis-ready geospatial formats, generating intelligent maritime routing networks, and performing advanced vessel route optimization
-- **Version**: 0.1.0 (early development, active)
 - **License**: AGPL-3.0-only
 - **Author**: Viktor Kolbasov <contact@studentdotai.com>
 - **Repository**: https://github.com/studentdotai/Nautical-Graph-Toolkit
-- **Python**: 3.11+ required
+- **Python**: 3.11+ required (3.12+ planned for v0.5.0+ with PyTorch/CUDA)
+
+**Naming Convention**: See [NAMING_CONVENTION.md](./NAMING_CONVENTION.md) for proper usage of "Vector Nautical" (company), "Nautical-Graph-Toolkit" (product), and "Route Assistant" (future vision).
 
 ## Documentation and API Accuracy
 

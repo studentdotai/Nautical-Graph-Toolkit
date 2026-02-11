@@ -36,6 +36,9 @@ venv/
 # Jupyter Notebook
 .ipynb_checkpoints
 
+# MkDocs build output
+site/
+
 # Output directories from your scripts
 docs/notebooks/output/
 

@@ -168,8 +168,8 @@ The grid merges sea areas with fairways and channels. (line 2)
 **Overflow Handling:**
 - **Notebook-specific details** → APPENDIX section at notebook end
 - **General knowledge** → External `.md` documentation
-- **Backend information** → Reference `docs/SETUP.md`, `docs/DATABASE_BACKEND_GUIDE.md`
-- **Performance metrics** → Reference `docs/TECHNICAL_SPECS.md`
+- **Backend information** → Reference `docs/getting-started/setup.md`, `docs/user-guides/database-backend-guide.md`
+- **Performance metrics** → Reference `docs/reference/technical-specs.md`
 
 **Cross-References:**
 - Link to external docs for general information
@@ -274,8 +274,8 @@ This notebook requires:
 2. **[Backend-specific]**: Schema/file name containing S-57 layers
 3. **Port Data**: Standard port definitions (included with package)
 
-**Setup Instructions:** See `docs/SETUP.md`
-**Troubleshooting:** See `docs/TROUBLESHOOTING.md`
+**Setup Instructions:** See `docs/getting-started/setup.md`
+**Troubleshooting:** See `docs/reference/troubleshooting.md`
 ```
 
 ### Fine Graph Template
@@ -314,8 +314,8 @@ This notebook requires:
 2. **[Backend-specific]**: Schema/file with S-57 layers
 3. **Port Data**: Standard port definitions
 
-**Setup Instructions:** See `docs/SETUP.md`
-**Troubleshooting:** See `docs/TROUBLESHOOTING.md`
+**Setup Instructions:** See `docs/getting-started/setup.md`
+**Troubleshooting:** See `docs/reference/troubleshooting.md`
 ```
 
 ### Weighted Graph Template
@@ -354,8 +354,8 @@ This notebook requires:
 2. **Depth Data**: Sounding data (SOUNDG layer)
 3. **Weather Data**: Wind, wave, current rasters (optional)
 
-**Setup Instructions:** See `docs/SETUP.md`
-**Troubleshooting:** See `docs/TROUBLESHOOTING.md`
+**Setup Instructions:** See `docs/getting-started/setup.md`
+**Troubleshooting:** See `docs/reference/troubleshooting.md`
 ```
 
 ### Import/Utility Template
@@ -384,8 +384,8 @@ This notebook requires:
 1. **Data Type**: Description and location
 2. **Data Type**: Description and location
 
-**Setup Instructions:** See `docs/SETUP.md`
-**Troubleshooting:** See `docs/TROUBLESHOOTING.md`
+**Setup Instructions:** See `docs/getting-started/setup.md`
+**Troubleshooting:** See `docs/reference/troubleshooting.md`
 ```
 
 ### Template Guidelines
@@ -412,7 +412,7 @@ For notebooks with complex parameters (spacing, buffers, vessel specs):
 **Detailed documentation:**
 - Place in APPENDIX if notebook-specific
 - Reference external docs for general information
-- Link to `docs/SETUP.md` for backend-specific parameters
+- Link to `docs/getting-started/setup.md` for backend-specific parameters
 
 **Example:**
 ```markdown
@@ -543,8 +543,8 @@ print("=" * 70)
 ### Backend Selection
 
 For guidance on choosing the appropriate backend for your use case, see:
-- `docs/SETUP.md` - Complete setup instructions and feature comparison
-- `docs/DATABASE_BACKEND_GUIDE.md` - Detailed backend tradeoffs and recommendations
+- `docs/getting-started/setup.md` - Complete setup instructions and feature comparison
+- `docs/user-guides/database-backend-guide.md` - Detailed backend tradeoffs and recommendations
 
 **Quick Reference:**
 - **PostGIS**: Production, multi-user, large datasets (1000+ ENCs)
@@ -906,9 +906,9 @@ print("=" * 70)
 ### Single Source of Truth Principle
 
 **General knowledge belongs in external `.md` files:**
-- Backend comparisons and setup: `docs/SETUP.md`, `docs/DATABASE_BACKEND_GUIDE.md`
-- Performance benchmarks: `docs/TECHNICAL_SPECS.md` (to be created)
-- Storage requirements: `docs/TECHNICAL_SPECS.md`
+- Backend comparisons and setup: `docs/getting-started/setup.md`, `docs/user-guides/database-backend-guide.md`
+- Performance benchmarks: `docs/reference/technical-specs.md` (to be created)
+- Storage requirements: `docs/reference/technical-specs.md`
 - S-57 specifications: External IHO documentation
 - GDAL configuration: `.claude/skills/gdal-s57-setup/SKILL.md`
 
@@ -1057,8 +1057,8 @@ fig = logger.visualize_performance(
 
 **AVOID hardcoding in notebooks:**
 - "This takes 21 minutes" → Use `load_estimates()` for dynamic estimates
-- "Requires 8 GB RAM" → Reference `docs/TECHNICAL_SPECS.md`
-- "PostGIS is 2x faster" → Reference `docs/TECHNICAL_SPECS.md`
+- "Requires 8 GB RAM" → Reference `docs/reference/technical-specs.md`
+- "PostGIS is 2x faster" → Reference `docs/reference/technical-specs.md`
 
 **Key Principles:**
 - Track all major workflow steps with `start_timer()` / `end_step()`

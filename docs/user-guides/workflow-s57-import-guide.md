@@ -9,32 +9,36 @@ The **S-57 Data Import Tool** (`scripts/import_s57.py`) is a production-grade co
 The tool performs automated S-57 conversion with the following features:
 
 1. **Three Conversion Modes**
-   - **Base Mode**: One-to-one bulk conversion (each ENC → separate output file/schema)
-   - **Advanced Mode**: Layer-centric conversion (all ENCs merged by layer with ENC source tracking)
-   - **Update Mode**: Incremental or force updates to existing datasets
+
+    - **Base Mode**: One-to-one bulk conversion (each ENC → separate output file/schema)
+    - **Advanced Mode**: Layer-centric conversion (all ENCs merged by layer with ENC source tracking)
+    - **Update Mode**: Incremental or force updates to existing datasets
 
 2. **Multiple Output Formats**
-   - **PostGIS**: Server-based database with schema management
-   - **GeoPackage**: SQLite-based portable format (`.gpkg`)
-   - **SpatiaLite**: SQLite-based spatial format (`.sqlite`)
+
+    - **PostGIS**: Server-based database with schema management
+    - **GeoPackage**: SQLite-based portable format (`.gpkg`)
+    - **SpatiaLite**: SQLite-based spatial format (`.sqlite`)
 
 3. **Quality Assurance**
-   - Pre-flight validation (environment, paths, database connectivity)
-   - Post-conversion verification (layer sampling, feature count validation)
-   - DSID stamping verification (Advanced mode only)
-   - Performance benchmarking
+
+    - Pre-flight validation (environment, paths, database connectivity)
+    - Post-conversion verification (layer sampling, feature count validation)
+    - DSID stamping verification (Advanced mode only)
+    - Performance benchmarking
 
 4. **Advanced Features**
-   - Parallel file processing for faster conversions
-   - Automatic batch size tuning based on available memory
-   - Incremental update tracking with change summaries
-   - Comprehensive logging and error reporting
+
+    - Parallel file processing for faster conversions
+    - Automatic batch size tuning based on available memory
+    - Incremental update tracking with change summaries
+    - Comprehensive logging and error reporting
 
 ## Prerequisites
 
 ### Required Software
-- Python 3.8+
-- GDAL (exactly pinned version - see WORKFLOW_QUICKSTART.md for version details)
+- Python {{ python_version }}+
+- GDAL {{ gdal_version }}
 - PostgreSQL with PostGIS extension (for PostGIS output)
 - All dependencies listed in `pyproject.toml`
 
@@ -61,7 +65,7 @@ psql -h localhost -U postgres -d enc_db -c "CREATE EXTENSION IF NOT EXISTS postg
 
 ### 1. Clone/Download the Project
 ```bash
-cd ~/python_projects_wsl2/1_MaritimeModule_V1
+cd ~/Nautical-Graph-Toolkit  # or wherever you cloned the project
 ```
 
 ### 2. Install Dependencies
@@ -79,14 +83,14 @@ Create or edit `.env` file:
 # .env
 DB_NAME="enc_db"
 DB_USER="postgres"
-DB_PASSWORD="your_password"
+DB_PASSWORD="your_secure_password"
 DB_HOST="127.0.0.1"
 DB_PORT="5432"
 ```
 
 Or pass credentials via command-line arguments:
 ```bash
---db-name enc_db --db-user postgres --db-password xxx --db-host 127.0.0.1 --db-port 5432
+--db-name enc_db --db-user postgres --db-password your_secure_password --db-host 127.0.0.1 --db-port 5432
 ```
 
 ## Usage Guide
@@ -122,7 +126,7 @@ python scripts/import_s57.py \
   --output-format postgis \
   --db-host 127.0.0.1 \
   --db-user postgres \
-  --db-password xxx
+  --db-password your_secure_password
 ```
 
 **Output**: Separate schema/file for each ENC (US1WC01M, US1EEZ1M, etc.)
@@ -226,6 +230,7 @@ python scripts/import_s57.py \
 ```
 
 **When to use**:
+
 - High memory systems: increase `--memory-limit-mb`
 - Limited memory: decrease batch size or reduce workers
 - Disable auto-tune only if you know optimal settings
@@ -262,6 +267,7 @@ python scripts/import_s57.py \
 ```
 
 **Expected output**:
+
 - Multiple `.gpkg` files (one per ENC)
 - Quick conversion (< 10 minutes for typical dataset)
 - No database required
@@ -282,10 +288,11 @@ python scripts/import_s57.py \
   --benchmark-output benchmarks.csv \
   --db-host 127.0.0.1 \
   --db-user postgres \
-  --db-password secret
+  --db-password your_secure_password
 ```
 
 **Expected results**:
+
 - Single PostGIS schema `us_enc_all` with merged layers
 - All features stamped with source ENC (`dsid_dsnm` column)
 - Performance metrics saved to `benchmarks.csv`
@@ -439,9 +446,9 @@ Use for performance tracking across runs.
 
 1. **Number of ENCs**: More files = longer processing
 2. **Output Format**:
-   - PostGIS: Medium (database I/O)
-   - GeoPackage: Faster (file-based)
-   - SpatiaLite: Fastest (simple SQLite)
+    - PostGIS: Medium (database I/O)
+    - GeoPackage: Faster (file-based)
+    - SpatiaLite: Fastest (simple SQLite)
 3. **Parallel Workers**: 2-4 optimal; 8+ may reduce efficiency
 4. **Memory**: More memory allows larger batches
 5. **Verification**: Adds ~5-10 minutes for detailed checks
@@ -498,6 +505,7 @@ Error: No S-57 files (*.000) found in /path/to/data
 ```
 
 **Solution**:
+
 - S-57 files must have `.000` extension (base file)
 - Check directory exists and contains ENCs:
   ```bash
@@ -552,6 +560,7 @@ python scripts/import_s57.py ... --schema enc_west_v2
 ```
 
 **Solution**:
+
 - Not all ENCs contain all layers (normal)
 - Check source data has those layer types:
   ```bash
@@ -597,6 +606,7 @@ python scripts/import_s57.py ... --schema enc_west_v2
 ### Custom GDAL Configuration
 
 The tool automatically configures GDAL S-57 settings:
+
 - `RETURN_PRIMITIVES=OFF` (return geometries, not primitives)
 - `SPLIT_MULTIPOINT=ON` (separate multipoint features)
 - `ADD_SOUNDG_DEPTH=ON` (extract depth from soundings)
@@ -610,6 +620,7 @@ No user configuration needed; these are set automatically.
 ### Batch Size Tuning
 
 Auto-tuning works as follows:
+
 1. System detects available RAM
 2. Allocates % for batch processing
 3. Dynamically adjusts batch size per ENC
@@ -623,6 +634,7 @@ Disable auto-tuning only if you have specific requirements:
 ### Parallel Processing Safety
 
 Parallel mode is **read-only safe**:
+
 - Multiple workers read different ENCs simultaneously
 - Write operations still serialized (prevents corruption)
 - Validation level set to `strict` for safety
@@ -633,12 +645,14 @@ Safe to use with confidence.
 ### Incremental vs Force Updates
 
 **Incremental Update** (`--mode update` without `--force-update`):
+
 - Compares timestamps with existing data
 - Only updates modified ENCs
 - Faster for periodic updates
 - Preserves unmodified data
 
 **Force Update** (`--mode update --force-update`):
+
 - Removes old data for specified ENCs
 - Reimports from source
 - Slower but ensures clean state
@@ -661,6 +675,7 @@ ORDER BY COUNT(*) DESC;
 ```
 
 Useful for:
+
 - Auditing which ENC contributed features
 - Identifying update sources
 - Validating data completeness
@@ -695,40 +710,36 @@ Useful for:
    ```
 
 3. **Create visualizations**:
-   - Open GeoPackage in QGIS
-   - Use `docs/notebooks/layers_inspect.ipynb`
-   - Export to web-compatible format
+    - Open GeoPackage in QGIS
+    - Use `docs/notebooks/layers_inspect.ipynb`
+    - Export to web-compatible format
 
 4. **Build routing graphs**:
-   - See `WORKFLOW_POSTGIS_GUIDE.md`
-   - Use imported data for maritime graph creation
+    - See `WORKFLOW_POSTGIS_GUIDE.md`
+    - Use imported data for maritime graph creation
 
 5. **Schedule updates**:
-   - Monitor NOAA ENC updates
-   - Run update workflow periodically
-   - Track changes with benchmarks
+    - Monitor NOAA ENC updates
+    - Run update workflow periodically
+    - Track changes with benchmarks
 
 ## Related Documentation
 
 - **Script**: `scripts/import_s57.py`
-- **Setup**: `docs/WORKFLOW_QUICKSTART.md`
-- **PostGIS Workflow**: `docs/WORKFLOW_POSTGIS_GUIDE.md`
-- **GeoPackage Workflow**: `docs/WORKFLOW_GEOPACKAGE_GUIDE.md`
+- **Setup**: `docs/getting-started/workflow-quickstart.md`
+- **PostGIS Workflow**: `docs/user-guides/workflow-postgis-guide.md`
+- **GeoPackage Workflow**: `docs/user-guides/workflow-geopackage-guide.md`
 - **Notebooks**:
-  - `docs/notebooks/import_s57.ipynb` - Detailed examples
-  - `docs/notebooks/layers_inspect.ipynb` - Layer analysis
-  - `docs/notebooks/s57utils.ipynb` - Utility functions
+    - `docs/notebooks/import_s57.ipynb` - Detailed examples
+    - `docs/notebooks/layers_inspect.ipynb` - Layer analysis
+    - `docs/notebooks/s57utils.ipynb` - Utility functions
 
 ## Support & Feedback
 
 For issues, questions, or improvements:
+
 - Check logs: `tail s57_import.log`
 - Run with `--verbose` for debug details
 - Verify environment: `python scripts/import_s57.py --dry-run`
 - See troubleshooting section above
 
-## License & Attribution
-
-This workflow tool is part of the Maritime Module, a comprehensive maritime analysis toolkit.
-
-For contributions or issues, refer to the project's GitHub repository.

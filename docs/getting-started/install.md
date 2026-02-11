@@ -80,6 +80,7 @@ For users who want the full PostGIS workflow (database-based analysis, better pe
 ### Complete Setup
 
 **Includes:**
+
 - Conda environment (same as Quick Install)
 - Docker PostGIS database
 
@@ -115,6 +116,7 @@ uv pip install --no-deps ruff pytest-cov
 ### Miniforge (Required)
 
 This project requires Miniforge, which includes:
+
 - `mamba` (fast Conda package manager)
 - Pre-configured for conda-forge channel
 
@@ -276,7 +278,7 @@ https://git-scm.com/download/win
 
 **Use Miniforge Prompt for all commands.**
 
-**⚠️ Windows PowerShell Users:** If you prefer to use PowerShell instead of Miniforge Prompt, or encounter issues with `mamba` commands not being recognized, see [Windows PowerShell & Mamba Issues](docs/TROUBLESHOOTING.md#windows-powershell--mamba-issues) in the troubleshooting guide.
+**⚠️ Windows PowerShell Users:** If you prefer to use PowerShell instead of Miniforge Prompt, or encounter issues with `mamba` commands not being recognized, see [Windows PowerShell & Mamba Issues](../reference/troubleshooting.md#windows-powershell--mamba-issues) in the troubleshooting guide.
 
 **Proceed with [Quick Install](#1-quick-install-geopackage-workflow) steps.**
 
@@ -286,7 +288,7 @@ https://git-scm.com/download/win
 
 ### Windows Users: PowerShell & Mamba Issues
 
-If you're on Windows and experiencing issues with Mamba/Conda commands in PowerShell (e.g., "mamba not recognized", "scripts disabled", or "prefix does not exist"), see the dedicated [Windows PowerShell & Mamba Issues](docs/TROUBLESHOOTING.md#windows-powershell--mamba-issues) section in the troubleshooting guide.
+If you're on Windows and experiencing issues with Mamba/Conda commands in PowerShell (e.g., "mamba not recognized", "scripts disabled", or "prefix does not exist"), see the dedicated [Windows PowerShell & Mamba Issues](../reference/troubleshooting.md#windows-powershell--mamba-issues) section in the troubleshooting guide.
 
 ### Issue: "Package 'gdal' is not available from current channels"
 
@@ -315,12 +317,14 @@ mamba env create -f environment.yml
 **Cause:** Package exists in both Conda (environment.yml) and pip (requirements.txt).
 
 **Solution:**
+
 1. Check which package is being reinstalled
 2. Remove it from `requirements.in` if it's a binary/geo package (belongs in environment.yml)
 3. Recompile: `uv pip compile requirements.in -o requirements.txt`
 4. Retry install
 
 **Binary packages that MUST stay in environment.yml only:**
+
 - gdal
 - libgdal
 - geopandas
@@ -333,44 +337,12 @@ mamba env create -f environment.yml
 
 ### Issue: "no such module: rtree" in SQLite operations
 
-**Cause:** Conda's `sqlite` package is not installed or environment is not properly configured.
+GeoPackage and SpatiaLite backends require SQLite with RTREE support. See [Setup Guide — SQLite RTREE Requirement](setup.md#sqlite-rtree-requirement) for the full explanation.
 
-**Diagnosis:**
+**Quick fix:**
 ```bash
-# Check if SQLite is available from Conda
-conda list | grep sqlite
-
-# Verify rtree support in Python
-python -c "import sqlite3; conn = sqlite3.connect(':memory:'); conn.execute('CREATE VIRTUAL TABLE test USING rtree(id, minx, maxx)'); print('✓ RTREE support available')"
-```
-
-**Solution:**
-```bash
-# Reinstall Conda environment to ensure sqlite is included
 mamba env update -f environment.yml --prune
-
-# Reactivate environment
 mamba activate nautical
-```
-
-**Why this happens:**
-- GeoPackage and SpatiaLite backends require SQLite with RTREE support
-- Conda's `sqlite` package provides RTREE-enabled SQLite on all platforms (Linux, macOS ARM/Intel, Windows)
-- The `sqlite` package is now included in `environment.yml`
-
-**Verification:**
-```bash
-# Verify sqlite is installed from Conda
-mamba list | grep sqlite
-# Expected: sqlite 3.x.x
-
-# Verify rtree support works
-python -c "
-import sqlite3
-conn = sqlite3.connect(':memory:')
-conn.execute('CREATE VIRTUAL TABLE test USING rtree(id, minx, maxx, miny, maxy)')
-print('✓ RTREE support is available')
-"
 ```
 
 ---
@@ -380,6 +352,7 @@ print('✓ RTREE support is available')
 **Symptoms:** Container exits with error code 137 (OOM killer).
 
 **Solution:**
+
 1. Increase `shm_size` in docker-compose.yml:
    ```yaml
    shm_size: 8gb  # Increase from 4gb
@@ -413,7 +386,7 @@ export PATH="$HOME/miniforge3/bin:$PATH"  # Add to ~/.bashrc or ~/.zshrc
 
 **Symptoms:**
 ```
-ImportError: GDAL API version mismatch: installed GDAL is 3.x.x, expecting 3.10.3
+ImportError: GDAL API version mismatch: installed GDAL is 3.x.x, expecting {{ gdal_version }}
 ```
 
 **Cause:** Mixing Conda GDAL with pip GDAL.
@@ -443,7 +416,7 @@ conda info --envs | grep nautical
 
 # Test 2: GDAL import and version
 python -c "from osgeo import gdal; print(f'✓ GDAL {gdal.__version__}')"
-# Expected: ✓ GDAL 3.10.3
+# Expected: ✓ GDAL {{ gdal_version }}
 
 # Test 3: Package import
 python -c "import nautical_graph_toolkit; print(f'✓ Nautical Graph Toolkit {nautical_graph_toolkit.__version__}')"
@@ -523,7 +496,7 @@ EOF
 ```bash
 # Using psql command line
 docker exec -it postgis_nautical psql -U postgres -d enc_db -c "SELECT PostGIS_Version();"
-# Expected: PostGIS 3.4.x
+# Expected: PostGIS {{ postgis_version }}.x
 
 # Using Python
 python << 'EOF'
@@ -547,18 +520,21 @@ This project uses a **Hybrid Workflow** combining Conda (for binary/geo-librarie
 We use three specific files to manage dependencies:
 
 **✅ `environment.yml` - The "Base Layer" (Conda/System packages)**
+
 - Contains heavy system libraries requiring compilation or specific system linking
 - Examples: gdal, numpy, pandas, geopandas, fiona, shapely
 - Managed by Mamba
 - **When to edit**: Adding binary/geospatial packages from conda-forge
 
 **✅ `requirements.in` - The "Definition Layer" (Abstract Python dependencies)**
+
 - Human-readable list of top-level pure Python libraries we need
 - Examples: fastapi, pydantic, beautifulsoup4, h3
 - Edit this file to add new pure Python packages
 - **When to edit**: Adding pure Python dependencies
 
 **✅ `requirements.txt` - The "Lock Layer" (Exact pinned Python versions)**
+
 - Auto-generated file freezing exact versions for reproducibility
 - **⚠️ Never edit this file manually**
 - Regenerated by: `uv pip compile requirements.in -o requirements.txt`
@@ -566,11 +542,13 @@ We use three specific files to manage dependencies:
 ### Why Two-Layer Dependencies?
 
 **Layer 1: Conda (Binary/System packages)**
+
 - GDAL, numpy, pandas, geopandas require compiled C/C++ libraries
 - Conda provides pre-compiled binaries optimized for your system
 - Handles complex linking (GDAL → GEOS → PROJ → SQLite)
 
 **Layer 2: uv (Pure Python packages)**
+
 - FastAPI, Pydantic, BeautifulSoup4 are pure Python
 - uv is 10-100x faster than pip for these packages
 - No compilation needed, just file extraction
@@ -578,6 +556,7 @@ We use three specific files to manage dependencies:
 ### The Compile Loop
 
 **Why we don't use `uv sync`:**
+
 - `uv sync` creates an isolated virtual environment (ignores Conda)
 - Would reinstall GDAL from PyPI, conflicting with Conda version
 - `pyproject.toml` is intentionally removed to prevent this
@@ -598,6 +577,7 @@ uv pip install --no-deps -r requirements.txt
 ```
 
 **The `--no-deps` flag is critical:**
+
 - Prevents uv from resolving transitive dependencies
 - Trusts that requirements.txt is already complete
 - Avoids downloading binary packages from PyPI
@@ -615,7 +595,9 @@ uv pip install <package_name>
 ```
 
 **Pros:** Fast and immediate
+
 **Cons:** Not saved - if you recreate the environment or a colleague installs it, this package will be missing
+
 
 **The "Saving" Workflow (Permanent) ⭐ Use This**
 
@@ -645,6 +627,7 @@ uv pip install --no-deps -r requirements.txt
 ### ✅ Binary/Geo Package (Add to environment.yml)
 
 **When to use:**
+
 - Package requires compiled C/C++ code
 - Package is in conda-forge channel
 - Package depends on GDAL/GEOS/PROJ
@@ -669,6 +652,7 @@ python -c "import new_package; print(new_package.__version__)"
 ### ✅ Pure Python Package (Add to requirements.in)
 
 **When to use:**
+
 - Pure Python code (no compilation)
 - Not in conda-forge or better maintained on PyPI
 
@@ -738,14 +722,15 @@ If installation still fails, please report with:
    ```
 
 3. **Error output:**
-   - Full traceback
-   - Output of `uv pip compile requirements.in -o requirements.txt -v` (verbose)
-   - Output of `mamba env create -f environment.yml -v` (verbose)
+    - Full traceback
+    - Output of `uv pip compile requirements.in -o requirements.txt -v` (verbose)
+    - Output of `mamba env create -f environment.yml -v` (verbose)
 
 4. **Open issue:**
    https://github.com/studentdotai/Nautical-Graph-Toolkit/issues
 
 Include:
+
 - Operating system and version
 - Python version
 - Full error messages and tracebacks

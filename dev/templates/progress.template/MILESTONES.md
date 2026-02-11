@@ -214,7 +214,7 @@ Major achievements and project milestones.
 
 - **Daily Log**: `/dev/progress/DAILY_LOG.md` (daily granular progress)
 - **Changelog**: `/dev/progress/CHANGELOG.md` (version changes and notable updates)
-- **Roadmap**: `/docs/ROADMAP.md` (project root - long-term vision and strategy)
+- **Roadmap**: `/docs/project/roadmap.md` (long-term vision and strategy)
 - **Priorities**: `/dev/todo/PRIORITIES.md` (current focus areas)
 - **Tasks**: `/dev/tasks/TASK_INDEX.md` (active work tracking)
 - **Project Rules**: `/dev/rules/CLAUDE.md` (project knowledge and context)

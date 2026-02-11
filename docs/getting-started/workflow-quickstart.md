@@ -20,7 +20,8 @@ This unified quick-start guide covers all workflow types. Currently implemented:
 
 ### GDAL Version Pinning
 
-This project requires **GDAL 3.10.3** (exact version) for S-57 ENC data processing. This version is pinned in:
+This project requires **GDAL {{ gdal_version }}** (exact version) for S-57 ENC data processing. This version is pinned in:
+
 - `environment.yml` - For Conda environment
 - `requirements.txt` - For pip dependencies
 
@@ -86,11 +87,12 @@ python scripts/import_s57.py \
   --input-path data/ENC_ROOT \
   --output-format gpkg \
   --schema enc_charts \
-  --output-dir docs/notebooks/output \
+  --output-dir output \
   --verify
 ```
 
 **What It Creates**:
+
 - Single schema/file (enc_west) with all ENCs merged by layer
 - ~20+ S-57 layers (seaare, lndare, soundg, fairwy, drgare, etc.)
 - Each feature has `dsid_dsnm` column indicating source ENC
@@ -124,6 +126,7 @@ python scripts/import_s57.py \
 ```
 
 **Impact on Existing Workflows**:
+
 - After update, recommend regenerating graphs for accuracy
 - Can reuse base_graph if only minor updates (evaluate performance)
 - Always regenerate fine/weighted graphs for precise routes
@@ -184,29 +187,7 @@ ls -lh output/enc_charts.gpkg
 
 ### Skip Import: Use Pre-Processed Databases
 
-**Alternative to lengthy import**: If you want to skip the data import step entirely (which can take 40-60 minutes), download pre-processed ENC databases from our pCloud repository:
-
-**🔗 [ENC-Graph-test-files Repository](https://u.pcloud.link/publink/show?code=kZVUYM5Zm87H47h2G1XBANXHwhIfcJA681Oy)**
-
-**Quick Start Option:**
-1. Download `enc_west.gpkg` (209 MB) - Western US Coast coverage
-2. Place in `data/` directory or your output location
-3. Configure workflow to use it (update `maritime_workflow_config.yml` if needed)
-4. Proceed directly to workflow execution (skip import step!)
-
-```bash
-# Download enc_west.gpkg from pCloud → place in data/ directory
-
-# Verify database is readable
-ogrinfo data/enc_west.gpkg | head -20
-
-# Now run workflow directly - no import needed!
-python scripts/maritime_graph_geopackage_workflow.py
-```
-
-**Time Saved**: ~40-60 minutes (no S-57 import processing)
-
-For more pre-processed options including pre-generated graphs, see [data/DATA_GUIDE.md](../data/DATA_GUIDE.md#-pre-generated-examples--large-datasets-pcloud-repository).
+Download pre-processed ENC databases to skip the import step entirely — see the [Data Guide](../user-guides/data-guide.md#-pre-generated-examples--large-datasets-pcloud-repository) for the full catalogue, download instructions, and use-case recommendations. **Time saved: ~40-60 minutes.**
 
 ---
 
@@ -235,6 +216,7 @@ python scripts/maritime_graph_postgis_workflow.py --config docs/maritime_workflo
 **Estimated time: 45-60 minutes**
 
 The script will:
+
 - ✓ Create base graph (0.3 NM resolution)
 - ✓ Create fine/H3 graph (high-resolution)
 - ✓ Apply weighting system (static, directional, dynamic)
@@ -383,7 +365,7 @@ python scripts/import_s57.py \
   --input-path data/ENC_SF_LA/ENC_ROOT \
   --output-format gpkg \
   --schema enc_west \
-  --output-dir docs/notebooks/output \
+  --output-dir output \
   --verify
 
 # Expected output
@@ -475,20 +457,7 @@ cat output/detailed_route_7.5m_draft.geojson
 
 ## Backend Selection Considerations
 
-### Choose PostGIS If:
-- ✓ Production deployment with server infrastructure
-- ✓ Multi-user environment (concurrent route calculations)
-- ✓ Large datasets (100+ ENCs, frequent updates)
-- ✓ Database-side spatial operations needed
-- ✓ Server handles graph generation better
-
-### Choose GeoPackage If:
-- ✓ Single-user or testing environment
-- ✓ Need to share workflows (USB drive, cloud, email)
-- ✓ No server infrastructure available
-- ✓ Offline operation required
-- ✓ Portable deployment needed
-- ✓ Moderate dataset size (10-100 ENCs)
+For guidance on choosing between PostGIS, GeoPackage, and SpatiaLite, see the [Database Backend Guide](../user-guides/database-backend-guide.md).
 
 ### Consistency Requirement
 **IMPORTANT**: Import and workflow backends MUST match:
@@ -553,6 +522,7 @@ tail -f docs/logs/maritime_workflow_*.log
 ```
 
 **Log file improvements:**
+
 - Automatic rotation: Max 50MB (INFO) or 500MB (DEBUG), keeps 3 backups
 - Third-party verbose logs suppressed (Fiona, GDAL) - 99% size reduction
 - Full project-level debug info still available
@@ -634,6 +604,7 @@ docs/logs/maritime_workflow_20251027_135805.log.2  # Backup
 docs/logs/maritime_workflow_20251027_135805.log.3  # Backup
 ```
 Detailed operation logs with automatic rotation
+
 - Size limits: 50MB (INFO) or 500MB (DEBUG) per file
 - Keeps 3 backup files
 - Third-party verbose logs suppressed (99% smaller)
@@ -648,6 +619,7 @@ Error: No S-57 files (*.000) found in /path/to/data
 ```
 
 **Solution:**
+
 - S-57 files must have `.000` extension (base files)
 - Verify directory contains ENCs: `find /path/to/data -name "*.000" -type f`
 - Check read permissions: `ls -la /path/to/data`
@@ -662,6 +634,7 @@ ProgrammingError: schema "enc_west" does not exist
 **Why This Happens**: Workflow can't find imported data
 
 **Solution**:
+
 1. Verify import completed: `python scripts/import_s57.py ... --verify`
 2. Check schema exists: `psql -d enc_db -c "SELECT schema_name FROM information_schema.schemata;"`
 3. Verify correct backend:
@@ -683,6 +656,7 @@ FileNotFoundError: Layer 'seaare' not found
 **Why This Happens**: Import didn't include all necessary layers
 
 **Solution**:
+
 1. Verify what layers were imported:
    ```bash
    # PostGIS
@@ -708,6 +682,7 @@ MemoryError: Unable to allocate array
 **Why This Happens**: Too many ENCs processed simultaneously
 
 **Solution**:
+
 1. Use parallel processing with fewer workers:
    ```bash
    python scripts/import_s57.py --mode advanced ... \
@@ -728,6 +703,7 @@ DatabaseError: database is locked
 ```
 
 **Solution**:
+
 1. Close other applications using the file (QGIS, etc.)
 2. Delete lock files: `rm output/enc_west.gpkg-wal`
 3. Retry import
@@ -770,6 +746,7 @@ Graph creation fails with different results than before update
 **Why This Happens**: Updated ENC data affects graph generation
 
 **Solution**:
+
 1. Always regenerate fine/weighted graphs after S57Updater
 2. Base graph can sometimes be reused (check performance)
 3. Re-run full workflow:
@@ -809,23 +786,20 @@ ls output/*.gpkg
 ```
 Project Root/
 ├── scripts/
-│   ├── import_s57.py                  # S-57 data import tool (Step 1)
-│   └── SCRIPTS_GUIDE.md                # Scripts reference guide
+│   ├── import_s57.py                        # S-57 import tool (Step 1)
+│   ├── maritime_graph_postgis_workflow.py   # PostGIS workflow (Step 2)
+│   └── maritime_graph_geopackage_workflow.py # GeoPackage workflow (Step 2)
 │
 ├── docs/
-│   ├── maritime_graph_postgis_workflow.py   # PostGIS workflow (Step 2)
-│   ├── maritime_graph_geopackage_workflow.py # GeoPackage workflow (Step 2)
 │   ├── maritime_workflow_config.yml   # Configuration (shared)
-│   ├── WORKFLOW_QUICKSTART.md         # This file
-│   ├── WORKFLOW_POSTGIS_GUIDE.md      # PostGIS details
-│   ├── WORKFLOW_GEOPACKAGE_GUIDE.md   # GeoPackage details
-│   ├── WORKFLOW_S57_IMPORT_GUIDE.md   # Import detailed guide
-│   ├── logs/                           # Auto-created log directory
-│   └── notebooks/
-│       └── output/                     # Generated outputs
-│           ├── *.gpkg (ENCs + graphs)  # GeoPackage files
-│           ├── *.geojson               # Route files
-│           └── benchmark_*.csv         # Performance metrics
+│   ├── getting-started/               # Setup guides
+│   ├── user-guides/                   # Workflow documentation
+│   └── logs/                           # Auto-created log directory
+│
+├── output/                             # Generated outputs (at project root)
+│   ├── *.gpkg                          # GeoPackage files (ENCs + graphs)
+│   ├── *.geojson                       # Route files
+│   └── benchmark_*.csv                 # Performance metrics
 │
 ├── data/
 │   └── ENC_ROOT/                      # S-57 files (.000) - source data
@@ -866,7 +840,7 @@ Project Root/
 
 ## Performance Expectations
 
-**Real-World Benchmarks (2025-11-03)** - SF Bay to LA Route (47 ENCs)
+**Real-World Benchmarks** - SF Bay to LA Route (47 ENCs)
 
 ### Total Processing Time Comparison
 
@@ -884,6 +858,7 @@ Project Root/
 | **GeoPackage** | H3 Hexagonal | **180.0 min** | 768K | 📦 Portable - research |
 
 **Performance Highlights:**
+
 - 🚀 PostGIS is **2.0-2.4× faster** than GeoPackage
 - ⚠️ Weighting step accounts for **37-89%** of total time
 - 📈 Graphs scale superlinearly: 4× nodes → 3.6× time
@@ -905,6 +880,7 @@ Project Root/
 ### Bottleneck Analysis
 
 **Weighting Step % of Total Time:**
+
 - PostGIS FINE 0.2nm: **36.7%**
 - PostGIS FINE 0.1nm: **59.7%**
 - PostGIS H3 Hex: **76.9%**
@@ -921,6 +897,7 @@ Project Root/
      For production planning, use upper bound estimates.
 
 **Optimization Tips:**
+
 - 💡 Use `--skip-base --skip-fine` to resume from weighting step (saves 5-10 min)
 - ⚡ For iteration: FINE 0.2nm mode offers best speed/detail balance
 - 🚀 For production: PostGIS + FINE 0.1nm recommended (21.3 min, detailed routes)

@@ -19,6 +19,7 @@ This directory contains **production-ready Python scripts** for maritime analysi
 **Purpose:** Convert S-57 Electronic Navigational Chart (ENC) data into GIS-ready formats with flexible modes and backends.
 
 **Key Features:**
+
 - 3 conversion modes: Base (one-to-one), Advanced (layer-centric with source tracking), Updater (incremental updates)
 - 3 backend support: PostGIS, GeoPackage, SpatiaLite
 - Comprehensive validation and verification
@@ -36,7 +37,7 @@ python scripts/import_s57.py --mode advanced --input-path data/ENC_SF_LA/ENC_ROO
   --output-format postgis --schema enc_west --verify
 ```
 
-**Related Guide:** See `docs/WORKFLOW_S57_IMPORT_GUIDE.md` for comprehensive documentation.
+**Related Guide:** See `docs/user-guides/workflow-s57-import-guide.md` for comprehensive documentation.
 
 ---
 
@@ -45,12 +46,14 @@ python scripts/import_s57.py --mode advanced --input-path data/ENC_SF_LA/ENC_ROO
 **Purpose:** Orchestrate complete maritime navigation graph creation and routing workflow using PostGIS backend.
 
 **Workflow Steps:**
+
 1. Create base graph (0.3 NM resolution)
 2. Create fine/H3 graph (0.02-0.3 NM or hexagonal)
 3. Apply three-tier weighting (static, directional, dynamic)
 4. Calculate optimal routes
 
 **Key Features:**
+
 - Configuration-driven (YAML)
 - Automatic schema management
 - Performance benchmarking
@@ -69,7 +72,7 @@ python scripts/maritime_graph_postgis_workflow.py --config docs/maritime_workflo
 python scripts/maritime_graph_postgis_workflow.py --config docs/maritime_workflow_config.yml --vessel-draft 12.0
 ```
 
-**Related Guide:** See `docs/WORKFLOW_POSTGIS_GUIDE.md` for detailed workflow documentation.
+**Related Guide:** See `docs/user-guides/workflow-postgis-guide.md` for detailed workflow documentation.
 
 ---
 
@@ -81,6 +84,7 @@ python scripts/maritime_graph_postgis_workflow.py --config docs/maritime_workflo
 Same as PostGIS workflow (base → fine → weighting → pathfinding) but stores results in portable GeoPackage files instead of database.
 
 **Key Features:**
+
 - No server required (file-based)
 - Fully portable and offline-capable
 - Same weighting and routing as PostGIS
@@ -102,7 +106,7 @@ python scripts/maritime_graph_geopackage_workflow.py --config docs/maritime_work
 python scripts/maritime_graph_geopackage_workflow.py --config docs/maritime_workflow_config.yml --log-level DEBUG
 ```
 
-**Related Guide:** See `docs/WORKFLOW_GEOPACKAGE_GUIDE.md` for detailed workflow documentation.
+**Related Guide:** See `docs/user-guides/workflow-geopackage-guide.md` for detailed workflow documentation.
 
 ---
 
@@ -110,12 +114,14 @@ python scripts/maritime_graph_geopackage_workflow.py --config docs/maritime_work
 
 ### Scenario 1: "I have raw S-57 ENC files and need to prepare them for analysis"
 → **Use `import_s57.py`**
+
 - Choose backend: PostGIS (server), GeoPackage (portable), or SpatiaLite (lightweight)
 - Choose mode: Base (simple), Advanced (recommended), or Updater (update existing)
 - Example: `python scripts/import_s57.py --mode advanced --input-path data/ENC_ROOT --output-format gpkg --verify`
 
 ### Scenario 2: "I have S-57 data in PostGIS and want complete maritime routing workflow"
 → **Use `maritime_graph_postgis_workflow.py`**
+
 - Assumes S-57 data already loaded in PostGIS schema (enc_west or custom)
 - Handles all steps: graph creation, weighting, routing
 - Best for production and large datasets
@@ -123,6 +129,7 @@ python scripts/maritime_graph_geopackage_workflow.py --config docs/maritime_work
 
 ### Scenario 3: "I need portable, offline maritime routing (no server)"
 → **Use `maritime_graph_geopackage_workflow.py`**
+
 - File-based, single-file output (.gpkg)
 - Works offline, shareable between systems
 - Slightly slower but fully portable
@@ -130,6 +137,7 @@ python scripts/maritime_graph_geopackage_workflow.py --config docs/maritime_work
 
 ### Scenario 4: "I need to update existing S-57 data with new charts"
 → **Use `import_s57.py` with update mode**
+
 - Updates existing database/GeoPackage incrementally
 - Transactional (all-or-nothing)
 - Example: `python scripts/import_s57.py --mode update --update-source data/ENC_ROOT_UPDATE --output-format postgis --schema enc_west --force-update`
@@ -204,10 +212,10 @@ python scripts/import_s57.py --mode advanced --input-path data/ENC_ROOT \
 ## Installation & Requirements
 
 ### Prerequisites
-- Python 3.11+
-- GDAL (pinned version - see [SETUP.md](../docs/SETUP.md) for exact version)
+- Python {{ python_version }}+
+- GDAL {{ gdal_version }}
 - Dependencies: `pip install -e .` or Conda+uv setup
-- For PostGIS: PostgreSQL 16+ with PostGIS extension + .env credentials
+- For PostGIS: PostgreSQL {{ pg_version }}+ with PostGIS extension + .env credentials
 
 ### Basic Setup
 ```bash
@@ -254,12 +262,12 @@ cp .env.example .env
 
 For comprehensive guides, see:
 
-- **S-57 Import**: `docs/WORKFLOW_S57_IMPORT_GUIDE.md` - All modes, backends, examples, troubleshooting
-- **PostGIS Workflow**: `docs/WORKFLOW_POSTGIS_GUIDE.md` - Server-based complete workflow
-- **GeoPackage Workflow**: `docs/WORKFLOW_GEOPACKAGE_GUIDE.md` - File-based complete workflow
-- **Setup Guide**: `docs/SETUP.md` - Environment setup and data requirements
-- **Quick Start**: `docs/WORKFLOW_QUICKSTART.md` - Get started in 5 minutes
-- **Troubleshooting**: `docs/TROUBLESHOOTING.md` - Common issues and solutions
+- **S-57 Import**: `docs/user-guides/workflow-s57-import-guide.md` - All modes, backends, examples, troubleshooting
+- **PostGIS Workflow**: `docs/user-guides/workflow-postgis-guide.md` - Server-based complete workflow
+- **GeoPackage Workflow**: `docs/user-guides/workflow-geopackage-guide.md` - File-based complete workflow
+- **Setup Guide**: `docs/getting-started/setup.md` - Environment setup and data requirements
+- **Quick Start**: `docs/getting-started/workflow-quickstart.md` - Get started in 5 minutes
+- **Troubleshooting**: `docs/reference/troubleshooting.md` - Common issues and solutions
 
 ---
 
@@ -275,14 +283,7 @@ For comprehensive guides, see:
 
 ## Support
 
-- Check `docs/TROUBLESHOOTING.md` for common issues
+- Check `docs/reference/troubleshooting.md` for common issues
 - Use `--help` on any script for complete option reference
 - Enable verbose logging with `--verbose` for debugging
 - Review script docstrings for implementation details
-
----
-
-**Last Updated:** 2026-01-20
-**Scripts Version:** Production-ready (tested)
-**Python:** 3.11+
-**GDAL:** See [SETUP.md](../docs/SETUP.md) for exact pinned version

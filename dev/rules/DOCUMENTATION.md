@@ -2,17 +2,20 @@
 
 Comprehensive reference for all user-facing markdown documentation files, their purposes, relationships, and update patterns. Use this guide for documentation updates, commit tracking, and understanding cross-references.
 
-**Last Updated**: 2026-01-20
+**Last Updated**: 2026-02-03
 **User-Facing Documentation Files**: 17+ markdown files
 **Note**: Development automation files in `/dev/` are tracked separately
+**Documentation Platform**: User-facing docs are served via MkDocs (Material theme). Paths below use the MkDocs `docs/` navigation structure.
 
 ---
 
 ## Quick Navigation
 
-- **User-Facing Documentation**: `docs/` directory
-- **Root Documentation**: Project root files
-- **Supporting Documentation**: Scripts, data guides
+- **Getting Started**: `docs/getting-started/` — setup, install, quickstart
+- **User Guides**: `docs/user-guides/` — backend workflows, S-57 import, scripts
+- **Reference**: `docs/reference/` — technical specs, troubleshooting
+- **Project**: `docs/project/` — changelog, roadmap
+- **Root**: `README.md` (project root)
 - **Development Automation**: `/dev/` directory (tracked separately)
 
 ---
@@ -21,11 +24,11 @@ Comprehensive reference for all user-facing markdown documentation files, their 
 
 ### Primary Setup & Installation Guides
 
-#### 1. **SETUP.md** ⭐ PRIMARY REFERENCE
+#### 1. **docs/getting-started/setup.md** ⭐ PRIMARY REFERENCE
 - **Purpose**: Backend setup and software prerequisites (single source of truth)
 - **Audience**: First-time users, DevOps engineers
 - **Contains**:
-  - Software prerequisites (GDAL 3.10.3 - EXACT version specification)
+  - Software prerequisites (GDAL version — managed via macros)
   - Backend comparison table (PostGIS vs GeoPackage vs SpatiaLite)
   - Backend-specific installation steps
   - SQLite RTREE requirement explanation
@@ -34,34 +37,34 @@ Comprehensive reference for all user-facing markdown documentation files, their 
   - Data import overview
   - Verification procedures
 - **Update Frequency**: When new backends added, requirements change
-- **Cross-References**: Referenced by WORKFLOW_QUICKSTART.md, DATABASE_BACKEND_GUIDE.md, all workflow guides
+- **Cross-References**: Referenced by workflow-quickstart.md, database-backend-guide.md, all workflow guides
 - **Relationships**:
-  - ✅ Establishes GDAL 3.10.3 as central version spec (other docs reference this)
+  - ✅ Establishes GDAL version as central spec (other docs reference this)
   - ✅ Defines database naming convention (enc_db)
   - ✅ Defines schema/dataset naming (enc_west)
-  - ✅ Links to WORKFLOW_QUICKSTART.md for actual usage
+  - ✅ Links to workflow-quickstart.md for actual usage
 
-#### 2. **WORKFLOW_QUICKSTART.md** ⭐ CENTRALIZED WORKFLOW REFERENCE
+#### 2. **docs/getting-started/workflow-quickstart.md** ⭐ CENTRALIZED WORKFLOW REFERENCE
 - **Purpose**: 5-minute quick start tutorial (first-time user entry point)
 - **Audience**: New users wanting fastest path to working setup
 - **Contains**:
-  - Prerequisites section with link to SETUP.md
+  - Prerequisites section with link to setup.md
   - Quick installation steps
   - First graph creation example
   - Common pitfalls
 - **Update Frequency**: When workflow changes significantly
 - **Cross-References**: All workflow guides reference this as starting point
 - **Relationships**:
-  - ✅ Points users to SETUP.md for detailed prerequisites
-  - ✅ Centralizes GDAL version reference (3.10.3)
-  - ✅ Entry point for WORKFLOW_POSTGIS_GUIDE.md, WORKFLOW_GEOPACKAGE_GUIDE.md
-  - ✅ References TROUBLESHOOTING.md for common issues
+  - ✅ Points users to setup.md for detailed prerequisites
+  - ✅ Centralizes GDAL version reference (via macros)
+  - ✅ Entry point for workflow-postgis-guide.md, workflow-geopackage-guide.md
+  - ✅ References troubleshooting.md for common issues
 
 ---
 
 ### Backend-Specific Workflow Guides
 
-#### 3. **WORKFLOW_POSTGIS_GUIDE.md**
+#### 3. **docs/user-guides/workflow-postgis-guide.md**
 - **Purpose**: Complete PostGIS-based workflow (production deployment)
 - **Audience**: Production systems, large datasets, server deployments
 - **Contains**:
@@ -74,13 +77,13 @@ Comprehensive reference for all user-facing markdown documentation files, their 
   - Database: `enc_db` (lowercase)
   - Schema: `enc_west` (standard dataset)
 - **Update Frequency**: When PostGIS features change
-- **Cross-References**: References SETUP.md for PostgreSQL version, TECHNICAL_SPECS.md for performance
+- **Cross-References**: References setup.md for PostgreSQL version, technical-specs.md for performance
 - **Relationships**:
-  - ✅ Specialized version of WORKFLOW_QUICKSTART.md
-  - ✅ Uses database/schema naming from SETUP.md
-  - ✅ References TROUBLESHOOTING.md for PostgreSQL-specific issues
+  - ✅ Specialized version of workflow-quickstart.md
+  - ✅ Uses database/schema naming from setup.md
+  - ✅ References troubleshooting.md for PostgreSQL-specific issues
 
-#### 4. **WORKFLOW_GEOPACKAGE_GUIDE.md**
+#### 4. **docs/user-guides/workflow-geopackage-guide.md**
 - **Purpose**: GeoPackage-based workflow (portable, offline)
 - **Audience**: Portable deployments, offline usage, desktop applications
 - **Contains**:
@@ -91,11 +94,11 @@ Comprehensive reference for all user-facing markdown documentation files, their 
 - **Conventions Used**: Same database/schema naming as PostGIS
 - **Update Frequency**: When GeoPackage features change
 - **Relationships**:
-  - ✅ Parallel to WORKFLOW_POSTGIS_GUIDE.md (different backend, same API)
-  - ✅ Uses database/schema naming from SETUP.md
-  - ✅ References TROUBLESHOOTING.md for GeoPackage-specific issues
+  - ✅ Parallel to workflow-postgis-guide.md (different backend, same API)
+  - ✅ Uses database/schema naming from setup.md
+  - ✅ References troubleshooting.md for GeoPackage-specific issues
 
-#### 5. **WORKFLOW_S57_IMPORT_GUIDE.md**
+#### 5. **docs/user-guides/workflow-s57-import-guide.md**
 - **Purpose**: S-57 ENC data import process and options
 - **Audience**: Data engineers, users with raw ENC files
 - **Contains**:
@@ -104,34 +107,34 @@ Comprehensive reference for all user-facing markdown documentation files, their 
   - Large dataset handling
   - Update detection
   - Batch processing
-- **Conventions Used**: Database/schema naming from SETUP.md
+- **Conventions Used**: Database/schema naming from setup.md
 - **Update Frequency**: When import features change
 - **Relationships**:
-  - ✅ Prerequisites for WORKFLOW_POSTGIS_GUIDE.md, WORKFLOW_GEOPACKAGE_GUIDE.md
+  - ✅ Prerequisites for workflow-postgis-guide.md, workflow-geopackage-guide.md
   - ✅ Uses S-57 concepts from project domain
-  - ✅ References TROUBLESHOOTING.md for import issues
+  - ✅ References troubleshooting.md for import issues
 
 ---
 
 ### Decision & Reference Guides
 
-#### 6. **DATABASE_BACKEND_GUIDE.md** ⭐ DECISION GUIDE
+#### 6. **docs/user-guides/database-backend-guide.md** ⭐ DECISION GUIDE
 - **Purpose**: Backend selection decision matrix (help users choose right backend)
 - **Audience**: Anyone deciding between PostGIS, GeoPackage, SpatiaLite
 - **Contains**:
   - Feature comparison table (all backends)
   - Quick decision guide
-  - Links to SETUP.md for prerequisites
+  - Links to setup.md for prerequisites
   - Links to specific workflow guides
   - Getting Started section with workflow navigation
 - **Update Frequency**: When new backends added or features change
 - **Relationships**:
-  - ✅ Directs users to SETUP.md (prerequisites)
-  - ✅ Links to WORKFLOW_POSTGIS_GUIDE.md, WORKFLOW_GEOPACKAGE_GUIDE.md
+  - ✅ Directs users to setup.md (prerequisites)
+  - ✅ Links to workflow-postgis-guide.md, workflow-geopackage-guide.md
   - ✅ Navigation hub for backend-specific content
   - ✅ No direct cross-references FROM other docs (primary decision entry point)
 
-#### 7. **TECHNICAL_SPECS.md** ⭐ PERFORMANCE REFERENCE
+#### 7. **docs/reference/technical-specs.md** ⭐ PERFORMANCE REFERENCE
 - **Purpose**: Technical specifications, performance benchmarks, storage planning
 - **Audience**: Performance engineers, capacity planners, optimization specialists
 - **Contains**:
@@ -149,7 +152,7 @@ Comprehensive reference for all user-facing markdown documentation files, their 
   - ✅ Referenced by notebooks' APPENDIX sections
   - ✅ Guides parameter selection in workflow guides
 
-#### 8. **TROUBLESHOOTING.md** ⭐ PROBLEM-SOLVING REFERENCE
+#### 8. **docs/reference/troubleshooting.md** ⭐ PROBLEM-SOLVING REFERENCE
 - **Purpose**: Common issues, solutions, and workarounds
 - **Audience**: Users encountering problems, debugging
 - **Contains**:
@@ -164,11 +167,11 @@ Comprehensive reference for all user-facing markdown documentation files, their 
 - **Update Frequency**: As issues are discovered and resolved
 - **Cross-References**: Referenced from all workflow guides as problem-solving resource
 - **Relationships**:
-  - ✅ Referenced by WORKFLOW_QUICKSTART.md for common pitfalls
+  - ✅ Referenced by workflow-quickstart.md for common pitfalls
   - ✅ Referenced by all backend workflow guides
   - ✅ Contains solutions for issues documented elsewhere
 
-#### 9. **WEIGHTS_WORKFLOW_EXAMPLE.md**
+#### 9. **docs/user-guides/weights-workflow-example.md**
 - **Purpose**: Graph weighting system examples and customization
 - **Audience**: Advanced users, route optimization engineers
 - **Contains**:
@@ -179,9 +182,9 @@ Comprehensive reference for all user-facing markdown documentation files, their 
   - Customization patterns
 - **Update Frequency**: When weighting features change
 - **Relationships**:
-  - ✅ Advanced extension of WORKFLOW_POSTGIS_GUIDE.md
+  - ✅ Advanced extension of workflow-postgis-guide.md
   - ✅ Uses project domain concepts (vessel constraints, weight factors)
-  - ✅ References TROUBLESHOOTING.md for weighting issues
+  - ✅ References troubleshooting.md for weighting issues
 
 ---
 
@@ -191,14 +194,14 @@ Comprehensive reference for all user-facing markdown documentation files, their 
 
 These two documents are **committed last** (after all other changes) to ensure they contain the most comprehensive and accurate project overview at release time.
 
-#### **CHANGELOG.md** ⭐ FINAL RELEASE RECORD
+#### **docs/project/changelog.md** ⭐ FINAL RELEASE RECORD
 - **Purpose**: Complete version history and current release notes
 - **Committed**: Last (before creating release tag)
 - **Contains**: All changes, bug fixes, new features for this release
 - **Timing**: Updated with final version number and release date immediately before commit
 - **Why Last**: Captures final state of all changes included in release
 
-#### **ROADMAP.md** ⭐ PROJECT VISION & FUTURE
+#### **docs/project/roadmap.md** ⭐ PROJECT VISION & FUTURE
 - **Purpose**: Vision, milestones, and future development plans
 - **Committed**: Last (before creating release tag)
 - **Contains**: Version roadmap, status indicators, contribution guidelines
@@ -208,11 +211,11 @@ These two documents are **committed last** (after all other changes) to ensure t
 **Commit Order**:
 ```
 1. All code changes (features, fixes, refactoring)
-2. All documentation updates (SETUP.md, guides, etc.)
+2. All documentation updates (setup.md, guides, etc.)
 3. DOCUMENTATION.md updates (this file)
-4. CHANGELOG.md final update (version notes, release date)
-5. ROADMAP.md final update (version status)
-6. Create git tag (after CHANGELOG.md and ROADMAP.md committed)
+4. changelog.md final update (version notes, release date)
+5. roadmap.md final update (version status)
+6. Create git tag (after changelog.md and roadmap.md committed)
 ```
 
 ---
@@ -227,20 +230,20 @@ These two documents are **committed last** (after all other changes) to ensure t
   - Feature highlights
   - Performance benchmarks with charts
   - Installation quick start
-  - System requirements (GDAL 3.10.3)
+  - System requirements (GDAL version)
   - Getting started links
   - Comparison with alternatives
 - **Update Frequency**: When major features added or performance changes
 - **Conventions Used**:
-  - GDAL 3.10.3 specification
+  - GDAL version (via macros)
   - Links to docs/ for detailed guides
 - **Cross-References**: Entry point to docs/ guides
 - **Relationships**:
   - ✅ Primary entry point for external users
-  - ✅ Links to SETUP.md, WORKFLOW_QUICKSTART.md, INSTALL.md
-  - ✅ Showcases performance from TECHNICAL_SPECS.md
+  - ✅ Links to setup.md, workflow-quickstart.md, install.md
+  - ✅ Showcases performance from technical-specs.md
 
-### 11. **INSTALL.md** ⭐ INSTALLATION GUIDE
+### 11. **docs/getting-started/install.md** ⭐ INSTALLATION GUIDE
 - **Purpose**: Detailed GDAL installation guide (3 methods for different OSes)
 - **Audience**: Users with installation issues, platform-specific setup
 - **Contains**:
@@ -250,13 +253,13 @@ These two documents are **committed last** (after all other changes) to ensure t
   - Installation verification
   - Common errors and solutions
 - **Update Frequency**: When GDAL installation changes or new OS support added
-- **Conventions Used**: GDAL 3.10.3 exact version requirement
-- **Cross-References**: Referenced from README.md and SETUP.md
+- **Conventions Used**: GDAL version managed via macros
+- **Cross-References**: Referenced from README.md and setup.md
 - **Relationships**:
-  - ✅ Specialized GDAL installation guide (complements SETUP.md)
-  - ✅ Cross-references TROUBLESHOOTING.md for installation errors
+  - ✅ Specialized GDAL installation guide (complements setup.md)
+  - ✅ Cross-references troubleshooting.md for installation errors
 
-### 12. **CHANGELOG.md** ⭐ VERSION HISTORY
+### 12. **docs/project/changelog.md** ⭐ VERSION HISTORY
 - **Purpose**: Release notes, version history, all changes documented
 - **Audience**: Users tracking changes, developers reviewing versions
 - **Contains**:
@@ -277,7 +280,7 @@ These two documents are **committed last** (after all other changes) to ensure t
 
 ### Scripts & Tools
 
-#### 13. **scripts/SCRIPTS_GUIDE.md**
+#### 13. **docs/user-guides/scripts-guide.md**
 - **Purpose**: Documentation for production scripts
 - **Contains**:
   - `import_s57.py` usage and options
@@ -285,11 +288,11 @@ These two documents are **committed last** (after all other changes) to ensure t
   - `maritime_graph_geopackage_workflow.py` execution
   - CLI flags and parameters
 - **Update Frequency**: When scripts change
-- **Conventions Used**: Database/schema naming from SETUP.md, GDAL version from SETUP.md
+- **Conventions Used**: Database/schema naming from setup.md, GDAL version from setup.md
 
 ### Data Management
 
-#### 14. **data/DATA_GUIDE.md**
+#### 14. **docs/user-guides/data-guide.md**
 - **Purpose**: Guide to data files and datasets available
 - **Contains**:
   - Pre-generated example datasets (enc_west.gpkg, us_enc_all.gpkg)
@@ -299,7 +302,7 @@ These two documents are **committed last** (after all other changes) to ensure t
   - Custom data setup
 - **Update Frequency**: When new datasets added
 - **Relationships**:
-  - ✅ Referenced by SETUP.md for data availability options
+  - ✅ Referenced by setup.md for data availability options
   - ✅ Provides pre-generated data alternatives to full S-57 import
 
 ---
@@ -311,24 +314,24 @@ These two documents are **committed last** (after all other changes) to ensure t
 **When to update each file:**
 
 ```
-1. SETUP.md (PRIMARY)
+1. setup.md (PRIMARY)
    ↓
-   ├→ WORKFLOW_QUICKSTART.md
-   ├→ WORKFLOW_POSTGIS_GUIDE.md
-   ├→ WORKFLOW_GEOPACKAGE_GUIDE.md
-   ├→ WORKFLOW_S57_IMPORT_GUIDE.md
-   ├→ DATABASE_BACKEND_GUIDE.md
-   └→ INSTALL.md (for GDAL version)
+   ├→ workflow-quickstart.md
+   ├→ workflow-postgis-guide.md
+   ├→ workflow-geopackage-guide.md
+   ├→ workflow-s57-import-guide.md
+   ├→ database-backend-guide.md
+   └→ install.md (for GDAL version)
 
-2. TECHNICAL_SPECS.md (PERFORMANCE)
+2. technical-specs.md (PERFORMANCE)
    ↓
    └→ README.md (highlights key metrics)
 
-3. TROUBLESHOOTING.md (SOLUTIONS)
+3. troubleshooting.md (SOLUTIONS)
    ↓
    └→ All workflow guides reference
 
-4. CHANGELOG.md (FINAL RECORD)
+4. changelog.md (FINAL RECORD)
    ↓
    └→ Consolidated after release
 ```
@@ -337,18 +340,18 @@ These two documents are **committed last** (after all other changes) to ensure t
 
 **File → References**
 
-- `README.md` → SETUP.md, WORKFLOW_QUICKSTART.md, INSTALL.md, TECHNICAL_SPECS.md
-- `SETUP.md` → (PRIMARY - no references; others point here)
-- `WORKFLOW_QUICKSTART.md` → SETUP.md, TROUBLESHOOTING.md
-- `WORKFLOW_POSTGIS_GUIDE.md` → SETUP.md, TECHNICAL_SPECS.md, TROUBLESHOOTING.md
-- `WORKFLOW_GEOPACKAGE_GUIDE.md` → SETUP.md, TECHNICAL_SPECS.md, TROUBLESHOOTING.md
-- `WORKFLOW_S57_IMPORT_GUIDE.md` → SETUP.md, TROUBLESHOOTING.md
-- `DATABASE_BACKEND_GUIDE.md` → SETUP.md, all workflow guides
-- `TECHNICAL_SPECS.md` → (SOURCE OF TRUTH - no references)
-- `TROUBLESHOOTING.md` → (SOLUTION REFERENCE - no references)
-- `INSTALL.md` → SETUP.md (GDAL version)
-- `SCRIPTS_GUIDE.md` → SETUP.md (database/schema naming)
-- `DATA_GUIDE.md` → SETUP.md (pre-generated datasets)
+- `README.md` → setup.md, workflow-quickstart.md, install.md, technical-specs.md
+- `docs/getting-started/setup.md` → (PRIMARY - no references; others point here)
+- `docs/getting-started/workflow-quickstart.md` → setup.md, troubleshooting.md
+- `docs/user-guides/workflow-postgis-guide.md` → setup.md, technical-specs.md, troubleshooting.md
+- `docs/user-guides/workflow-geopackage-guide.md` → setup.md, technical-specs.md, troubleshooting.md
+- `docs/user-guides/workflow-s57-import-guide.md` → setup.md, troubleshooting.md
+- `docs/user-guides/database-backend-guide.md` → setup.md, all workflow guides
+- `docs/reference/technical-specs.md` → (SOURCE OF TRUTH - no references)
+- `docs/reference/troubleshooting.md` → (SOLUTION REFERENCE - no references)
+- `docs/getting-started/install.md` → setup.md (GDAL version)
+- `docs/user-guides/scripts-guide.md` → setup.md (database/schema naming)
+- `docs/user-guides/data-guide.md` → setup.md (pre-generated datasets)
 
 ---
 
@@ -363,22 +366,22 @@ These two documents are **committed last** (after all other changes) to ensure t
 docs: Standardize documentation and fix inconsistencies (v0.1.1)
 
 - Fixed GDAL version inconsistencies (3.11.3 → 3.10.3)
-  Files: README.md, INSTALL.md, SCRIPTS_GUIDE.md
+  Files: README.md, install.md, scripts-guide.md
 
 - Standardized database naming (ENC_db → enc_db)
-  Files: SETUP.md, all workflow guides (8 files)
+  Files: setup.md, all workflow guides (8 files)
 
 - Standardized schema naming (us_enc_all → enc_west)
   Files: All workflow guides, data guide (8 files)
 
 - Added PostgreSQL 16+ requirement
-  Files: DATABASE_BACKEND_GUIDE.md, SCRIPTS_GUIDE.md
+  Files: database-backend-guide.md, scripts-guide.md
 
 - Updated environment setup references (Conda+uv)
-  Files: WORKFLOW_QUICKSTART.md, all guides (5 files)
+  Files: workflow-quickstart.md, all guides (5 files)
 
 - Added comprehensive performance benchmarks
-  Files: TECHNICAL_SPECS.md (fine graph, H3, storage)
+  Files: technical-specs.md (fine graph, H3, storage)
 
 - Total: 13 documentation files, 100+ fixes
 ```
@@ -393,8 +396,8 @@ fix: Resolve graph edge accumulation bug + update docs
 - Fixed save_graph_to_gpkg() file deletion logic
   File: src/nautical_graph_toolkit/core/graph.py:1358
 
-- Documented fix in TROUBLESHOOTING.md
-  File: docs/TROUBLESHOOTING.md
+- Documented fix in troubleshooting.md
+  File: docs/reference/troubleshooting.md
 ```
 
 ### Reference Files in Commits
@@ -407,17 +410,17 @@ fix: Resolve graph edge accumulation bug + update docs
 
 ### Final Release Commit (Before Tag)
 
-**Special commit for release closure - includes CHANGELOG.md and ROADMAP.md:**
+**Special commit for release closure - includes changelog.md and roadmap.md:**
 
 ```
-chore: Release v0.1.1 - Update CHANGELOG and ROADMAP
+chore: Release v0.1.1 - Update changelog and roadmap
 
-- Updated CHANGELOG.md with final v0.1.1 release notes
+- Updated changelog.md with final v0.1.1 release notes
   - All bug fixes, features, and standardizations documented
   - Release date: 2026-01-20
   - 13 files modified, 100+ fixes
 
-- Updated ROADMAP.md with version 0.1.1 status
+- Updated roadmap.md with version 0.1.1 status
   - Marked v0.1.1 as complete
   - Updated v0.2.0 roadmap with 0.1.1 learnings
 
@@ -431,20 +434,165 @@ Ready for git tag v0.1.1
 ## Key Conventions (Maintained Across All Docs)
 
 ### Software Versions
-- **GDAL**: Always 3.10.3 (exact, pinned)
-- **PostgreSQL**: Always 16+ (minimum requirement)
-- **Python**: Always 3.11+ required
+Version values are managed via macros — see [Version Macros](#version-macros) section. Single source of truth: `mkdocs.yml` under `extra:`.
 
 ### Database Naming
 - **Database**: `enc_db` (lowercase)
 - **Schema/Dataset**: `enc_west` (new standard)
 
 ### Documentation Cross-References
-- **SETUP.md**: Primary reference for software prerequisites
-- **WORKFLOW_QUICKSTART.md**: Centralized GDAL version reference and entry point
-- **DATABASE_BACKEND_GUIDE.md**: Decision guide linking to SETUP.md and workflow guides
-- **TECHNICAL_SPECS.md**: Performance benchmarks and specifications
-- **TROUBLESHOOTING.md**: Problem-solving resource referenced by all guides
+- **setup.md**: Primary reference for software prerequisites
+- **workflow-quickstart.md**: Centralized entry point
+- **database-backend-guide.md**: Decision guide linking to setup.md and workflow guides
+- **technical-specs.md**: Performance benchmarks and specifications
+- **troubleshooting.md**: Problem-solving resource referenced by all guides
+
+---
+
+## Version Macros
+
+User-facing docs use `mkdocs-macros-plugin` for version variables. Variables are defined in `mkdocs.yml` under `extra:` and resolve at build time — rendered pages show the value, source Markdown shows the `{{ }}` token.
+
+### Available Variables
+
+| Token | Value (as of v0.1.1) | Controls |
+|---|---|---|
+| `{{ python_version }}` | 3.11 | Python minimum requirement |
+| `{{ gdal_version }}` | 3.10.3 | GDAL exact pinned version |
+| `{{ pg_version }}` | 16 | PostgreSQL minimum version |
+| `{{ postgis_version }}` | 3.4 | PostGIS minimum version |
+
+### Usage
+
+Use `{{ variable_name }}` anywhere in any `.md` file under `docs/`. Example:
+
+````markdown
+Requires GDAL {{ gdal_version }} (exact version — do not upgrade).
+````
+
+### Version Bumps
+
+To update a version across all docs, edit only `mkdocs.yml`:
+
+```yaml
+extra:
+  python_version: "3.12"   # ← single source of truth
+  gdal_version: "3.11.0"
+  pg_version: "17"
+  postgis_version: "3.5"
+```
+
+All docs rebuild with the new values automatically.
+
+### Exclusions — Do NOT Use Macros In
+
+- **changelog.md** — entries are historical snapshots; hardcode the version that was current at release time
+- **Version-comparison troubleshooting notes** — analytical text that discusses specific version numbers (e.g., "3.10.3 vs 3.11.3") must stay literal
+
+---
+
+## Markdown Formatting Rules
+
+MkDocs Material uses CommonMark parsing. Two formatting pitfalls cause broken rendering — follow the rules below to avoid them.
+
+### Rule 1 — Blank Line Before Lists
+
+CommonMark requires an empty line between a paragraph and a list. Without it the list items render as inline continuation text.
+
+````markdown
+✓ Correct:
+
+Choose your backend based on scale:
+
+- PostGIS (1000+ ENCs)
+- GeoPackage (100-1000 ENCs)
+- SpatiaLite (<500 ENCs)
+````
+
+````markdown
+✗ Wrong — list collapses into the paragraph:
+
+Choose your backend based on scale:
+- PostGIS (1000+ ENCs)
+- GeoPackage (100-1000 ENCs)
+- SpatiaLite (<500 ENCs)
+````
+
+**Exception — list directly under a heading:** A heading of any level acts as a block-level break. A list immediately after a heading renders correctly without a blank line.
+
+````markdown
+✓ Both render identically — no blank line needed after the heading:
+
+#### Dependencies
+- **Python**: 3.11, 3.12 (with 3.11+ required)
+- **GDAL**: 3.10.3 (pinned for stability)
+- **Core Geospatial**: GeoPandas 1.1+, Shapely 2.0+, Fiona 1.10+
+````
+
+### Rule 2 — Nested Bullets Inside Numbered Lists: 6-Space Indent
+
+Material theme requires sub-bullets under a numbered item to be indented by **4 spaces** (aligned past the `N. ` prefix). A standard 2-space indent collapses them into the parent paragraph.
+
+````markdown
+✓ Correct (6-space indent on sub-bullets):
+
+1. **Base Graph Creation** (0.3 NM resolution)
+    - Defines geographic area of interest
+    - Filters ENC charts to the relevant region
+    - Creates navigable water grid from S-57 layers
+````
+
+````markdown
+✗ Wrong (3-space indent — sub-bullets render flat):
+
+1. **Base Graph Creation** (0.3 NM resolution)
+  - Defines geographic area of interest
+  - Filters ENC charts to the relevant region
+  - Creates navigable water grid from S-57 layers
+````
+
+**Triple-nested lists** — the same 4-space-per-level pattern extends to any depth. Each nesting level adds exactly 4 spaces:
+
+````markdown
+✓ Correct (0 / 4 / 8 spaces):
+
+- **Complete /dev Directory Hub System**: Comprehensive knowledge base (~2,000 lines)
+    - **4 Rule Files** (~590 lines):
+        - `CLAUDE.md`: Project knowledge with architecture, dependencies, performance data
+        - `AGENTS.md`: Agent-specific behavior guidelines and collaboration patterns
+        - `CODE_STANDARDS.md`: Coding conventions, testing standards, security practices
+        - `WORKFLOW.md`: Development processes, commands, troubleshooting
+````
+
+````markdown
+✗ Wrong (inconsistent indent — level 3 collapses into level 2):
+
+- **Complete /dev Directory Hub System**: Comprehensive knowledge base (~2,000 lines)
+    - **4 Rule Files** (~590 lines):
+      - `CLAUDE.md`: Project knowledge with architecture, dependencies, performance data
+      - `AGENTS.md`: Agent-specific behavior guidelines and collaboration patterns
+````
+
+### Rule 3 — Blank Line Before Tables
+
+CommonMark requires an empty line between a paragraph and a table. Without it the table renders as literal text instead of a formatted grid.
+
+````markdown
+✓ Correct:
+
+| Backend    | Nodes | Time   |
+|------------|-------|--------|
+| PostGIS    | 184K  | 21 min |
+| GeoPackage | 173K  | 52 min |
+````
+
+````markdown
+✗ Wrong — table renders as plain text:
+| Backend    | Nodes | Time   |
+|------------|-------|--------|
+| PostGIS    | 184K  | 21 min |
+| GeoPackage | 173K  | 52 min |
+````
 
 ---
 
@@ -453,12 +601,13 @@ Ready for git tag v0.1.1
 **When creating new user-facing documentation:**
 
 1. **Identify the category**:
-   - User setup/workflow → `docs/WORKFLOW_*.md` or `docs/SETUP.md`
-   - Backend-specific → `docs/WORKFLOW_<BACKEND>_GUIDE.md`
-   - Performance/technical → `docs/TECHNICAL_SPECS.md`
-   - Troubleshooting → `docs/TROUBLESHOOTING.md`
-   - Root → Project root (README.md, INSTALL.md, CHANGELOG.md)
-   - Supporting → `scripts/SCRIPTS_GUIDE.md`, `data/DATA_GUIDE.md`
+   - User setup/workflow → `docs/getting-started/`
+   - Backend-specific workflows → `docs/user-guides/workflow-<backend>-guide.md`
+   - Performance/technical → `docs/reference/technical-specs.md`
+   - Troubleshooting → `docs/reference/troubleshooting.md`
+   - Project docs → `docs/project/` (changelog, roadmap)
+   - Root → Project root (`README.md`)
+   - Supporting → `docs/user-guides/` (scripts-guide, data-guide)
 
 2. **Update this file** (DOCUMENTATION.md):
    - Add new file to appropriate section
@@ -467,14 +616,14 @@ Ready for git tag v0.1.1
    - Update relationship map if needed
 
 3. **Add cross-references** in related files:
-   - Update SETUP.md if new backend/requirement
+   - Update setup.md if new backend/requirement
    - Update README.md if user-facing
-   - Update CHANGELOG.md if released
+   - Update changelog.md if released
    - Reference from other docs that relate
 
 4. **Follow conventions**:
    - Use standard naming (lowercase, hyphens for readability)
-   - Reference SETUP.md for version specs
+   - Reference setup.md for version specs
    - Use established database/schema naming
    - Link to related documentation, not duplicate
 
@@ -485,10 +634,10 @@ Ready for git tag v0.1.1
 ### Documentation Review Workflow
 
 1. **Read this DOCUMENTATION.md** to understand relationships
-2. **Identify primary reference file** (SETUP.md, TECHNICAL_SPECS.md, etc.)
+2. **Identify primary reference file** (setup.md, technical-specs.md, etc.)
 3. **Update primary file** first
 4. **Update secondary files** that reference it
-5. **Update CHANGELOG.md** with summary
+5. **Update changelog.md** with summary
 6. **Create commit** referencing this guide's "Commit Tracking Guide"
 
 ### Documentation Update Checklist
@@ -498,15 +647,15 @@ Ready for git tag v0.1.1
 - [ ] Make changes to primary file
 - [ ] Check all cross-references in other files
 - [ ] Update related secondary files
-- [ ] Verify naming conventions (GDAL 3.10.3, enc_db, enc_west)
-- [ ] Update CHANGELOG.md with changes
+- [ ] Verify naming conventions (version macros, enc_db, enc_west)
+- [ ] Update changelog.md with changes
 - [ ] Create descriptive commit message with file references
 
 **Release Commit (Final, Before Tag)**:
 - [ ] All other documentation updates completed
 - [ ] All code changes committed
-- [ ] CHANGELOG.md finalized with version and date
-- [ ] ROADMAP.md updated with version status
+- [ ] changelog.md finalized with version and date
+- [ ] roadmap.md updated with version status
 - [ ] Create final release commit message
 - [ ] Ready for git tag creation
 
@@ -516,7 +665,7 @@ Ready for git tag v0.1.1
 
 - **"Where is X documented?"** → Search this file's "User-Facing Documentation" sections
 - **"What references file Y?"** → Check "Cross-Reference Map" section
-- **"What's the GDAL version?"** → Always SETUP.md (single source of truth)
+- **"What's the GDAL version?"** → setup.md / mkdocs.yml macros (single source of truth)
 - **"How should a new doc be committed?"** → See "Commit Tracking Guide" section
 - **"When should I update documentation?"** → Follow "Update Hierarchy" section
 
@@ -526,19 +675,19 @@ Ready for git tag v0.1.1
 
 ## Special Note: Release Documentation Timing
 
-**CHANGELOG.md** and **ROADMAP.md** are special documents that should be **committed last** before creating a release tag:
+**changelog.md** and **roadmap.md** are special documents that should be **committed last** before creating a release tag:
 
 1. **Why Last**: They capture the final state of all changes and project status at release moment
 2. **When**: After all code changes, all documentation updates, and all other commits
 3. **Before Tag**: Create these final commits, then create the git tag immediately after
-4. **Example**: For v0.1.1, CHANGELOG.md was updated 2026-01-20 with final notes, then committed before tag
+4. **Example**: For v0.1.1, changelog.md was updated 2026-01-20 with final notes, then committed before tag
 
-This ensures the release tag captures the complete project state including both history (CHANGELOG.md) and vision (ROADMAP.md).
+This ensures the release tag captures the complete project state including both history (changelog.md) and vision (roadmap.md).
 
 ---
 
-**Last Updated**: 2026-01-20 by Claude Code
+**Last Updated**: 2026-02-03 by Claude Code
 **Maintained by**: Nautical Graph Toolkit Team
-**Versioning**: Synced with CHANGELOG.md v0.1.1 release
+**Versioning**: Synced with changelog.md v0.1.1 release
 **Scope**: User-facing and supporting documentation (excludes /dev/ automation)
-**Special Documents**: CHANGELOG.md and ROADMAP.md committed last before release tag
+**Special Documents**: changelog.md and roadmap.md committed last before release tag

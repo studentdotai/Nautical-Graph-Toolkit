@@ -1,0 +1,12 @@
+/* Dark theme header — darker navy than the slate body for visual separation.
+   Material uses --md-primary-fg-color as the header background (not --md-primary).
+   Blue preset value: #2094f3. Overridden here only for the slate scheme. */
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: #0d1b2a;
+  --md-primary-fg-color--light: #1a2e45;
+  --md-primary-fg-color--dark: #071018;
+
+  /* --md-typeset-a-color inherits from --md-primary-fg-color by default;
+     pin it back to the blue preset so body links stay visible on dark backgrounds */
+  --md-typeset-a-color: #2094f3;
+}

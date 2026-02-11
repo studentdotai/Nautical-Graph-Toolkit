@@ -1,0 +1,186 @@
+site_name: Nautical Graph Toolkit
+site_url: https://studentdotai.github.io/Nautical-Graph-Toolkit
+site_description: Maritime S-57 ENC to GIS conversion, intelligent routing networks, and vessel route optimization
+site_author: Vector Nautical
+repo_url: https://github.com/studentdotai/Nautical-Graph-Toolkit
+repo_name: studentdotai/Nautical-Graph-Toolkit
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  language: en
+
+  # Color palette - Maritime Blue Theme
+  palette:
+    # Light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: blue
+      accent: cyan
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+
+    # Dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: blue
+      accent: cyan
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+  # Features
+  features:
+    - navigation.instant      # Instant loading (SPA-like)
+    - navigation.tracking     # URL updates with scroll
+    - navigation.tabs         # Top-level sections as tabs
+    - navigation.sections     # Expand sections
+    - navigation.expand       # Expand all subsections
+    - navigation.top          # Back to top button
+    - navigation.footer       # Previous/Next footer
+    - search.suggest          # Search suggestions
+    - search.highlight        # Highlight search terms
+    - search.share            # Share search results
+    - content.code.copy       # Copy button on code blocks
+    - content.code.annotate   # Add annotations to code
+    - content.tabs.link       # Link content tabs
+    - toc.follow              # TOC follows scroll
+    - toc.integrate           # TOC integrated in nav
+
+  # Custom icons
+  icon:
+    repo: fontawesome/brands/github
+    edit: material/pencil
+    view: material/eye
+    logo: material/ferry
+
+# Navigation structure
+nav:
+  - Nautical Graph Toolkit: index.md
+  - Getting Started:
+    - Installation: getting-started/install.md
+    - Setup Guide: getting-started/setup.md
+    - Quick Start: getting-started/workflow-quickstart.md
+  - User Guides:
+    - Scripts Guide: user-guides/scripts-guide.md
+    - S-57 Import Guide: user-guides/workflow-s57-import-guide.md
+    - GeoPackage Workflow: user-guides/workflow-geopackage-guide.md
+    - PostGIS Workflow: user-guides/workflow-postgis-guide.md
+    - Weights & Routing: user-guides/weights-workflow-example.md
+    - Data Guide: user-guides/data-guide.md
+    - Database Backend Guide: user-guides/database-backend-guide.md
+  - Tutorials:
+    - Jupyter Notebooks: notebooks/index.md
+  - Reference:
+    - Technical Specifications: reference/technical-specs.md
+    - API Documentation: api/index.md
+    - Troubleshooting: reference/troubleshooting.md
+  - Project:
+    - Roadmap: project/roadmap.md
+    - Changelog: project/changelog.md
+    - Contributing: project/contributing.md
+
+# Plugins
+plugins:
+  - search:
+      separator: '[\s\-,:!=\[\]()"/]+|(?!\b)(?=[A-Z][a-z])|\.(?!\d)|&[lg]t;'
+
+  - macros
+
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            docstring_style: google
+            show_source: true
+            show_root_heading: true
+            show_root_full_path: false
+            heading_level: 2
+            merge_init_into_class: true
+            docstring_section_style: table
+
+  - git-revision-date-localized:
+      enable_creation_date: true
+      type: date  # Static dates instead of dynamic "timeago"
+      fallback_to_build_date: true  # Graceful fallback when Git unavailable
+      enabled: !ENV [ENABLE_GIT_REVISION, true]  # Can disable: ENABLE_GIT_REVISION=false mkdocs build
+
+  - minify:
+      minify_html: true
+      minify_js: true
+      minify_css: true
+
+# Markdown extensions
+markdown_extensions:
+  # Python Markdown
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+      title: On this page
+
+  # PyMdown Extensions
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.betterem:
+      smart_enable: all
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+
+# Extra configuration
+extra:
+  version:
+    provider: mike  # Version management
+
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/studentdotai/Nautical-Graph-Toolkit
+    - icon: fontawesome/solid/anchor
+      link: https://opencollective.com/vectornautical
+
+  # Pinned dependency versions — single source of truth for docs
+  python_version: "3.11"
+  gdal_version: "3.10.3"
+  pg_version: "16"
+  postgis_version: "3.4"
+  project_version: "0.1.2"
+  last_updated: "2026-02-11"
+
+# Extra CSS
+extra_css:
+  - assets/css/custom.css
+
+# Copyright
+copyright: Copyright &copy; 2025 Vector Nautical. Licensed under AGPL-3.0.
+
+# Extra JavaScript - MathJax for equations
+extra_javascript:
+  - https://polyfill.io/v3/polyfill.min.js?features=es6
+  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js

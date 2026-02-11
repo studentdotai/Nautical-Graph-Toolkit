@@ -8,7 +8,7 @@ This document provides comprehensive performance benchmarks, storage requirement
 - **Route**: Los Angeles to San Francisco (387 NM)
 - **Data Source**: ENC_SF_LA_SET (enc_west schema)
 - **Hardware**: AMD Strix Halo, 128GB unified memory
-- **Backends Tested**: PostgreSQL 16+ with PostGIS, GeoPackage
+- **Backends Tested**: PostgreSQL {{ pg_version }}+ with PostGIS, GeoPackage
 - **OS**: Ubuntu 24.04 (Linux)
 - **Future**: Windows 11 benchmarks planned
 
@@ -72,6 +72,7 @@ Fine graphs use buffer-based area selection (24 NM buffer around base route) for
 | ~50K | ~197K | ~3.1 | ~23.1 | ~5.4 | ~0.6 | ~32 |
 
 **⚠️ PostGIS Processing Mode Critical Performance Difference:**
+
 - Single SQL process: **~1499s** ❌ (extremely slow, not recommended)
 - With subdivision: **~32s** ✅ (47× faster!)
 
@@ -110,7 +111,7 @@ Base graph storage varies significantly by node spacing:
 | 0.5 NM | GeoPackage | 216 MB | 129K | 513K | ~1.7 KB |
 | 0.5 NM | PostGIS | 195 MB | 129K | 513K | ~1.5 KB |
 
-† **0.1 NM PostGIS could not be reliably created with 32GB RAM allocation**. May be possible with 64GB or 96GB allocation on this 128GB unified memory system. Future tests will explore higher RAM configurations.
+**0.1 NM PostGIS could not be reliably created with 32GB RAM allocation**. May be possible with 64GB or 96GB allocation on this 128GB unified memory system. Future tests will explore higher RAM configurations.
 
 **Storage Ratio (PostGIS vs GeoPackage)**: ~0.9× for most configurations (where both measured)
 **Consistent bytes/node**: GeoPackage ~1.7 KB/node, PostGIS ~1.5 KB/node
@@ -129,6 +130,7 @@ High-precision fine graphs for detailed coastal and harbor routing using buffer-
 | 0.2 NM | GeoPackage | 78 MB | ~50K | ~197K | ~156 MB |
 
 **H3 Graph (Multi-resolution 6-11)**:
+
 | Backend | Size | Nodes | Edges | Bytes/100K Nodes |
 |---------|------|-------|-------|------------------|
 | PostGIS | 1.1 GB | ~821K | ~2.46M | ~134 MB |
@@ -169,27 +171,33 @@ Complete United States coastal waters dataset for production/regional analysis.
 ### Storage Planning Guidelines
 
 **Quick Start & Testing:**
+
 - Minimum: 500 MB free space (ENC_SF_LA_SET or ENC_ROOT_UPDATE_SET)
 - Recommended: 1 GB (includes converted database + 0.5 NM graph)
 
 **Regional Analysis (Single Route):**
+
 - Minimum: 2 GB free space (0.3 NM graph + converted S-57 data)
 - Recommended: 3 GB (includes 0.2 NM graph + working space)
 
 **Fine-Resolution Coastal Routing:**
+
 - Minimum: 500 MB free space (0.2 NM fine graph + 24 NM buffer)
 - Recommended: 1 GB (includes 0.1 NM fine graph + working space)
 - For H3 graphs: Minimum 1.2 GB (PostGIS) or 900 MB (GeoPackage)
 
 **High-Precision Routing:**
+
 - Minimum: 8 GB free space (0.1 NM graph)
 - Recommended: 10 GB (includes all spacings + backup overhead)
 
 **Full Production (Regional/All-US):**
+
 - Minimum: 15 GB free space (full NOAA catalog)
 - Recommended: 30 GB (includes PostGIS + indexes + multiple graphs)
 
 **Expansion Ratios by Backend:**
+
 - GeoPackage: ~3× raw S-57 size
 - SpatiaLite: ~2.5-3× raw S-57 size
 - PostGIS: ~4-5× raw S-57 size (with indexes)

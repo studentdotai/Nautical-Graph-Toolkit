@@ -13,7 +13,7 @@ Backend selection significantly impacts performance. This skill provides data-dr
 
 ## Performance Summary
 
-**⚠️ For current performance metrics, see `/docs/TECHNICAL_SPECS.md`** - This document contains comprehensive benchmarks updated regularly with actual test results.
+**⚠️ For current performance metrics, see `/docs/reference/technical-specs.md`** - This document contains comprehensive benchmarks updated regularly with actual test results.
 
 Key findings from latest benchmarks (SF Bay to LA route, 47 S-57 ENCs, ~387 NM):
 
@@ -23,9 +23,9 @@ Key findings from latest benchmarks (SF Bay to LA route, 47 S-57 ENCs, ~387 NM):
 - **Storage ratio**: PostGIS ~0.9× vs GeoPackage (slightly more compact)
 
 **Reference for specific metrics**:
-- **Graph Creation Performance**: `/docs/TECHNICAL_SPECS.md` - Section "Graph Creation Performance by Spacing" (0.1-0.5 NM)
-- **Fine Graph Performance**: `/docs/TECHNICAL_SPECS.md` - Section "Fine Graph Creation Performance by Spacing"
-- **Storage Requirements**: `/docs/TECHNICAL_SPECS.md` - Section "Storage Requirements"
+- **Graph Creation Performance**: `/docs/reference/technical-specs.md` - Section "Graph Creation Performance by Spacing" (0.1-0.5 NM)
+- **Fine Graph Performance**: `/docs/reference/technical-specs.md` - Section "Fine Graph Creation Performance by Spacing"
+- **Storage Requirements**: `/docs/reference/technical-specs.md` - Section "Storage Requirements"
 
 ## Decision Matrix
 
@@ -287,14 +287,14 @@ gdal.SetCacheMax(512 * 1024 * 1024)
 ## Cross-References
 
 **📊 Performance Data (Primary Source)**:
-- **`/docs/TECHNICAL_SPECS.md`**: ⭐ **Authoritative source for all performance benchmarks** - Updated regularly with latest test results
+- **`/docs/reference/technical-specs.md`**: ⭐ **Authoritative source for all performance benchmarks** - Updated regularly with latest test results
   - Graph Creation Performance by Spacing (0.1-0.5 NM)
   - Fine Graph Creation Performance by Spacing
   - Storage Requirements by Backend
   - Platform Benchmarks (Linux/Windows)
 
 **📋 Backend Selection & Setup**:
-- **`/docs/DATABASE_BACKEND_GUIDE.md`**: Quick reference comparison table and backend selection guidance
+- **`/docs/user-guides/database-backend-guide.md`**: Quick reference comparison table and backend selection guidance
 - **Project Knowledge**: `/dev/rules/CLAUDE.md` (Database Backend Patterns, Performance Characteristics sections)
 - **Development Workflow**: `/dev/rules/WORKFLOW.md`
 - **README.md**: High-level overview and SVG performance charts

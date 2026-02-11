@@ -3,7 +3,7 @@
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-blue)](https://www.python.org/downloads/)
 [![GitHub Release](https://img.shields.io/github/v/release/studentdotai/Nautical-Graph-Toolkit)](https://github.com/studentdotai/Nautical-Graph-Toolkit/releases)
-[![Changelog](https://img.shields.io/badge/changelog-keep%20a%20changelog-blue)](CHANGELOG.md)
+[![Changelog](https://img.shields.io/badge/changelog-keep%20a%20changelog-blue)](docs/project/changelog.md)
 [![Open Collective](https://img.shields.io/badge/Open%20Collective-vectornautical-blueviolet)](https://opencollective.com/vectornautical)
 
 A comprehensive maritime analysis toolkit for converting NOAA S-57 Electronic Navigational Charts (ENC) into analysis-ready geospatial formats, generating intelligent maritime routing networks, and performing advanced vessel route optimization.
@@ -70,7 +70,7 @@ This toolkit transforms raw S-57 chart data into production-ready geospatial dat
 - Git installed
   - Windows: https://git-scm.com/download/win
 
-**Note for Windows PowerShell users:** If you prefer PowerShell over Miniforge Prompt and encounter issues with `mamba` commands not being recognized, see [Windows PowerShell & Mamba Issues](docs/TROUBLESHOOTING.md#windows-powershell--mamba-issues) for the fix.
+**Note for Windows PowerShell users:** If you prefer PowerShell over Miniforge Prompt and encounter issues with `mamba` commands not being recognized, see [Windows PowerShell & Mamba Issues](docs/reference/troubleshooting.md#windows-powershell--mamba-issues) for the fix.
 
 #### Clone and Install
 
@@ -110,9 +110,9 @@ uv pip install -e .
 python -c "from nautical_graph_toolkit import S57Base; print('✓ Installation successful')"
 ```
 
-See [INSTALL.md](INSTALL.md) for detailed troubleshooting and platform-specific guides.
+See [INSTALL.md](docs/getting-started/install.md) for detailed troubleshooting and platform-specific guides.
 
-**⚠️ Windows Users:** If you encounter issues with Mamba/Conda commands in PowerShell (command not recognized, scripts disabled, etc.), see the [Windows PowerShell & Mamba Issues](docs/TROUBLESHOOTING.md#windows-powershell--mamba-issues) troubleshooting section.
+**⚠️ Windows Users:** If you encounter issues with Mamba/Conda commands in PowerShell (command not recognized, scripts disabled, etc.), see the [Windows PowerShell & Mamba Issues](docs/reference/troubleshooting.md#windows-powershell--mamba-issues) troubleshooting section.
 
 #### GDAL Installation
 
@@ -127,7 +127,7 @@ python -c "from osgeo import gdal; print(f'✓ GDAL {gdal.__version__} installed
 
 **⚠️ Important:** Do NOT install GDAL via pip (`pip install gdal`). This will conflict with the Conda installation and cause version mismatches.
 
-If you encounter GDAL issues, see [INSTALL.md](INSTALL.md) for troubleshooting.
+If you encounter GDAL issues, see [INSTALL.md](docs/getting-started/install.md) for troubleshooting.
 
 #### PostGIS Database Setup (Optional, for production workflows)
 
@@ -152,38 +152,27 @@ docker-compose up -d
 python -c "from sqlalchemy import create_engine; engine = create_engine('postgresql://postgres:postgres@localhost:5433/enc_db'); print('✓ PostGIS connected')"
 ```
 
-See [INSTALL.md Section 4](INSTALL.md#4-docker-postgis-setup) for complete platform-specific configuration and troubleshooting.
+See [INSTALL.md Section 4](docs/getting-started/install.md#4-docker-postgis-setup) for complete platform-specific configuration and troubleshooting.
 
-### 5-Minute Example: Build a Route Graph
+### Quick Start Example
 
-```python
-from nautical_graph_toolkit.core.graph import FineGraph
-from nautical_graph_toolkit.data import world_ports
+The toolkit provides comprehensive workflow scripts and Jupyter notebooks for building maritime routing graphs.
 
-# Initialize graph from GeoPackage with auto-download of missing ENCs
-graph = FineGraph(
-    db_path="maritime.gpkg",
-    region="us_west_coast",  # Auto-downloads relevant NOAA ENCs
-    auto_update=True
-)
+**Interactive Examples**: See the [Jupyter Notebooks](docs/notebooks/) for 13+ working examples covering:
+- ENC data import and conversion
+- Graph creation (BaseGraph, FineGraph, H3Graph)
+- Route optimization with A* pathfinding
+- Weighted graph construction and vessel constraints
 
-# Define vessel constraints
-constraints = {
-    "draft": 8.5,      # meters
-    "height": 45.0,    # meters
-    "vessel_type": "general_cargo"
-}
+**Complete Workflow**: For a step-by-step walkthrough, see the [Quick Start Workflow Guide](docs/getting-started/workflow-quickstart.md).
 
-# Find optimal route from Long Beach to San Francisco
-route = graph.find_route(
-    start=(33.74, -118.21),
-    end=(37.81, -122.41),
-    constraints=constraints,
-    method="weighted_a*"
-)
+**Command-line Workflows**:
+```bash
+# PostGIS backend (recommended for production)
+python scripts/maritime_graph_postgis_workflow.py
 
-# Export for visualization
-route.to_geojson("route.geojson")
+# GeoPackage backend (portable, single-file)
+python scripts/maritime_graph_geopackage_workflow.py
 ```
 
 ## ⚡ Performance Benchmarks
@@ -329,23 +318,21 @@ Comprehensive real-world performance analysis from production testing (Nov 2025)
 
 We have a comprehensive public roadmap that outlines our development journey from foundation to production-ready QGIS integration.
 
-**Current Status**: v0.1.1 Released ✅ (2026-01-20)
+**Current Status**: v0.1.2 Released ✅ (February 2026)
 
-**Near-term Goals** (v0.2.0 - Foundation & Polish):
-- PyPI distribution for easy installation
-- Security audit and comprehensive API documentation
-- Docker/Kubernetes deployment support
-- CI/CD pipeline with >80% test coverage
+**Near-term Goals** (v0.1.x Foundation Completion → v0.2.0 PyTorch Integration):
+- **v0.1.x**: Security audit, Weights class refactor (PyTorch prep), 80% test coverage
+- **v0.2.0**: PyTorch integration, limited PyPI distribution (no GDAL), full Docker packaging, mkdocstrings API docs
 
 **Long-term Vision**:
-- **QGIS 4.0 Plugin Integration** (2026) - Native QGIS plugin for maritime route planning
-- **Advanced Pathfinding** - Time-dependent routing with tidal currents
-- **ML-Powered Optimization** - Traffic prediction and route optimization models
-- **GPU Acceleration** - CUDA-based graph processing (research track)
+- **QGIS 4.0 Plugin Integration** (February 20, 2026) - Native QGIS plugin for maritime route planning
+- **Advanced Pathfinding** - Time-dependent routing with tidal currents (post-QGIS MVP)
+- **Advanced ML Models** - Build on PyTorch foundation for traffic amd weather optimization (post-v0.2.0)
+- **GPU Production Support** - Expand CUDA acceleration beyond experimental (post-v0.2.0)
 
 **Development Note**: This is a part-time project developed between sea contracts. Timelines are flexible and availability-dependent. Community contributions welcome starting with v0.2.0!
 
-➡️ **[View the Full Project Roadmap](docs/ROADMAP.md)** for detailed version plans, dependencies, and contribution opportunities.
+➡️ **[View the Full Project Roadmap](docs/project/roadmap.md)** for detailed version plans, dependencies, and contribution opportunities.
 
 ---
 
@@ -359,11 +346,31 @@ We have a comprehensive public roadmap that outlines our development journey fro
 
 ## 📚 Documentation
 
-- **[Setup Guide](docs/SETUP.md)** - Detailed installation and configuration for all backends
-- **[Quick Start Workflow](docs/WORKFLOW_QUICKSTART.md)** - 5-minute introduction
-- **[PostGIS Guide](docs/WORKFLOW_POSTGIS_GUIDE.md)** - Production-scale setup
-- **[GeoPackage Guide](docs/WORKFLOW_GEOPACKAGE_GUIDE.md)** - Portable single-file setup
-- **[Jupyter Notebooks](docs/notebooks/)** - 12 interactive examples and tutorials
+**[View Live Documentation](https://studentdotai.github.io/Nautical-Graph-Toolkit)**
+
+Built with **MkDocs** using the Material theme.
+
+### User Guides
+- **[Setup Guide](docs/getting-started/setup.md)** - Detailed installation and configuration for all backends
+- **[Quick Start Workflow](docs/getting-started/workflow-quickstart.md)** - 5-minute introduction
+- **[PostGIS Guide](docs/user-guides/workflow-postgis-guide.md)** - Production-scale setup
+- **[GeoPackage Guide](docs/user-guides/workflow-geopackage-guide.md)** - Portable single-file setup
+- **[Jupyter Notebooks](docs/notebooks/)** - 13 interactive examples and tutorials
+
+### Preview Documentation Locally
+
+```bash
+# Standard preview (uses Git dates when available)
+mkdocs serve
+# Opens at http://127.0.0.1:8000
+
+# Fast preview without Git dates (if you encounter Git errors)
+ENABLE_GIT_REVISION=false mkdocs serve
+```
+
+> **Note**: If you encounter `git-revision-date-localized` plugin errors, use the second command above or see [Documentation Build Issues](docs/reference/troubleshooting.md#documentation-build-issues) in the troubleshooting guide.
+
+Deployment to GitHub Pages is automated via CI/CD on version tags.
 
 ## 🏗️ Architecture
 
@@ -371,20 +378,29 @@ The toolkit uses a clean, layered architecture:
 
 ```
 nautical_graph_toolkit/
-   core/              # Main conversion and routing classes
-      graph.py       # Graph classes (BaseGraph, FineGraph, H3Graph)
-      s57_converter.py   # S-57 conversion classes
-      router.py      # Route optimization engine
-   utils/             # Database and utility connectors
-      db_utils.py    # Database operations
-      s57_utils.py   # S-57 attribute lookups
-      port_utils.py  # World Port Index integration
-      noaa_database.py # NOAA ENC scraper
-   data/              # S-57 reference data and configurations
-      graph_config.yml   # Graph layer definitions
-      s57_objects.csv    # S-57 object class lookup
-      custom_ports.csv   # User-defined ports
-   __init__.py
+   core/                    # Main conversion and routing classes
+      graph.py             # Graph classes (BaseGraph, FineGraph, H3Graph, Weights)
+      s57_data.py          # S-57 conversion classes and database managers
+      pathfinding_lite.py  # A* pathfinding engine
+   utils/                   # Database and utility connectors
+      db_utils.py          # Database operations (PostGIS, GeoPackage, SpatiaLite)
+      s57_utils.py         # S-57 attribute lookups and NOAA database
+      port_utils.py        # World Port Index integration
+      s57_classification.py # S-57 feature classification
+      geometry_utils.py    # Geometric operations (buffer, slice)
+      misc_utils.py        # Coordinate conversion and helpers
+      plot_utils.py        # Plotly visualization utilities
+      notebook_utils.py    # Jupyter notebook benchmarking
+      logging_utils.py     # Enhanced logging utilities
+   data/                    # S-57 reference data and configurations
+      graph_config.yml      # Graph layer definitions
+      s57objectclasses.csv  # S-57 object class lookup
+      s57attributes.csv     # S-57 attribute definitions
+      s57expectedinput.csv  # S-57 expected input specifications
+      WorldPortIndex_2019Shapefile/ # Port locations
+      custom_ports.csv      # User-defined ports
+      noaa_database.csv     # NOAA ENC catalog cache
+   __init__.py              # Main package exports
 ```
 
 ### Core Classes
@@ -394,10 +410,18 @@ nautical_graph_toolkit/
 | `S57Base` | Bulk conversion | Import large ENC datasets quickly |
 | `S57Advanced` | Feature-level conversion | Detailed analysis with source attribution |
 | `S57Updater` | Incremental updates | Keep PostGIS in sync with new charts |
+| `ENCDataFactory` | Database connector factory | Multi-backend data access |
+| `PostGISManager` | PostGIS operations | Spatial analysis and server deployment |
+| `GPKGManager` | GeoPackage operations | Portable single-file database |
+| `SpatiaLiteManager` | SpatiaLite operations | Lightweight file-based database |
 | `BaseGraph` | Coarse routing network | Large-scale maritime analysis |
 | `FineGraph` | Detailed routing network | Coastal route planning |
 | `H3Graph` | Hexagonal routing network | Multi-resolution flexibility |
-| `PostGISManager` | Database queries | Spatial analysis and reporting |
+| `Weights` | Edge weight calculation | Vessel-specific routing costs |
+| `Astar` | A* pathfinding | Route computation |
+| `Route` | Route management | Export and analysis |
+| `NoaaDatabase` | NOAA ENC catalog | Chart metadata and updates |
+| `PortData` | Port information | World Port Index integration |
 
 ## 💼 Common Workflows
 
@@ -413,54 +437,66 @@ converter = S57Base(
 converter.convert_by_enc()
 ```
 
-### Build a Production Maritime Graph on PostGIS
-```python
-from nautical_graph_toolkit.core import FineGraph
+### Build a Maritime Routing Graph
 
-graph = FineGraph(
-    backend="postgis",
-    db_config={
-        "host": "localhost",
-        "user": "maritime",
-        "password": "secure_pass",
-        "dbname": "maritime_prod"
-    },
-    resolution="fine"  # 0.02-0.3 NM
-)
-graph.build()  # Builds all routing layers
+For complete step-by-step guides, see:
+- [PostGIS Workflow Guide](docs/user-guides/workflow-postgis-guide.md)
+- [GeoPackage Workflow Guide](docs/user-guides/workflow-geopackage-guide.md)
+
+Graph creation is done via the workflow scripts:
+```bash
+# PostGIS backend (recommended for production)
+python scripts/maritime_graph_postgis_workflow.py
+
+# GeoPackage backend (portable, single-file)
+python scripts/maritime_graph_geopackage_workflow.py
 ```
 
 ### Find Optimal Vessel Route
-```python
-# Vessel with 9m draft approaching restricted channel
-route = graph.find_route(
-    start=(47.60, -122.33),  # Seattle
-    end=(46.75, -122.92),    # Astoria
-    constraints={"draft": 9.0, "vessel_type": "container_ship"},
-    avoid_zones=["restricted", "military"]
-)
 
-# Export with metadata
-route.to_geojson(
-    "optimized_route.geojson",
-    include_attributes=["depth", "current", "traffic"]
+The toolkit provides A* pathfinding via the `Astar` class. See the [Weighted Workflow Example](docs/user-guides/weights-workflow-example.md) for a complete working example.
+
+```python
+from nautical_graph_toolkit.core.pathfinding_lite import Astar
+from shapely.geometry import Point
+
+# Load your graph (from PostGIS, GeoPackage, etc.)
+# graph = ... (load from your data source)
+
+# Create pathfinder
+pathfinder = Astar(graph)
+
+# Compute route
+route = pathfinder.compute_route(
+    start_point=Point(-122.33, 47.60),  # Seattle
+    end_point=Point(-122.92, 46.75),    # Astoria
+    weight_key='adjusted_weight'
 )
 ```
+
+For vessel-specific constraints and weighted routing, see the complete guides above.
 
 ### Synchronize Local Charts with NOAA
+
 ```python
-from nautical_graph_toolkit.utils import NoaaDatabase
+from nautical_graph_toolkit.utils.s57_utils import NoaaDatabase
 
 noaa = NoaaDatabase()
-updates = noaa.check_updates(local_enc_dir="/data/encs")
 
-# Lists all outdated charts
-for chart in updates["outdated"]:
-    print(f"Update available: {chart.name} (v{chart.edition})")
+# Get current NOAA ENC catalog
+charts = noaa.get_charts()  # Returns list of NoaaChart objects
 
-# Auto-download updates
-noaa.download_updates(updates, destination="/data/encs")
+# Or get as DataFrame
+df = noaa.get_dataframe()
+
+# Save to CSV for reference
+noaa.save_to_csv("my_enc_catalog.csv")
+
+# Force refresh from live NOAA website
+charts = noaa.get_charts(force_refresh=True)
 ```
+
+**Note**: Download charts directly from NOAA: https://charts.noaa.gov/ENCs/ENCs.shtml
 
 ## 📦 Installation & Dependencies
 
@@ -516,7 +552,7 @@ Want to validate your installation or skip lengthy data processing? We provide a
 - ✅ Learn from production-quality examples
 - ✅ Benchmark performance against reference implementations
 
-See [data/DATA_GUIDE.md](data/DATA_GUIDE.md#-pre-generated-examples--large-datasets-pcloud-repository) for detailed file descriptions and download instructions.
+See [data/DATA_GUIDE.md](docs/user-guides/data-guide.md#-pre-generated-examples--large-datasets-pcloud-repository) for detailed file descriptions and download instructions.
 
 ## 📁 Project Structure
 
@@ -527,10 +563,11 @@ nautical-graph-toolkit/
       utils/               # Database connectors, utilities
       data/                # S-57 reference data & configs
    docs/                    # Documentation
+      getting-started/     # Setup, install, quickstart
+      user-guides/         # Workflow guides, data & scripts guides
       notebooks/           # Jupyter tutorials (15+)
-      SETUP.md
-      WORKFLOW_QUICKSTART.md
-      WORKFLOW_POSTGIS_GUIDE.md
+      project/             # Changelog, roadmap, contributing
+      reference/           # Technical specs, troubleshooting
    tests/                   # Unit & integration tests
    setup.py                 # Package metadata
    README.md                # This file
@@ -571,7 +608,7 @@ AGPL-3.0 means:
 
 ## 🤝 Contributing
 
-**Note:** This project is currently in active early development (v0.1.0). We will begin accepting community contributions starting with **v0.2.0** as the codebase stabilizes and comprehensive contribution guidelines are established. See the [Roadmap](#-roadmap) for timeline details.
+**Note:** This project is currently in active early development (v{{ project_version }}). We will begin accepting community contributions starting with **v0.2.0** as the codebase stabilizes and comprehensive contribution guidelines are established. See the [Roadmap](#-roadmap) for timeline details.
 
 In the meantime, you can:
 - Report bugs or request features on [GitHub Issues](https://github.com/studentdotai/Nautical-Graph-Toolkit/issues)
@@ -602,7 +639,7 @@ While the core development is a one-person effort carried out part-time (often a
 
 ### Flagship Product: Nautical Graph Toolkit
 
-Our first step toward this vision is the **Nautical Graph Toolkit (v0.1.0)**. It is an open-source engine designed to bridge the gap between raw hydrographic data (S-57 ENCs) and intelligent routing. It transforms static charts into vessel-aware, weighted graphs, allowing developers and mariners to analyze the marine environment without the barriers of legacy software.
+Our first step toward this vision is the **Nautical Graph Toolkit (v{{ project_version }})**. It is an open-source engine designed to bridge the gap between raw hydrographic data (S-57 ENCs) and intelligent routing. It transforms static charts into vessel-aware, weighted graphs, allowing developers and mariners to analyze the marine environment without the barriers of legacy software.
 
 ### Why We Need Your Support: The Hardware Fund
 
@@ -632,7 +669,7 @@ The maritime sector is built on strict regulations and certified "black box" sys
 ## 💬 Support
 
 - **Issues**: Report bugs or request features on [GitHub Issues](https://github.com/studentdotai/Nautical-Graph-Toolkit/issues)
-- **Changelog**: See [CHANGELOG.md](CHANGELOG.md) for release notes and version history
+- **Changelog**: See [CHANGELOG.md](docs/project/changelog.md) for release notes and version history
 - **Documentation**: See [docs/](docs/) for detailed guides
 - **Notebooks**: Check [docs/notebooks/](docs/notebooks/) for examples
 

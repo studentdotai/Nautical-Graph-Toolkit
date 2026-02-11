@@ -23,7 +23,7 @@ This package requires GDAL 3.10.3 (installed via Conda). Install via:
 See https://github.com/studentdotai/Nautical-Graph-Toolkit for detailed guides.
 """
 
-__version__ = "0.1.0"
+__version__ = "0.1.2"
 __author__ = "Viktor Kolbasov"
 __email__ = "contact@studentdotai.com"
 __license__ = "AGPL-3.0-only"
@@ -58,11 +58,12 @@ except (ImportError, SyntaxError):
     pass
 
 # Try to import router
-try:
-    from nautical_graph_toolkit.core.router import Router
-    _all_exports.append("Router")
-except (ImportError, SyntaxError):
-    pass
+# Router module not yet implemented
+# try:
+#     from nautical_graph_toolkit.core.router import Router
+#     _all_exports.append("Router")
+# except (ImportError, SyntaxError):
+#     pass
 
 # Try to import database manager
 try:
