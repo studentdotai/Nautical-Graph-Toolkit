@@ -6,12 +6,12 @@ This unified quick-start guide covers all workflow types. Currently implemented:
 
 ### PostGIS Workflow
 1. **`maritime_graph_postgis_workflow.py`** - Main executable script
-2. **`maritime_workflow_config.yml`** - Workflow configuration
+2. **`config/workflow_config.yml`** - Workflow configuration
 3. **`WORKFLOW_POSTGIS_GUIDE.md`** - Comprehensive documentation
 
 ### GeoPackage/SpatiaLite Workflow
 1. **`maritime_graph_geopackage_workflow.py`** - Main executable script
-2. **`maritime_workflow_config.yml`** - Workflow configuration (shared)
+2. **`config/workflow_config.yml`** - Workflow configuration (shared)
 3. **`WORKFLOW_GEOPACKAGE_GUIDE.md`** - Comprehensive documentation
 
 ---
@@ -86,7 +86,7 @@ python scripts/import_s57.py \
   --mode advanced \
   --input-path data/ENC_ROOT \
   --output-format gpkg \
-  --schema enc_charts \
+  --schema enc_west \
   --output-dir output \
   --verify
 ```
@@ -199,7 +199,7 @@ Download pre-processed ENC databases to skip the import step entirely — see th
 
 #### 1. Verify Configuration
 ```bash
-python scripts/maritime_graph_postgis_workflow.py --config docs/maritime_workflow_config.yml --dry-run
+python scripts/maritime_graph_postgis_workflow.py --config config/workflow_config.yml --dry-run
 ```
 
 Expected output:
@@ -210,7 +210,7 @@ Dry run mode - configuration validated, exiting
 
 #### 2. Run Full Pipeline
 ```bash
-python scripts/maritime_graph_postgis_workflow.py --config docs/maritime_workflow_config.yml
+python scripts/maritime_graph_postgis_workflow.py --config config/workflow_config.yml
 ```
 
 **Estimated time: 45-60 minutes**
@@ -239,12 +239,12 @@ cat output/benchmark_graph_*.csv
 
 #### 1. Verify Configuration
 ```bash
-python scripts/maritime_graph_geopackage_workflow.py --config docs/maritime_workflow_config.yml --dry-run
+python scripts/maritime_graph_geopackage_workflow.py --config config/workflow_config.yml --dry-run
 ```
 
 #### 2. Run Full Pipeline
 ```bash
-python scripts/maritime_graph_geopackage_workflow.py --config docs/maritime_workflow_config.yml
+python scripts/maritime_graph_geopackage_workflow.py --config config/workflow_config.yml
 ```
 
 **Estimated time: 14-20 minutes** (faster than PostGIS for file-based operations)
@@ -305,7 +305,7 @@ psql -h 127.0.0.1 -U postgres -d enc_db -c \
 ```
 
 #### Step 3: Configure Workflow
-Edit `docs/maritime_workflow_config.yml`:
+Edit `config/workflow_config.yml`:
 ```yaml
 base_graph:
   departure_port: "Los Angeles"
@@ -326,10 +326,10 @@ weighting:
 #### Step 4: Run Workflow
 ```bash
 # Dry run first (validate setup)
-python scripts/maritime_graph_postgis_workflow.py --config docs/maritime_workflow_config.yml --dry-run
+python scripts/maritime_graph_postgis_workflow.py --config config/workflow_config.yml --dry-run
 
 # Full workflow
-python scripts/maritime_graph_postgis_workflow.py --config docs/maritime_workflow_config.yml
+python scripts/maritime_graph_postgis_workflow.py --config config/workflow_config.yml
 
 # Expected output
 # Base Graph Creation: 127.4s (2.1 min)
@@ -392,7 +392,7 @@ Same as PostGIS (uses same YAML file)
 #### Step 4: Run Workflow
 ```bash
 # Workflow uses GeoPackage automatically
-python scripts/maritime_graph_geopackage_workflow.py --config docs/maritime_workflow_config.yml
+python scripts/maritime_graph_geopackage_workflow.py --config config/workflow_config.yml
 
 # Expected output (faster than PostGIS)
 # Base Graph Creation: 117.5s (2.0 min)
@@ -438,10 +438,10 @@ python scripts/import_s57.py \
 #### Step 2: Regenerate Graphs
 ```bash
 # Regenerate all graphs with updated data
-python scripts/maritime_graph_postgis_workflow.py --config docs/maritime_workflow_config.yml
+python scripts/maritime_graph_postgis_workflow.py --config config/workflow_config.yml
 
 # For GeoPackage: graphs reload updated data automatically
-python scripts/maritime_graph_geopackage_workflow.py --config docs/maritime_workflow_config.yml
+python scripts/maritime_graph_geopackage_workflow.py --config config/workflow_config.yml
 ```
 
 #### Step 3: Compare Routes
@@ -529,7 +529,7 @@ tail -f docs/logs/maritime_workflow_*.log
 
 ## Configuration
 
-Edit `docs/maritime_workflow_config.yml` to customize:
+Edit `config/workflow_config.yml` to customize:
 
 ```yaml
 # Which workflow steps to run
@@ -790,8 +790,11 @@ Project Root/
 │   ├── maritime_graph_postgis_workflow.py   # PostGIS workflow (Step 2)
 │   └── maritime_graph_geopackage_workflow.py # GeoPackage workflow (Step 2)
 │
+├── config/
+│   ├── workflow_config.yml            # Workflow configuration (shared across backends)
+│   └── test_config.yml                # Integration test defaults (schemas, file paths)
+│
 ├── docs/
-│   ├── maritime_workflow_config.yml   # Configuration (shared)
 │   ├── getting-started/               # Setup guides
 │   ├── user-guides/                   # Workflow documentation
 │   └── logs/                           # Auto-created log directory
@@ -813,7 +816,7 @@ Project Root/
 
 1. **Import data**: Choose between PostGIS or GeoPackage, then follow "Example 1" or "Example 2" above
 2. **Verify import**: Use verification commands in "Prerequisites: Data Import Pipeline"
-3. **Configure workflow**: Edit `docs/maritime_workflow_config.yml` (departure/arrival ports)
+3. **Configure workflow**: Edit `config/workflow_config.yml` (departure/arrival ports)
 4. **Run workflow**: Execute the appropriate workflow script for your backend
 5. **Visualize results**: Open output `.gpkg` files in QGIS
 
@@ -835,7 +838,7 @@ Project Root/
 - **WORKFLOW_QUICKSTART.md** - This file (unified guide covering both)
 
 ### Configuration
-- **maritime_workflow_config.yml** - Workflow configuration (well-commented, shared across backends)
+- **config/workflow_config.yml** - Workflow configuration (well-commented, shared across backends)
 - **src/nautical_graph_toolkit/data/graph_config.yml** - Graph parameters (grid, H3, layers)
 
 ## Performance Expectations

@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgis/postgis:16-3.4
+    image: postgis/postgis:16-3.5
     container_name: postgis_nautical
     restart: always
     shm_size: 4gb
@@ -15,12 +15,17 @@ services:
     command: >
       postgres
       -c shared_buffers=4GB
-      -c work_mem=128MB
+      -c work_mem=512MB
       -c maintenance_work_mem=1GB
       -c effective_cache_size=12GB
       -c random_page_cost=1.1
       -c max_worker_processes=8
       -c max_parallel_workers_per_gather=4
+      -c max_wal_size=8GB
+      -c min_wal_size=2GB
+      -c checkpoint_timeout=15min
+      -c checkpoint_completion_target=0.9
+      -c max_locks_per_transaction=1024
 
 volumes:
   postgis_data:

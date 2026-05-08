@@ -167,7 +167,7 @@ This is the inaugural release of the Nautical Graph Toolkit, a comprehensive mar
 - **GeoPackage Workflow Script** (scripts/maritime_graph_geopackage_workflow.py):
     - File-based portable workflow execution
     - Identical feature set to PostGIS workflow
-    - Shared configuration (maritime_workflow_config.yml)
+    - Shared configuration (config/workflow_config.yml)
     - Perfect for offline and portable deployments
 
 ##### Utility Modules
@@ -758,10 +758,271 @@ docs/
 
 ---
 
+## [0.1.5] - 2026-05-08
+
+### Weights System Restructuring & ML Pipeline Foundation
+
+This release restructures the entire weighting architecture from a monolithic `WeightsLegacy` class into a modular, three-tier system with dual production/ML weight managers, a stateless calculation engine, and cross-backend support (GeoDataFrame, GeoPackage/SpatiaLite, PostGIS).
+
+**Release Focus**: Extracting weight calculation logic into reusable components (2026-02 to 2026-04), adding ML-optimized weight tracking (`WeightsOpen`), vectorized spatial processing, and comprehensive test coverage (50K+ lines added across 51 files).
+
+---
+
+### Added
+
+#### Core Architecture: Modular Weight System
+
+- **`weight_calculator.py`** — Stateless weight calculation algorithms extracted from the legacy monolith
+  - `WeightCalculator` class: single source of truth for all weight logic
+  - Three-tier methods: `calculate_blocking_factor()` (Tier 1), `calculate_penalty_factor()` (Tier 2), `calculate_bonus_factor()` (Tier 3)
+  - `encode_depth_bands()`: 5-band UKC penalty system (Grounding → Restricted → Shallow → Safe → Deep)
+  - `encode_ver_clearance_meters()`: Vertical clearance encoding for bridges/cables/pipelines
+  - `apply_static_weights_vectorized()`: Fully vectorized spatial join pipeline (shapely 2.0 + pandas groupby)
+  - `calculate_directional_factor_from_bands()`: Configurable angular difference bands
+  - `calculate_dynamic_safety_margin()`: Environmental condition adjustments (weather, visibility, night)
+  - **Smooth mode** (`smooth_mode=True`): Continuous exp/log weight functions for GNN/PyTorch pipelines
+    - `_calculate_penalty_factor_smooth()`: `1 + ln(1 + hazard_score * scale)` — self-limiting logarithmic growth
+    - `_calculate_bonus_factor_smooth()`: `1 + exp(-k * preference_score)` — exponential decay from open water to preferred
+    - SQL expression builders for PostGIS (`_build_*_sql_expr`) and GeoPackage (`_build_*_gpkg_expr`)
+    - GeoDataFrame vectorized smooth mode (`_calculate_smooth_weights_gdf()`)
+
+- **`weights.py`** — Dual weight management system with ABC base class
+  - **`BaseWeights`** (abstract): Shared infrastructure — S57 classification, config loading, column categorization, buffer zone configuration, vessel parameter management
+  - **`Weights`** (production): Aggregated three-tier weights
+    - `apply_static_weights_gdf()`: Vectorized static weight computation with GDF backend
+    - `apply_static_weights_sql()`: SpatiaLite SQL-based processing
+    - `apply_static_weights_postgis()`: PostGIS server-side processing
+    - `calculate_dynamic_weights_gdf()`: GeoDataFrame dynamic weight computation
+    - `calculate_dynamic_weights_sql()`: SpatiaLite dynamic weights
+    - `calculate_dynamic_weights_postgis()`: PostGIS dynamic weights
+    - Three-tier aggregation: blocking (MAX), penalty (PRODUCT/MAX), bonus (MAX)
+  - **`WeightsOpen`** (ML-optimized): Per-layer weight tracking
+    - Same backend methods as `Weights` but preserves individual layer contributions
+    - Flat columns: `wt_{layer_name}` (weight value) and `wt_{layer_name}_n` (feature count) per S-57 layer
+    - Designed for GNN/PyTorch feature extraction pipelines
+    - Cross-validation against `Weights` to guarantee routing parity
+
+- **`weight_optimization.py`** — ML pipeline utilities
+  - **`GraphWeightOptimizer`** (stateless): Validate, export, and import ML weight data
+    - `validate_against_weights()`: Verifies WeightsOpen produces identical routing to Weights
+    - `export_for_pytorch()`: Export layer weights as DataFrame, tensors, or dict
+    - `encode_vessel_params()`: Feature vector encoding for vessel parameters
+    - `load_historical_routes()`: Historical route data loading for training
+    - `import_learned_weights()`: Apply learned weights back to graph
+  - **`FineTuning`** (stateful): Database-side weight refinement operations
+    - `reapply_directional_weights()`: Recalculate directional weights with updated angle bands
+    - Bulk update operations via PostgisTableManager
+
+#### Graph Conversion Enhancements
+
+- **`graph.py`** — Multi-backend directed graph conversion
+  - `convert_to_directed_gdf()`: In-memory GeoDataFrame conversion
+  - `convert_to_directed_sql()`: SpatiaLite SQL-based conversion
+  - `convert_to_directed_gpkg()`: GeoPackage dispatcher
+  - `convert_to_directed_postgis()`: Database-side PostGIS conversion
+  - Deterministic ID assignment: forward edges 1→N, reverse edges N+1→2N
+  - `GraphConfigManager`: Programmatic graph_config.yml reading/writing with comment preservation
+
+#### Geometry Utilities
+
+- **`geometry_utils.py`** — Extracted `Buffer` and `Bearing` utility classes
+  - **`Buffer`** class:
+    - Nautical mile to degree conversion with latitude correction
+    - `apply_buffer_fine_gdf()`: UTM-reprojected geodesically-accurate buffer (no post-filter needed)
+    - `apply_buffer_fast_gdf()`: Per-feature lat-corrected degree buffer with post-filter
+    - `resolve_method()`: Auto-selects 'fine' (Point/Area) vs 'fast' (Line-only) based on geometry types
+  - **`Bearing`** class:
+    - `bearing_scalar()`: Single bearing calculation (forward azimuth)
+    - `bearing_gdf()`: Vectorized NumPy bearing for GeoDataFrames
+    - `angular_difference_scalar()`: Scalar angular difference with 360° wrap-around
+    - `angular_difference_gdf()`: Vectorized angular difference
+    - SQL fragments for SpatiaLite and PostGIS bearing calculations
+
+#### Route Export
+
+- **`route_utils.py`** — RTZ (Route Exchange Format) export
+  - **`RTZ`** class: Maritime route export in RTZ 1.2 XML format
+    - `from_linestring()`: Load waypoints from Shapely LineString
+    - `from_geojson()`: Create RTZ from GeoJSON file
+    - `to_xml()` / `save()`: Generate and write RTZ XML
+    - Cross-track distance (XTD), safety contour, depth configuration
+    - Geometry type selection (Loxodrome/Orthodrome)
+
+#### PostGIS Bulk Operations
+
+- **`postgis_table_manager.py`** — TEMP table lifecycle manager
+  - **`PostisTableManager`**: Optimized bulk weight updates for large graphs
+    - `create()`: TEMP table creation with session tuning
+    - `upsert_from_select()`: Bulk insert with conflict resolution
+    - `bulk_update_from()`: Single UPDATE from temp table
+    - `ctas_swap()`: Create Table As Select for large updates
+    - `should_use_ctas()`: Heuristic decision between UPDATE vs CTAS strategy
+    - Reduces dead tuples by ~95%, prevents autovacuum lock contention
+
+#### S-57 Classification Updates
+
+- **`s57_classification.py`** — Enhanced classification system
+  - Extended feature classification with additional S-57 layer support
+  - Updated weight factors and buffer distances
+  - Buffer zone classification for coastal proximity ring penalties
+- **`s57object_definitions.csv`** — New S-57 object definition reference data (232 entries)
+
+#### S-57 Data Manager Updates
+
+- **`s57_data.py`** — Enhanced database manager methods
+  - **`PostGISManager`**: `connector` property — lazily instantiates `PostGISConnector` for advanced diagnostic operations
+  - **`PostGISManager`**: `verify_feature_update_status()` — verifies Edition/Update values in feature layers correspond to DSID layer values
+  - **`SpatiaLiteManager` / `GPKGManager`**: `verify_feature_update_status()` — same verification for SQLite-based backends
+
+#### Database Utilities
+
+- **`db_utils.py`** — Enhanced database operations
+  - `pool_pre_ping=True` on SQLAlchemy engine for connection liveness checks
+  - `PostGISConnector.get_features()` — filtered feature query with parameterized SQL, table/column validation
+  - `FileDBConnector.get_features()` — same API for GeoPackage/SpatiaLite with OGR WHERE clause fallback to SQLite
+  - Database health monitoring suite: `check_active_queries()`, `check_table_locks()`, `check_table_bloat()`, `terminate_backend()`, `terminate_all_backends()` (with dry_run), and `check_database_health()` (combined diagnostic with optional auto-remediation)
+
+#### Configuration
+
+- **`workflow_config.yml`** — New workflow orchestration configuration
+  - Database configuration (PostGIS and GeoPackage backends)
+  - Four-step pipeline control (base_graph → fine_graph → weighting → pathfinding)
+  - Vessel parameters (draft, height, safety margins, environmental conditions)
+  - Output management with auto-generated timestamped directories
+  - Performance benchmarking with CSV export
+  - A* algorithm selection (multiple maritime-specific variants)
+  - Three-tier coastal buffer zone system
+- **`graph_config.yml`** — Enhanced weight settings
+  - Three-tier weight system configuration (blocking, penalty, bonus thresholds)
+  - WeightCalculator parameters (17 configurable constants)
+  - Directional weight angle bands
+  - Buffer zone thresholds (3.0, 4.0, 12.0 NM)
+  - Static layer classification with risk multipliers and buffer distances
+
+#### Scripts
+
+- **`maritime_weights_workflow.py`** — Standalone weight computation script
+  - Weight-only pipeline: enrich → static → directional → dynamic
+  - Supports GeoPackage and PostGIS backends
+  - Benchmark export and configuration validation
+- **`weight_benchmark.py`** — Weight computation benchmarking tool
+  - Performance comparison across backends and modes
+  - Timing metrics and throughput analysis
+- **`ngt.py`** — Interactive CLI Launcher for Nautical Graph Toolkit
+  - Three workflows: S-57 Import, Graph Pipeline, Weights Pipeline
+  - Questionary + Rich interactive prompts with dark theme styling
+  - Port autocomplete with PortData validation and canonical name lookup
+  - Config file discovery (`config/*.yml`) with auto-select when only one exists
+  - Dry-run preview for all workflows
+  - Cascading skip/edit phase: each pipeline step can be skipped or customized independently
+  - Backend selection (PostGIS, GeoPackage, SpatiaLite) with backend-aware prompts
+  - Temp config file management with atexit cleanup
+  - H3 navigable layer preview from `graph_config.yml`
+  - Bounding box expansion UI for slice buffer boundaries
+  - Vessel parameter form with type selection and numeric fields
+  - Command preview panel before execution with confirmation
+- **`compare_graphs.py`** — Cross-backend graph comparison utility
+- **`compare_weights.py`** — Weight parity validation between Weights and WeightsOpen
+- **`graph_alignment_test.py`** — Graph alignment verification script
+
+#### Notebooks
+
+- **`graph_weighted_open_Postgis.ipynb`** — WeightsOpen workflow with PostGIS
+  - Per-layer weight tracking demonstration
+  - ML feature extraction for GNN pipelines
+- **`inspect_edge.ipynb`** — Cross-backend edge inspection tool
+  - Side-by-side attribute comparison
+  - Tolerance checking for numerical differences
+- **`graph_weighted_directed_GeoPackage_v3.ipynb`** — Updated GeoPackage workflow
+  - Mode selection (mem vs sql) for SpatiaLite processing
+  - Comprehensive benchmarking
+- **`pathfinding_compare.ipynb`** — Pathfinding algorithm comparison
+- **`geometry_utils.ipynb`** — Buffer and Bearing utility demonstrations
+
+#### Documentation
+
+- **`docs/user-guides/workflow-weights-guide.md`** — Dedicated weights workflow guide
+- **`docs/reference/weights_system.md`** — Weights system technical reference
+- **`docs/user-guides/weights-workflow-example.md`** — Updated with new architecture
+- **`config/test_config.yml`** — Test configuration template
+- **RTZ Schema**: `src/nautical_graph_toolkit/data/RTZ_Schema_version_1_2.xsd` — RTZ 1.2 XSD schema definition
+
+#### Testing Infrastructure (11 new test files, ~6,600+ lines)
+
+##### Unit Tests
+- **`tests/core/test_weights.py`** (1,717 lines) — WeightCalculator and weight manager tests
+- **`tests/core/test_buffer_zone_classify.py`** — Buffer zone classification tests
+- **`tests/core/test_convert_to_directed.py`** (489 lines) — Directed graph conversion tests
+- **`tests/core/test_fillet_smoothing.py`** — Fillet smoothing tests
+- **`tests/core/test_string_pulling.py`** — String pulling algorithm tests
+- **`tests/utils/test_bearing.py`** (228 lines) — Bearing calculation tests
+- **`tests/utils/test_buffer_zones.py`** (140 lines) — Buffer zone utility tests
+
+##### Integration Tests (Real S-57 Data)
+- **`tests/core__real_data/conftest.py`** (265 lines) — Shared fixtures for real-data tests
+- **`tests/core__real_data/test_static_weights_cross_backend.py`** (789 lines) — Cross-backend static weight parity
+- **`tests/core__real_data/test_bearing_cross_backend.py`** (769 lines) — Bearing calculation parity across backends
+- **`tests/core__real_data/test_buffer_geometry_utils.py`** (474 lines) — Buffer geometry operations
+- **`tests/core__real_data/test_buffer_land_geometry_utils.py`** (890 lines) — Land buffer geometry
+- **`tests/core__real_data/test_buffer_methods.py`** (832 lines) — Buffer method comparison (fine vs fast)
+- **`tests/core__real_data/test_convert_to_directed_real.py`** (398 lines) — Directed conversion with real data
+- **`tests/core__real_data/test_enrich_features_cross_backend.py`** (503 lines) — Feature enrichment parity
+
+### Changed
+
+- **`weights_legacy.py`** → Renamed from original `weights.py`; preserved for reference only
+- **`graph.py`**: Multiple `convert_to_directed` backends replacing single NetworkX conversion
+  - `overwrite` flag on `export_postgis_to_gpkg`; default auto-increments filename instead of raising `FileExistsError`
+- **`pathfinding_lite.py`** — Major expansion: new A* variants, Rustworkx acceleration, and route smoothing (+2,236 lines)
+    - **`Astar`** (base): `min_cost_factor` for scaled heuristic admissibility; lazy STRtree edge cache via `_get_edge_tree()`
+    - **`AstarImproved`**: New subclass with "pilot quantity" heuristic favoring straighter paths
+    - **`AstarMaritime`**: Two-Pass Corridor Routing — A* scout (Pass 1) identifies rough course, Dijkstra (Pass 2) finds optimal route within a spatial corridor
+    - **`AstarMaritimeSmooth`**: Three-Pass Maritime Routing — inherits Passes 1–2, adds String-Pulling post-processing (Pass 3)
+    - **`Route`** (enhanced): Improved `detailed_route()` with fillet smoothing, forced routing, and multi-format export
+    - `pass1_refresh` parameter to reuse cached rustworkx graph when topology is unchanged
+    - Added `rustworkx` as optional dependency (graceful `ImportError` fallback to NetworkX)
+    - Weight column handling updated for three-tier system (`blocking_factor`, `penalty_factor`, `bonus_factor`, `adjusted_weight`)
+- **`s57_classification.py`**: Extended classifications, updated weight factors and buffer distances
+- **`geometry_utils.py`**: Major expansion with Buffer and Bearing class extraction (+1,305 lines)
+  - `_normalize_ring_geometry()`: Extracts polygonal components from GeometryCollection results
+- **`db_utils.py`**: Updated for new weight column schema
+- **`import_s57.py`**: Enhanced with benchmarking and validation
+- **`maritime_graph_postgis_workflow.py`**: Updated for new weights API
+- **`maritime_graph_geopackage_workflow.py`**: Updated for new weights API
+
+### Fixed
+
+- Connection safety in `build_buffer_zones_sql` — replaced raw `engine.connect()` with `engine.begin()` context managers
+- UKC and vertical clearance calculation alignment between PostGIS and GeoPackage backends
+- `_sjoin_and_aggregate` return type unified — always returns `(edge_values, edge_sources)` tuple
+- Edge accumulation on repeated notebook runs (GeoPackage file deletion before save)
+- SpatiaLite artifact cleanup after processing
+- PostGIS ring zones use `ST_CollectionExtract(..., 3)` for polygon-only output
+- SpatiaLite `bearing_sql()` — use `MOD()` instead of Python-style modulo for compatibility
+
+### Performance Improvements
+
+- Vectorized static weight computation using shapely 2.0 + pandas groupby (replaces row-by-row processing)
+- PostGIS server-side weight computation via TEMP tables (reduces dead tuples ~95%)
+- Chunked processing support for memory management on large graphs
+- Spatial index acceleration via GeoPandas sjoin (auto-builds STRtree)
+- Rustworkx backend for A* Pass 1 search (Rust-native A* replacing NetworkX Python A*)
+- STRtree spatial index for corridor construction, obstacle detection, and line-of-sight checks
+- Lazy edge tree caching shared between pathfinder and Route classes
+
+### Statistics
+
+- **51 files changed**: 50,417 insertions, 1,061 deletions
+- **New files**: 28 (core: 3, utils: 2, scripts: 4, tests: 11, notebooks: 4, docs/config: 4)
+- **Modified files**: 23
+- **Test coverage**: 11 new test files (~6,600+ lines of tests)
+
+---
+
 ## Planned Releases
 
 ### [0.2.0] - Foundation & Polish
-**Status**: 📋 Planned | **Depends on**: v0.1.0
+**Status**: 📋 Planned | **Depends on**: v0.1.5
 
 Focus on robustness, accessibility, and security:
 

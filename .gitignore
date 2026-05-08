@@ -41,6 +41,7 @@ site/
 
 # Output directories from your scripts
 docs/notebooks/output/
+output/
 
 # WSL2/Windows metadata files
 *:Zone.Identifier
@@ -75,6 +76,7 @@ htmlcov/
 
 # Personal progress tracking (individual work logs)
 dev/progress/
+dev/analysis/
 
 # Personal task tracking (active and completed tasks)
 dev/tasks/active/
@@ -94,3 +96,6 @@ dev_backup_*/
 !dev/rules/
 !dev/*.md
 .ai/
+
+# IDE-generated Dockerfile (project uses compose files only)
+Dockerfile

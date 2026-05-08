@@ -16,6 +16,7 @@ This guide covers common issues you may encounter when working with the Nautical
 7. [GDAL/PROJ Database Warnings](#gdal-proj-database-warnings)
 8. [Port Selection Issues](#port-selection-issues)
 9. [Database Connection Issues](#database-connection-issues)
+    - VACUUM ANALYZE fails with "No space left on device" (Docker shm)
 10. [Data Source Issues](#data-source-issues)
 11. [S57Updater: File-Based Backend Safety](#s57updater-file-based-backend-safety) ⚠️ **Important**
 12. [Graph Creation Issues](#graph-creation-issues)
@@ -977,6 +978,75 @@ ProgrammingError: schema "enc_west" does not exist
    ```python
    pg_factory = ENCDataFactory(source=db_params, schema="enc_west")
    ```
+
+### Issue: VACUUM ANALYZE fails with "No space left on device" (Docker shm)
+
+**Symptoms:**
+```
+WARNING - VACUUM ANALYZE failed (non-critical, autovacuum will handle it):
+(psycopg2.errors.DiskFull) could not resize shared memory segment
+"/PostgreSQL.4141375306" to 67128832 bytes: No space left on device
+
+[SQL: VACUUM ANALYZE "graph"."fine_graph_open11_20_edges"]
+```
+
+**This appears after `enrich_edges_with_features_postgis()` completes successfully.**
+
+**Root Cause:**
+
+Despite the "No space left on device" message, this is **not** a disk space error. It is a **Docker container shared memory exhaustion** issue.
+
+PostgreSQL uses POSIX shared memory (`/dev/shm`) during VACUUM operations. Docker containers have a default `/dev/shm` limit of **64MB**, regardless of how much RAM your host machine has. The VACUUM resize request of ~64MB hits this container limit.
+
+**Diagnosis:**
+
+Check the actual shm_size of your running container:
+
+```bash
+docker inspect postgis_nautical --format '{{.HostConfig.ShmSize}}'
+# 67108864  ← 64MB (Docker default)
+# should be 4294967296 (4GB) if docker-compose.linux.yml was applied correctly
+```
+
+If the container shows `67108864` (64MB), it was started without the `shm_size: 4gb` setting from the compose file (e.g., started manually or before the setting was added).
+
+**Solution:**
+
+Recreate the container so the `shm_size: 4gb` in `docker-compose.linux.yml` takes effect:
+
+```bash
+docker compose -f docker-compose.linux.yml down
+docker compose -f docker-compose.linux.yml up -d
+```
+
+The `postgis_data` volume is persistent — **no data will be lost**.
+
+After restart, verify:
+
+```bash
+docker inspect postgis_nautical --format '{{.HostConfig.ShmSize}}'
+# 4294967296  ← 4GB ✓
+```
+
+**Impact:**
+
+- The enrichment itself (spatial joins, feature updates) **completes successfully** — VACUUM is post-processing only
+- PostgreSQL's autovacuum will eventually reclaim dead tuples from the UPDATE-heavy enrichment loop
+- Re-running enrichment on a restarted container will complete the VACUUM ANALYZE step
+
+**Configuration reference (`docker-compose.linux.yml`):**
+
+```yaml
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    shm_size: 4gb          # ← This sets /dev/shm inside the container
+    command: >
+      postgres
+      -c shared_buffers=4GB
+      -c maintenance_work_mem=1GB  # Used by VACUUM
+      -c work_mem=128MB
+```
 
 ---
 

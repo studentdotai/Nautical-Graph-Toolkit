@@ -3090,7 +3090,7 @@ class ENCDataFactory:
                     logger.warning(f"Could not cast column '{col}' to type '{s57_type}'. Error: {e}")
 
         # --- 3. Standardize all column names to lowercase AFTER type casting ---
-        unified_gdf.columns = [c.lower() for c in unified_gdf.columns]
+        unified_gdf = unified_gdf.rename(columns={c: c.lower() for c in unified_gdf.columns if c != c.lower()})
 
         # --- 4. Parse list-like string columns ---
         # Only process list attributes that already exist in the dataframe
@@ -3403,6 +3403,23 @@ class PostGISManager:
         except Exception as e:
             logger.error(f"Database connection failed: {e}")
             raise
+
+    @property
+    def connector(self) -> 'PostGISConnector':
+        """
+        Access to underlying PostGISConnector for advanced operations.
+
+        Provides access to diagnostic tools like check_database_health(),
+        check_active_queries(), check_table_locks(), etc.
+
+        Example:
+            health = factory.manager.connector.check_database_health()
+            print(health['summary'])
+        """
+        if not hasattr(self, '_connector'):
+            from nautical_graph_toolkit.utils.db_utils import PostGISConnector
+            self._connector = PostGISConnector(self.db_params, self.schema)
+        return self._connector
 
     def get_layer(self, layer_name: str, filter_by_enc: Optional[List[str]] = None) -> gpd.GeoDataFrame:
         """Retrieves a full layer from the database as a GeoDataFrame."""
@@ -4395,6 +4412,41 @@ class SpatiaLiteManager:
             logger.error(f"SpatiaLite database connection failed: {e}")
             raise
 
+    def check_active_queries(self, *args, **kwargs):
+        """Database diagnostics not available for SQLite-based backends."""
+        raise NotImplementedError(
+            "Database lock diagnostics are only available for PostGIS backends. "
+            "SQLite-based backends (GPKG/SpatiaLite) use a single-writer model."
+        )
+
+    def check_table_locks(self, *args, **kwargs):
+        """Database diagnostics not available for SQLite-based backends."""
+        raise NotImplementedError(
+            "Database lock diagnostics are only available for PostGIS backends. "
+            "SQLite-based backends (GPKG/SpatiaLite) use a single-writer model."
+        )
+
+    def check_table_bloat(self, *args, **kwargs):
+        """Database diagnostics not available for SQLite-based backends."""
+        raise NotImplementedError(
+            "Database lock diagnostics are only available for PostGIS backends. "
+            "SQLite-based backends (GPKG/SpatiaLite) use a single-writer model."
+        )
+
+    def terminate_backend(self, *args, **kwargs):
+        """Database diagnostics not available for SQLite-based backends."""
+        raise NotImplementedError(
+            "Database lock diagnostics are only available for PostGIS backends. "
+            "SQLite-based backends (GPKG/SpatiaLite) use a single-writer model."
+        )
+
+    def check_database_health(self, *args, **kwargs):
+        """Database diagnostics not available for SQLite-based backends."""
+        raise NotImplementedError(
+            "Database lock diagnostics are only available for PostGIS backends. "
+            "SQLite-based backends (GPKG/SpatiaLite) use a single-writer model."
+        )
+
     def get_layer(self, layer_name: str, filter_by_enc: Optional[List[str]] = None) -> gpd.GeoDataFrame:
         """Retrieves a full layer from the database as a GeoDataFrame."""
         # --- Hardening Step: Validate table name against database metadata ---
@@ -5049,6 +5101,41 @@ class GPKGManager:
             logger.error(f"GeoPackage connection failed: {e}")
             raise
 
+    def check_active_queries(self, *args, **kwargs):
+        """Database diagnostics not available for SQLite-based backends."""
+        raise NotImplementedError(
+            "Database lock diagnostics are only available for PostGIS backends. "
+            "SQLite-based backends (GPKG/SpatiaLite) use a single-writer model."
+        )
+
+    def check_table_locks(self, *args, **kwargs):
+        """Database diagnostics not available for SQLite-based backends."""
+        raise NotImplementedError(
+            "Database lock diagnostics are only available for PostGIS backends. "
+            "SQLite-based backends (GPKG/SpatiaLite) use a single-writer model."
+        )
+
+    def check_table_bloat(self, *args, **kwargs):
+        """Database diagnostics not available for SQLite-based backends."""
+        raise NotImplementedError(
+            "Database lock diagnostics are only available for PostGIS backends. "
+            "SQLite-based backends (GPKG/SpatiaLite) use a single-writer model."
+        )
+
+    def terminate_backend(self, *args, **kwargs):
+        """Database diagnostics not available for SQLite-based backends."""
+        raise NotImplementedError(
+            "Database lock diagnostics are only available for PostGIS backends. "
+            "SQLite-based backends (GPKG/SpatiaLite) use a single-writer model."
+        )
+
+    def check_database_health(self, *args, **kwargs):
+        """Database diagnostics not available for SQLite-based backends."""
+        raise NotImplementedError(
+            "Database lock diagnostics are only available for PostGIS backends. "
+            "SQLite-based backends (GPKG/SpatiaLite) use a single-writer model."
+        )
+
     def get_layer(self, layer_name: str, filter_by_enc: Optional[List[str]] = None) -> gpd.GeoDataFrame:
         """Retrieves a full layer from the GeoPackage as a GeoDataFrame."""
         # --- Hardening Step: Validate table name against database metadata ---
@@ -5069,7 +5156,8 @@ class GPKGManager:
         if filter_by_enc:
             # Create a safe WHERE clause for the underlying OGR driver.
             # GPKG uses uppercase field names from S-57 standard
-            enc_list_str = ", ".join([f"'{enc}'" for enc in filter_by_enc])
+            enc_names_only = [enc[0] if isinstance(enc, (tuple, list)) else enc for enc in filter_by_enc]
+            enc_list_str = ", ".join([f"'{e}'" for e in enc_names_only])
             where_clause = f"DSID_DSNM IN ({enc_list_str})"
 
         # Use fiona engine for consistent handling of StringList/IntegerList fields across formats

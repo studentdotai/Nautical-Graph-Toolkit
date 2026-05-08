@@ -545,7 +545,7 @@ layers:
     - { layer: "uwtroc", bands: [3, 4, 5, 6], resolution: null }
     - { layer: "obstrn", bands: [3, 4, 5, 6], resolution: null }
 
-# Weighting Configuration (see docs/maritime_workflow_config.yml for details)
+# Weighting Configuration (see config/workflow_config.yml for details)
 ```
 
 ---
@@ -632,7 +632,7 @@ Solution:
 
 -- For production optimization, see:
 --   docs/user-guides/scripts-guide.md
---   docs/maritime_workflow_config.yml
+--   config/workflow_config.yml
 ```
 
 **GeoPackage/SpatiaLite:**

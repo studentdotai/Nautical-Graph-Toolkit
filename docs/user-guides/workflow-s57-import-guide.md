@@ -280,7 +280,7 @@ python scripts/import_s57.py \
   --mode advanced \
   --input-path data/ENC_ROOT \
   --output-format postgis \
-  --schema us_enc_all \
+  --schema enc_west \
   --enable-parallel \
   --max-workers 4 \
   --memory-limit-mb 4096 \
@@ -348,7 +348,7 @@ python scripts/import_s57.py \
   --mode advanced \
   --input-path data/ENC_ROOT \
   --output-format postgis \
-  --schema us_enc_all \
+  --schema enc_west \
   --enable-parallel \
   --max-workers 8 \
   --memory-limit-mb 8192 \

@@ -47,7 +47,7 @@ This toolkit transforms raw S-57 chart data into production-ready geospatial dat
 ### 🎯 Intelligent Route Optimization
 - **3-Tier Weighting System**: Static (terrain cost), directional (current/wind), dynamic (traffic patterns)
 - **Vessel Constraints**: Draft restrictions, air clearance, vessel type
-- **A* Pathfinding**: Fast optimal route computation with NetworkX
+- **A* Pathfinding**: Fast optimal route computation with NetworkX and optional Rustworkx acceleration
 - **Route Export**: GeoJSON format for GIS visualization and sharing
 
 ### 📊 Comprehensive ENC Analysis
@@ -318,14 +318,16 @@ Comprehensive real-world performance analysis from production testing (Nov 2025)
 
 We have a comprehensive public roadmap that outlines our development journey from foundation to production-ready QGIS integration.
 
-**Current Status**: v0.1.2 Released ✅ (February 2026)
+**Current Status**: v0.1.5 Released ✅ (May 2026)
 
-**Near-term Goals** (v0.1.x Foundation Completion → v0.2.0 PyTorch Integration):
-- **v0.1.x**: Security audit, Weights class refactor (PyTorch prep), 80% test coverage
-- **v0.2.0**: PyTorch integration, limited PyPI distribution (no GDAL), full Docker packaging, mkdocstrings API docs
+**Near-term Goals** (v0.2.0 PyTorch Integration):
+- Transition to QGIS 4.0 compatible libraries
+- Include PyTorch support and optimization
+- Test RTZ route generation and export
+- Continue code and security hardening
 
 **Long-term Vision**:
-- **QGIS 4.0 Plugin Integration** (February 20, 2026) - Native QGIS plugin for maritime route planning
+- **QGIS 4.0 Plugin Integration** (Q4 2026) - Native QGIS plugin for maritime route planning
 - **Advanced Pathfinding** - Time-dependent routing with tidal currents (post-QGIS MVP)
 - **Advanced ML Models** - Build on PyTorch foundation for traffic amd weather optimization (post-v0.2.0)
 - **GPU Production Support** - Expand CUDA acceleration beyond experimental (post-v0.2.0)
@@ -380,14 +382,17 @@ The toolkit uses a clean, layered architecture:
 nautical_graph_toolkit/
    core/                    # Main conversion and routing classes
       graph.py             # Graph classes (BaseGraph, FineGraph, H3Graph, Weights)
+      weight_calculator.py # Stateless weight calculation engine (three-tier)
       s57_data.py          # S-57 conversion classes and database managers
-      pathfinding_lite.py  # A* pathfinding engine
+      pathfinding_lite.py  # A* pathfinding engine (Maritime, Smooth, Improved)
+      postgis_table_manager.py # PostGIS TEMP table lifecycle manager
+      route_utils.py       # Route export utilities
    utils/                   # Database and utility connectors
       db_utils.py          # Database operations (PostGIS, GeoPackage, SpatiaLite)
       s57_utils.py         # S-57 attribute lookups and NOAA database
       port_utils.py        # World Port Index integration
       s57_classification.py # S-57 feature classification
-      geometry_utils.py    # Geometric operations (buffer, slice)
+      geometry_utils.py    # Geometric operations (Buffer, Bearing)
       misc_utils.py        # Coordinate conversion and helpers
       plot_utils.py        # Plotly visualization utilities
       notebook_utils.py    # Jupyter notebook benchmarking
@@ -417,8 +422,13 @@ nautical_graph_toolkit/
 | `BaseGraph` | Coarse routing network | Large-scale maritime analysis |
 | `FineGraph` | Detailed routing network | Coastal route planning |
 | `H3Graph` | Hexagonal routing network | Multi-resolution flexibility |
+| `WeightCalculator` | Stateless weight calculation | Three-tier weight computation |
 | `Weights` | Edge weight calculation | Vessel-specific routing costs |
-| `Astar` | A* pathfinding | Route computation |
+| `WeightsOpen` | ML-optimized weight tracking | Per-layer GNN feature extraction |
+| `AstarMaritimeSmooth` | Three-pass A* routing | Optimal route with string-pulling |
+| `AstarMaritime` | Two-pass corridor routing | Maritime A* with corridor refinement |
+| `AstarImproved` | Pilot quantity heuristic | Straighter path optimization |
+| `PostisTableManager` | PostGIS bulk operations | TEMP table lifecycle and CTAS |
 | `Route` | Route management | Export and analysis |
 | `NoaaDatabase` | NOAA ENC catalog | Chart metadata and updates |
 | `PortData` | Port information | World Port Index integration |
@@ -454,20 +464,20 @@ python scripts/maritime_graph_geopackage_workflow.py
 
 ### Find Optimal Vessel Route
 
-The toolkit provides A* pathfinding via the `Astar` class. See the [Weighted Workflow Example](docs/user-guides/weights-workflow-example.md) for a complete working example.
+The toolkit provides A* pathfinding via the `AstarMaritimeSmooth` class with three-pass routing (A* scout → Dijkstra corridor → string-pulling). See the [Weighted Workflow Example](docs/user-guides/weights-workflow-example.md) for a complete working example.
 
 ```python
-from nautical_graph_toolkit.core.pathfinding_lite import Astar
+from nautical_graph_toolkit.core.pathfinding_lite import AstarMaritimeSmooth
 from shapely.geometry import Point
 
 # Load your graph (from PostGIS, GeoPackage, etc.)
 # graph = ... (load from your data source)
 
-# Create pathfinder
-pathfinder = Astar(graph)
+# Create pathfinder — three-pass routing: A* scout → Dijkstra corridor → string-pulling
+pathfinder = AstarMaritimeSmooth(graph)
 
 # Compute route
-route = pathfinder.compute_route(
+route = pathfinder.compute_route_maritime_smooth(
     start_point=Point(-122.33, 47.60),  # Seattle
     end_point=Point(-122.92, 46.75),    # Astoria
     weight_key='adjusted_weight'

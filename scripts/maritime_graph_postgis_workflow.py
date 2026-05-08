@@ -13,7 +13,7 @@ This script orchestrates a multi-step workflow:
 BACKEND-SPECIFIC FILE:
     This is the PostGIS-specific implementation of the maritime workflow.
     For GeoPackage/SpatiaLite backend, use maritime_graph_geopackage_workflow.py
-    Universal configuration shared by all backends: maritime_workflow_config.yml
+    Universal configuration shared by all backends: config/workflow_config.yml
 
 DOCUMENTATION:
     Backend-specific guide: docs/user-guides/workflow-postgis-guide.md
@@ -21,9 +21,9 @@ DOCUMENTATION:
     Setup instructions: docs/getting-started/setup.md
 
 CONFIGURATION FILES:
-    Database credentials: .env file (DB_NAME, DB_USER, DB_PASSWORD, DB_HOST, DB_PORT)
-    Workflow parameters: docs/maritime_workflow_config.yml (universal, backend-agnostic)
-    Graph parameters: src/nautical_graph_toolkit/data/graph_config.yml
+    Database credentials: .env (DB_NAME, DB_USER, DB_PASSWORD, DB_HOST, DB_PORT)
+    Workflow parameters: config/workflow_config.yml (universal, backend-agnostic)
+    Graph parameters: src/nautical_graph_toolkit/data/graph_config.yml (auto-resolved from package)
 
 Usage:
     python scripts/maritime_graph_postgis_workflow.py [options]
@@ -77,23 +77,36 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 import geopandas as gpd
+from shapely.geometry import Point
 
 from nautical_graph_toolkit.core.graph import (
-    BaseGraph, FineGraph, H3Graph, Weights, GraphConfigManager
+    BaseGraph, FineGraph, H3Graph, GraphConfigManager, GraphUtils
 )
+from nautical_graph_toolkit.core.weights import Weights, WeightsOpen
 from nautical_graph_toolkit.core.s57_data import ENCDataFactory
-from nautical_graph_toolkit.core.pathfinding_lite import Route
+from nautical_graph_toolkit.core.pathfinding_lite import (
+    Route, Astar, AstarImproved, AstarMaritime, AstarMaritimeSmooth
+)
 from nautical_graph_toolkit.utils.port_utils import Boundaries, PortData
 from nautical_graph_toolkit.utils.geometry_utils import Buffer, Slicer
 from nautical_graph_toolkit.utils.logging_utils import ICONS, SafeStreamHandler
 
-try:
-    from tqdm import tqdm
-    TQDM_AVAILABLE = True
-except ImportError:
-    TQDM_AVAILABLE = False
+WEIGHTS_CLASS = {
+    'weights': Weights,
+    'weights-open': WeightsOpen,
+}
+
+ASTAR_CLASS = {
+    'astar': Astar,
+    'astarimproved': AstarImproved,
+    'astarmaritime': AstarMaritime,
+    'astarmaritimesmooth': AstarMaritimeSmooth,
+}
 
 
+# TODO: Extract shared classes (WorkflowLogger, WorkflowConfig, PerformanceTracker,
+#   ASTAR_CLASS, WEIGHTS_CLASS, yaml import fallback) into a base module.
+#   ~270 lines are duplicated with maritime_graph_geopackage_workflow.py.
 class WorkflowLogger:
     """Manages dual logging (console + file) with third-party log suppression.
 
@@ -191,7 +204,7 @@ class WorkflowLogger:
 class WorkflowConfig:
     """Loads and manages workflow configuration.
 
-    NOTE: This loads maritime_workflow_config.yml which is universal across all backends.
+    NOTE: This loads config/workflow_config.yml which is universal across all backends.
     Backend-specific implementations (PostGIS, GeoPackage) interpret the same config file
     according to their backend capabilities and storage mechanisms.
     """
@@ -200,8 +213,13 @@ class WorkflowConfig:
         with open(config_path) as f:
             self.config = yaml.safe_load(f)
 
-        # Load graph config path (relative to project root)
-        graph_config_path = PROJECT_ROOT / self.config['graph_config_path']
+        # Resolve graph config path: explicit path in config, or auto-detect from package
+        raw = self.config.get('graph_config_path')
+        if raw:
+            graph_config_path = PROJECT_ROOT / raw
+        else:
+            from importlib.resources import files
+            graph_config_path = Path(str(files("nautical_graph_toolkit.data").joinpath("graph_config.yml")))
         self.graph_manager = GraphConfigManager(graph_config_path)
 
         # Construct standardized graph names from configuration
@@ -223,10 +241,10 @@ class WorkflowConfig:
         suffix = fine_cfg.get('name_suffix', '20')
 
         self.graph_names = {
-            'base': base_cfg.get('graph_name', 'base_graph'),
-            'base_route': base_cfg.get('base_route_name', 'base_route'),
-            'fine_undirected': f"{mode}_graph_{suffix}",
-            'fine_weighted': f"{mode}_graph_wt_{suffix}"
+            'base': base_cfg.get('graph_name', 'base_graph').lower(),
+            'base_route': base_cfg.get('base_route_name', 'base_route').lower(),
+            'fine_undirected': f"{mode}_graph_{suffix}".lower(),
+            'fine_weighted': f"{mode}_graph_wt_{suffix}".lower()
         }
 
     def get(self, key: str, default: Any = None) -> Any:
@@ -284,7 +302,7 @@ class MaritimeWorkflow:
     """Main workflow orchestrator for PostGIS backend.
 
     IMPORTANT: This is the PostGIS-specific implementation.
-    The workflow uses maritime_workflow_config.yml which contains universal settings
+    The workflow uses config/workflow_config.yml which contains universal settings
     shared across all backend implementations (PostGIS, GeoPackage, SpatiaLite).
 
     For GeoPackage/SpatiaLite workflows, refer to maritime_graph_geopackage_workflow.py
@@ -293,7 +311,8 @@ class MaritimeWorkflow:
     def __init__(
         self,
         config_path: Path,
-        log_dir: Path,
+        output_dir: Optional[Path] = None,
+        log_dir: Path = None,
         console_level: str = "INFO",
         file_level: str = "INFO",
         dry_run: bool = False
@@ -308,6 +327,9 @@ class MaritimeWorkflow:
         # Load configuration
         self.config = WorkflowConfig(config_path)
         self.dry_run = dry_run
+
+        # Store user-provided output dir (None = auto-generate timestamped)
+        self._output_dir = output_dir
 
         # Performance tracking
         self.perf = PerformanceTracker()
@@ -362,12 +384,34 @@ class MaritimeWorkflow:
                     self.logger_error(f"Missing required config: {field}")
                     return False
 
-            # Validate output directories
-            output_dir = Path(self.config.get('output.base_dir', 'output'))
-            output_dir.mkdir(parents=True, exist_ok=True)
+            # Setup output directory (auto-generate timestamped or use user-provided)
+            if self._output_dir is None:
+                # Get graph name from config for folder naming
+                graph_mode = self.config.get('fine_graph.mode', 'h3')
+                graph_suffix = self.config.get('fine_graph.name_suffix', 'graph')
+                graph_name = f"{graph_mode}_{graph_suffix}"
+
+                # Create timestamped folder: workflow_{graph_name}_{YYYYMMDD_HHMMSS}
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                folder_name = f"workflow_{graph_name}_{timestamp}"
+
+                # Output base directory (default: PROJECT_ROOT/output/)
+                output_base = PROJECT_ROOT / self.config.get('output.base_dir', 'output')
+                output_base.mkdir(parents=True, exist_ok=True)
+
+                # Auto-increment if collision (_2, _3, etc.)
+                output_dir = output_base / folder_name
+                counter = 2
+                while output_dir.exists():
+                    output_dir = output_base / f"{folder_name}_{counter}"
+                    counter += 1
+            else:
+                # User provided explicit path via CLI
+                output_dir = Path(self._output_dir).resolve()
 
             self.output_dir = output_dir
-            self.logger(f"Output directory: {output_dir}")
+            self.output_dir.mkdir(parents=True, exist_ok=True)
+            self.logger(f"Output directory: {self.output_dir}")
             self.logger(f"{ICONS['OK']} Configuration validated")
             return True
         except Exception as e:
@@ -525,6 +569,23 @@ class MaritimeWorkflow:
             self.logger_debug(f"Exception details:", exc_info=True)
             return False
 
+    def _resolve_custom_ports(self, cfg: dict):
+        """Auto-register custom ports from config coords if not already in port data."""
+        port = PortData()
+        for direction in ('departure', 'arrival'):
+            port_name = cfg.get(f'{direction}_port')
+            coords = cfg.get(f'{direction}_coords')
+            if not port_name or not coords:
+                continue
+            if port.get_port_by_name(port_name) is None:
+                port.create_custom_port(
+                    port_name=port_name,
+                    lon=coords['lon'],
+                    lat=coords['lat'],
+                    if_exists='skip'
+                )
+                self.logger(f"Registered custom port: {port_name}")
+
     def run_fine_graph(self) -> bool:
         """Step 2: Create fine or H3 graph."""
         self.logger("\n" + "=" * 60)
@@ -539,6 +600,9 @@ class MaritimeWorkflow:
 
             self.logger(f"Graph mode: {mode.upper()}")
 
+            # Resolve custom ports from config coords
+            self._resolve_custom_ports(cfg)
+
             # Load base route
             self.logger("Loading base route...")
             base_route_name = self.config.graph_names['base_route']
@@ -547,7 +611,17 @@ class MaritimeWorkflow:
                 schema_name=self.config.get('database.route_schema', 'routes'),
                 table_name="base_routes"
             )
-            self.logger(f"{ICONS['OK']} Base route loaded")
+            if route is None or route.is_empty:
+                self.logger_error(
+                    f"Base route '{base_route_name}' not found.\n"
+                    f"Base route must be created by run_base_graph() step first.\n"
+                    f"Options:\n"
+                    f"  1. Run base graph creation: Remove --skip-base flag\n"
+                    f"  2. Check that run_base_graph step completed successfully\n"
+                    f"  3. Verify base route was saved during step 1"
+                )
+                return False
+            self.logger(f"{ICONS['OK']} Base route loaded successfully")
 
             # Create buffer
             self.logger("Creating buffer around route...")
@@ -629,8 +703,6 @@ class MaritimeWorkflow:
                     )
                     self.logger(f"{ICONS['OK']} Saved to PostGIS")
 
-                graph_class = fg
-
             elif mode == "h3":
                 self.logger("Creating H3 hexagonal graph...")
                 h3 = H3Graph(
@@ -676,25 +748,9 @@ class MaritimeWorkflow:
                     )
                     self.logger(f"{ICONS['OK']} Saved to PostGIS")
 
-                graph_class = h3
-
             else:
                 self.logger_error(f"Unknown graph mode: {mode}")
                 return False
-
-            # Calculate route on fine graph
-            self.logger("Calculating route on fine graph...")
-            port = PortData()
-
-            dep_point = port.get_port_by_name(cfg['departure_port'])
-            arr_point = port.get_port_by_name(cfg['arrival_port'])
-
-            route = Route(graph=G, data_manager=self.factory.manager)
-            route_geometry, distance = route.base_route(
-                departure_point=dep_point.geometry,
-                arrival_point=arr_point.geometry
-            )
-            self.logger(f"{ICONS['OK']} Route calculated: {distance:.2f} NM")
 
             elapsed = self.perf.end_step()
             self.logger(f"{ICONS['OK']} Step 2 complete: {elapsed:.1f}s")
@@ -716,10 +772,12 @@ class MaritimeWorkflow:
             cfg = self.config.get('weighting')
             steps = cfg.get('steps', {})
 
-            weights_manager = Weights(data_factory=self.factory)
-            h3 = H3Graph(
+            weights_class_name = cfg.get('weights_class', 'weights')
+            weights_cls = WEIGHTS_CLASS[weights_class_name]
+            self.logger(f"Using weights class: {weights_cls.__name__}")
+            weights_manager = weights_cls(data_factory=self.factory)
+            bgraph = BaseGraph(
                 data_factory=self.factory,
-                route_schema_name=self.config.get('database.route_schema', 'routes'),
                 graph_schema_name=self.config.get('database.graph_schema', 'graph')
             )
 
@@ -740,7 +798,7 @@ class MaritimeWorkflow:
             # Step 1: Convert to directed
             if steps.get('convert_to_directed', True):
                 self.logger("Converting to directed graph...")
-                h3.convert_to_directed_postgis(
+                bgraph.convert_to_directed_postgis(
                     source_table_prefix=source_graph,
                     target_table_prefix=target_graph,
                     edges_schema=self.config.get('database.graph_schema', 'graph'),
@@ -763,14 +821,16 @@ class MaritimeWorkflow:
                     feature_layers=feature_layers,
                     is_directed=True,
                     include_sources=enrichment_cfg.get('include_sources', False),
-                    soundg_buffer_meters=enrichment_cfg.get('soundg_buffer_meters', 30)
+                    soundg_buffer_meters=enrichment_cfg.get('soundg_buffer_meters', 30),
+                    work_mem=enrichment_cfg.get('work_mem', '512MB')
                 )
                 self.logger(f"{ICONS['OK']} Features enriched")
 
             # Step 3: Static weights
             if steps.get('apply_static_weights', True):
                 self.logger("Applying static weights...")
-                config = weights_manager._load_config()
+                config = weights_manager.load_config()
+                buffer_zones_cfg = cfg.get('buffer_zones', {})
 
                 enc_schema = self.config.get('database.enc_schema', 'enc_west')
                 weights_manager.apply_static_weights_postgis(
@@ -779,14 +839,18 @@ class MaritimeWorkflow:
                     schema_name=self.config.get('database.graph_schema', 'graph'),
                     enc_schema=enc_schema,
                     static_layers=config['weight_settings']['static_layers'],
-                    usage_bands=cfg.get('static_weights_usage_bands', [3, 4, 5])
+                    usage_bands=cfg.get('static_weights_usage_bands', [3, 4, 5]),
+                    buffer_method=cfg.get('buffer_method', 'auto'),
+                    buffer_zones=buffer_zones_cfg.get('enabled', False),
+                    save_buffer_zones=buffer_zones_cfg.get('save_buffer_zones', False),
+                    aggr_mode=cfg.get('aggr_mode', None)
                 )
                 self.logger(f"{ICONS['OK']} Static weights applied")
 
             # Step 4: Directional weights
             if steps.get('apply_directional_weights', True):
                 self.logger("Applying directional weights...")
-                config = weights_manager._load_config()
+                config = weights_manager.load_config()
                 directional_cfg = config['weight_settings']['directional_weights']
 
                 weights_manager.calculate_directional_weights_postgis(
@@ -808,7 +872,7 @@ class MaritimeWorkflow:
                 weights_manager.calculate_dynamic_weights_postgis(
                     graph_name=target_graph,
                     schema_name=self.config.get('database.graph_schema', 'graph'),
-                    vessel_parameters=vessel_cfg,
+                    vessel_params=vessel_cfg,
                     environmental_conditions=env_cfg
                 )
                 self.logger(f"{ICONS['OK']} Dynamic weights applied")
@@ -832,16 +896,15 @@ class MaritimeWorkflow:
         try:
             cfg = self.config.get('pathfinding')
 
-            h3 = H3Graph(
+            bgraph = BaseGraph(
                 data_factory=self.factory,
-                route_schema_name=self.config.get('database.route_schema', 'routes'),
                 graph_schema_name=self.config.get('database.graph_schema', 'graph')
             )
 
             # Load weighted graph
             self.logger("Loading weighted graph from PostGIS...")
             target_graph = self.config.graph_names['fine_weighted']
-            G = h3.load_graph_from_postgis(target_graph)
+            G = bgraph.load_graph_from_postgis(target_graph)
             self.logger(f"{ICONS['OK']} Graph loaded: {G.number_of_nodes():,} nodes, {G.number_of_edges():,} edges")
 
             # Calculate route
@@ -851,12 +914,106 @@ class MaritimeWorkflow:
             dep_port = port.get_port_by_name(cfg['departure_port'])
             arr_port = port.get_port_by_name(cfg['arrival_port'])
 
-            route = Route(graph=G, data_manager=self.factory.manager)
-            route_detail = route.detailed_route(
-                departure_point=dep_port.geometry,
-                arrival_point=arr_port.geometry,
-                weight_key=cfg['weight_key']
-            )
+            # Determine A* implementation
+            astar_impl_name = cfg.get('astar_impl', 'AstarMaritime').lower()
+            astar_impl = ASTAR_CLASS.get(astar_impl_name, AstarMaritime)
+            self.logger(f"Using A* implementation: {astar_impl.__name__}")
+
+            # Build pathfinder kwargs based on configuration
+            pathfinder_kwargs = {}
+
+            # Add corridor parameters for AstarMaritime and AstarMaritimeSmooth
+            if issubclass(astar_impl, AstarMaritime):
+                pathfinder_kwargs.update({
+                    'corridor_buffer_nm': cfg.get('corridor_buffer_nm', 5.0),
+                    'include_tss': cfg.get('include_tss', True),
+                    'tss_bbox_extend_factor': cfg.get('tss_bbox_extend_factor', 0.5),
+                    'pass1_backend': cfg.get('pass1_backend', 'rustworkx'),
+                    'pass1_refresh': cfg.get('pass1_refresh', True),
+                })
+                self.logger(
+                    f"Maritime corridor: {cfg.get('corridor_buffer_nm', 5.0)} NM buffer, "
+                    f"TSS={'enabled' if cfg.get('include_tss', True) else 'disabled'}, "
+                    f"Pass-1 backend: {cfg.get('pass1_backend', 'rustworkx')}"
+                )
+
+            # Add string-pulling buffer for AstarMaritimeSmooth
+            if issubclass(astar_impl, AstarMaritimeSmooth):
+                pathfinder_kwargs['sp_buffer_nm'] = cfg.get('sp_buffer_nm', 2.0)
+                self.logger(f"String-pulling buffer: {cfg.get('sp_buffer_nm', 2.0)} NM")
+
+                # Navigability mask: pathfinder loads geometries lazily
+                pathfinder_kwargs['use_land_grid'] = cfg.get('use_land_grid', True)
+                pathfinder_kwargs['data_factory'] = self.factory
+                pathfinder_kwargs['channel_layers'] = cfg.get('channel_layers', None)
+                pathfinder_kwargs['graph_name'] = self.config.graph_names['fine_weighted']
+
+                # Compute ENC names for factory layer filtering
+                nodes_gdf = gpd.GeoDataFrame(
+                    geometry=[Point(n) for n in G.nodes()], crs='EPSG:4326')
+                graph_boundary = nodes_gdf.geometry.union_all().convex_hull
+                pathfinder_kwargs['enc_names'] = self.factory.get_encs_by_boundary(
+                    graph_boundary)
+
+                self.logger(
+                    f"Mask config: land_grid={cfg.get('use_land_grid', True)}, "
+                    f"channels={'auto (include_tss)' if cfg.get('channel_layers') is None else cfg.get('channel_layers')}"
+                )
+
+            # Debug export path for AstarMaritimeSmooth
+            debug_export_path = None
+            if cfg.get('debug_export_gpkg', False) and issubclass(astar_impl, AstarMaritimeSmooth):
+                debug_export_path = self.output_dir / "debug_pathfinding.gpkg"
+
+            # Route-level smoothing parameters
+            apply_smoothing = cfg.get('apply_smoothing', False)
+            merge_threshold_deg = cfg.get('merge_threshold_deg', 1.0)
+            arc_threshold_deg = cfg.get('arc_threshold_deg', 3.0)
+            collect_edge_stats = cfg.get('collect_edge_stats', True)
+
+            if apply_smoothing:
+                self.logger(f"Fillet smoothing enabled (merge={merge_threshold_deg}°, arc={arc_threshold_deg}°)")
+
+            # Build node_id_map for integer waypoint resolution
+            waypoint_ids = cfg.get('waypoints', [])
+            nid_map = None
+            if waypoint_ids:
+                self.logger("Building node ID map from graph...")
+                nid_map = GraphUtils.node_id_map(G)
+                self.logger(f"{ICONS['OK']} Node ID map: {len(nid_map)} entries")
+
+            route = Route(graph=G, data_manager=self.factory.manager, node_id_map=nid_map)
+
+            if waypoint_ids:
+                self.logger(f"Forced route with {len(waypoint_ids)} waypoint(s): {waypoint_ids}")
+                route_detail = route.forced_route(
+                    departure_point=dep_port.geometry,
+                    arrival_point=arr_port.geometry,
+                    waypoints=waypoint_ids,
+                    astar_impl=astar_impl,
+                    weight_key=cfg['weight_key'],
+                    collect_edge_stats=collect_edge_stats,
+                    min_cost_factor=cfg.get('min_cost_factor', 1.0),
+                    apply_smoothing=apply_smoothing,
+                    merge_threshold_deg=merge_threshold_deg,
+                    arc_threshold_deg=arc_threshold_deg,
+                    debug_export_path=debug_export_path,
+                    **pathfinder_kwargs
+                )
+            else:
+                route_detail = route.detailed_route(
+                    departure_point=dep_port.geometry,
+                    arrival_point=arr_port.geometry,
+                    astar_impl=astar_impl,
+                    weight_key=cfg['weight_key'],
+                    collect_edge_stats=collect_edge_stats,
+                    min_cost_factor=cfg.get('min_cost_factor', 1.0),
+                    apply_smoothing=apply_smoothing,
+                    merge_threshold_deg=merge_threshold_deg,
+                    arc_threshold_deg=arc_threshold_deg,
+                    debug_export_path=debug_export_path,
+                    **pathfinder_kwargs
+                )
             self.logger(f"{ICONS['OK']} Route calculated")
 
             # Save route
@@ -872,15 +1029,12 @@ class MaritimeWorkflow:
             if cfg.get('export_weighted_graph', False):
                 self.logger("Exporting weighted graph to GeoPackage...")
                 output_gpkg = self.output_dir / f"{target_graph}.gpkg"
-                try:
-                    h3.export_postgis_to_gpkg(
-                        schema_name=self.config.get('database.graph_schema', 'graph'),
-                        graph_name=target_graph,
-                        output_path=str(output_gpkg)
-                    )
-                    self.logger(f"{ICONS['OK']} Graph exported to GeoPackage")
-                except FileExistsError:
-                    self.logger_warning(f"GeoPackage already exists, skipping export")
+                summary = bgraph.export_postgis_to_gpkg(
+                    schema_name=self.config.get('database.graph_schema', 'graph'),
+                    graph_name=target_graph,
+                    output_path=str(output_gpkg)
+                )
+                self.logger(f"{ICONS['OK']} Graph exported: {Path(summary['output_path']).name}")
 
             elapsed = self.perf.end_step()
             self.logger(f"{ICONS['OK']} Step 4 complete: {elapsed:.1f}s")
@@ -924,14 +1078,26 @@ Examples:
     parser.add_argument(
         '--config',
         type=Path,
-        default=Path(__file__).parent.parent / 'docs' / 'maritime_workflow_config.yml',
+        default=Path(__file__).parent.parent / 'config' / 'workflow_config.yml',
         help='Path to workflow configuration YAML file (universal, backend-agnostic)'
+    )
+
+    parser.add_argument(
+        '--output-dir',
+        type=Path,
+        default=None,
+        help='Output directory (default: auto-generated output/workflow_{graph}_{timestamp}/)'
     )
 
     parser.add_argument(
         '--graph-mode',
         choices=['fine', 'h3'],
         help='Override graph mode (fine or h3)'
+    )
+
+    parser.add_argument(
+        '--name-suffix',
+        help='Override fine_graph.name_suffix (affects graph and output directory names)'
     )
 
     parser.add_argument(
@@ -965,6 +1131,12 @@ Examples:
     )
 
     parser.add_argument(
+        '--weights-class',
+        choices=['weights', 'weights-open'],
+        help='Weight manager class: "weights" (standard) or "weights-open" (ML-optimized with per-layer tracking)'
+    )
+
+    parser.add_argument(
         '--log-level',
         choices=['INFO', 'DEBUG'],
         default='INFO',
@@ -988,6 +1160,7 @@ Examples:
     log_dir = Path(__file__).parent / 'logs'
     workflow = MaritimeWorkflow(
         config_path=args.config,
+        output_dir=args.output_dir,
         log_dir=log_dir,
         console_level=args.log_level,
         file_level=args.log_level,  # Use same level for file as console
@@ -998,6 +1171,11 @@ Examples:
     if args.graph_mode:
         workflow.config.override('fine_graph.mode', args.graph_mode)
         # Reconstruct graph names after mode change
+        workflow.config._construct_graph_names()
+
+    if args.name_suffix:
+        workflow.config.override('fine_graph.name_suffix', args.name_suffix)
+        # Reconstruct graph names after suffix change
         workflow.config._construct_graph_names()
 
     if args.skip_base:
@@ -1015,7 +1193,8 @@ Examples:
     if args.vessel_draft:
         workflow.config.override('weighting.vessel.draft', args.vessel_draft)
 
-    # Run workflow
+    if args.weights_class:
+        workflow.config.override('weighting.weights_class', args.weights_class)
     success = workflow.run()
 
     sys.exit(0 if success else 1)

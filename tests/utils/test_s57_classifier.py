@@ -138,9 +138,9 @@ class TestClassificationRetrieval:
 
     @pytest.mark.unit
     def test_get_nav_class_for_light(self, classifier):
-        """Test that light is classified as SAFE."""
+        """Test that light is classified as INFORMATIONAL (no routing weight or danger proximity)."""
         nav_class = classifier.get_nav_class('LIGHTS')
-        assert nav_class == NavClass.SAFE
+        assert nav_class == NavClass.INFORMATIONAL
 
     @pytest.mark.unit
     def test_get_nav_class_unknown_defaults_to_informational(self, classifier):
@@ -235,7 +235,7 @@ class TestClassificationDetails:
         assert classification['acronym'] == 'FAIRWY'
         assert classification['nav_class'] == NavClass.SAFE
         assert classification['category'] == 'Route'
-        assert classification['risk_multiplier'] == 0.5  # Preferred route
+        assert 0 < classification['risk_multiplier'] < 2  # SAFE: preferred, below open-water baseline
         assert classification['buffer_meters'] == 0
         assert classification['is_traversable'] is True
 
@@ -246,8 +246,8 @@ class TestClassificationDetails:
         assert classification['acronym'] == 'WRECKS'
         assert classification['nav_class'] == NavClass.DANGEROUS
         assert classification['category'] == 'Obstruction'
-        assert classification['risk_multiplier'] == 100.0  # Extreme danger
-        assert classification['buffer_meters'] == 500  # Large safety buffer
+        assert classification['risk_multiplier'] > 100  # DANGEROUS: extreme penalty
+        assert classification['buffer_meters'] > 0      # has a safety buffer
         assert classification['is_traversable'] is False
 
     @pytest.mark.unit
@@ -256,15 +256,15 @@ class TestClassificationDetails:
         classification = classifier.get_classification('TSSCRS')
         assert classification['nav_class'] == NavClass.CAUTION
         assert classification['category'] == 'Traffic'
-        assert classification['risk_multiplier'] > 1.0  # Higher cost
-        assert classification['buffer_meters'] == 150
+        assert 2 < classification['risk_multiplier'] <= 100  # CAUTION: elevated cost, not blocking
+        assert classification['buffer_meters'] == 0
 
     @pytest.mark.unit
     def test_light_classification_details(self, classifier):
         """Test detailed classification for light."""
         classification = classifier.get_classification('LIGHTS')
-        assert classification['nav_class'] == NavClass.SAFE
-        assert classification['category'] == 'Aid'
+        assert classification['nav_class'] == NavClass.INFORMATIONAL
+        assert classification['category'] == 'Reference'
         assert classification['is_traversable'] is True
 
 

@@ -96,12 +96,12 @@ MAPBOX_TOKEN="your_mapbox_token"
 ### 4. Review Workflow Configuration
 The script uses two configuration files:
 
-- **`docs/maritime_workflow_config.yml`** - Workflow orchestration (ports, AOI, steps)
+- **`config/workflow_config.yml`** - Workflow orchestration (ports, AOI, steps)
 - **`src/nautical_graph_toolkit/data/graph_config.yml`** - Graph parameters (layers, weights, H3)
 
 ## Configuration Guide
 
-### maritime_workflow_config.yml
+### workflow_config.yml
 
 #### Workflow Control
 ```yaml
@@ -153,6 +153,9 @@ weighting:
   #   - target: h3_graph_wt_20
   # Do NOT manually set these; they are auto-generated.
 
+  # Weight manager class: "weights" (standard) or "weights-open" (ML-optimized)
+  weights_class: "weights"
+
   steps:
     convert_to_directed: true
     enrich_features: true
@@ -160,15 +163,38 @@ weighting:
     apply_directional_weights: true
     apply_dynamic_weights: true
 
+  # Vessel parameters (determine navigable water and clearance requirements)
   vessel:
-    draft: 7.5              # meters
-    height: 30.0            # meters
-    vessel_type: "cargo"
+    draft: 7.5                    # Depth of hull below waterline (meters)
+    height: 30.0                  # Height above waterline (meters)
+    beam: 25.0                    # Vessel width (meters)
+    length: 150.0                 # Vessel length (meters)
+    vessel_type: "cargo"          # cargo, tanker, passenger, fishing
+    ukc_safety_margin: 2.0        # Under-keel clearance buffer (meters)
+    ver_clearance_margin: 5.0     # Vertical clearance buffer (meters)
+    hor_clearance_margin: 20.0    # Horizontal clearance buffer (meters)
+    compliance_zone: null         # null = use defaults, or [2.5, 1.8, 1.3]
 
   environment:
-    weather_factor: 1.2     # 1.0=good, >1.0=poor
-    visibility_factor: 1.1
-    time_of_day: "day"
+    weather_factor: 1.2           # 1.0=good, >1.0=poor (weight multiplier)
+    visibility_factor: 1.1        # 1.0=good, >1.0=poor (weight multiplier)
+    time_of_day: "day"            # "day" or "night"
+
+  # Feature enrichment options
+  enrichment:
+    include_sources: false        # Store ENC source chart names in edge attributes
+    soundg_buffer_meters: 30      # Radius for sounding point spatial queries (meters)
+    work_mem: "512MB"             # PostGIS work memory for spatial joins
+
+  # Static weights processing
+  static_weights_usage_bands: [3, 4, 5]  # ENC chart bands contributing to weighting
+  buffer_method: "auto"           # "auto", "degrees", or "geodesic"
+  aggr_mode: exp                  # null (graph_config default), "max", or "exp"
+
+  # Buffer zone visualization (environmental/regulatory coastal boundaries)
+  buffer_zones:
+    enabled: false                # Enable buffer zone classification
+    save_buffer_zones: false      # Persist buffer zone geometries as separate tables
 ```
 
 #### Pathfinding Configuration
@@ -179,6 +205,22 @@ pathfinding:
   arrival_port: "San Francisco Arrival"
   arrival_coords: {lon: -122.400, lat: 37.805}
   weight_key: "adjusted_weight"
+
+  # A* algorithm selection
+  astar_impl: "AstarMaritime"      # "Astar", "AstarImproved", or "AstarMaritime"
+
+  # AstarMaritime-specific parameters
+  corridor_buffer_nm: 5.0          # Corridor width for Pass-2 optimization (NM)
+  include_tss: true                # Force-include TSS lanes in corridor
+  tss_bbox_extend_factor: 0.5      # Extend TSS detection bbox
+
+  # General pathfinding parameters
+  min_cost_factor: 1.0             # Minimum cost threshold
+  collect_edge_stats: true         # Collect detailed edge statistics
+
+  # Output options
+  route_filename_template: "detailed_route_{draft}m_draft.geojson"
+  export_weighted_graph: false     # Export weighted graph to GeoPackage
 ```
 
 ### graph_config.yml
@@ -245,15 +287,18 @@ python scripts/maritime_graph_postgis_workflow.py --log-level DEBUG
 ### Command-Line Options
 
 ```
---config PATH               Path to workflow config YAML
---graph-mode {fine,h3}      Override graph mode
---skip-base                 Skip base graph creation
---skip-fine                 Skip fine/H3 graph creation
---skip-weighting            Skip weighting steps
---skip-pathfinding          Skip final pathfinding
---vessel-draft FLOAT        Override vessel draft (meters)
---log-level {INFO,DEBUG}    Console logging level
---dry-run                   Validate config without execution
+--config PATH                       Path to workflow config YAML
+--output-dir PATH                   Output directory (default: auto-generated output/workflow_{graph}_{timestamp}/)
+--graph-mode {fine,h3}              Override graph mode
+--name-suffix SUFFIX                Override fine_graph.name_suffix (affects graph and output directory names)
+--skip-base                         Skip base graph creation
+--skip-fine                         Skip fine/H3 graph creation
+--skip-weighting                    Skip weighting steps
+--skip-pathfinding                  Skip final pathfinding
+--vessel-draft FLOAT                Override vessel draft (meters)
+--weights-class {weights,weights-open}  Weight manager class (default: "weights")
+--log-level {INFO,DEBUG}            Console logging level
+--dry-run                           Validate config without execution
 ```
 
 ## Example Workflows
@@ -263,7 +308,7 @@ python scripts/maritime_graph_postgis_workflow.py --log-level DEBUG
 python scripts/maritime_graph_postgis_workflow.py
 
 # Expected time: 45-60 minutes
-# Output:
+# Output directory: output/workflow_{graph}_{timestamp}/ (auto-generated)
 #   - PostGIS tables: base_graph_PG, h3_graph_pg_6_11, h3_graph_directed_pg_6_11_v3
 #   - GeoPackage files: base_graph_PG.gpkg, h3_graph_PG_6_11.gpkg
 #   - Routes: GeoJSON files with detailed route segments
@@ -310,6 +355,17 @@ python scripts/maritime_graph_postgis_workflow.py --log-level DEBUG
 python scripts/maritime_graph_postgis_workflow.py --skip-base --skip-fine
 ```
 
+### Scenario 6: ML-Optimized Weights (WeightsOpen)
+```bash
+python scripts/maritime_graph_postgis_workflow.py \
+  --weights-class weights-open \
+  --skip-base
+
+# Uses WeightsOpen class which produces per-layer flat tracking columns
+# (wt_{layer_name}, wt_{layer_name}_n) suitable for GNN/PyTorch consumption
+# Output includes additional feature columns: ft_sounding_wrecks, ft_sounding_obstrn
+```
+
 ## Output Files
 
 ### Database Tables (PostGIS)
@@ -348,18 +404,19 @@ graph.{mode}_graph_wt_{suffix}_edges    - Directed edges with weights:
 
 ### GeoPackage Files
 ```
-output/base_graph_PG.gpkg
-output/h3_graph_PG_6_11.gpkg
-output/h3_graph_directed_pg_6_11_v3.gpkg
+output/workflow_{graph}_{timestamp}/base_graph_PG.gpkg
+output/workflow_{graph}_{timestamp}/h3_graph_PG_6_11.gpkg
+output/workflow_{graph}_{timestamp}/h3_graph_directed_pg_6_11_v3.gpkg
 ```
 
-- Portable offline format
-- Can be opened in QGIS, ArcGIS, etc.
+- Auto-generated timestamped output directories (e.g., `output/workflow_h3_20_20260416_142310/`)
+- Use `--output-dir` to override with a custom path
+- Portable offline format, can be opened in QGIS, ArcGIS, etc.
 - Contains nodes and edges layers with all attributes
 
 ### Route Files
 ```
-output/detailed_route_7.5m_draft.geojson
+output/workflow_{graph}_{timestamp}/detailed_route_7.5m_draft.geojson
 ```
 
 - GeoJSON format with route segments
@@ -386,9 +443,9 @@ docs/logs/maritime_workflow_20251027_142310.log.3  # Rotated backup
 
 ### Benchmark Files
 ```
-output/benchmark_graph_base.csv
-output/benchmark_graph_fine.csv
-output/benchmark_graph_weighted_directed.csv
+output/workflow_{graph}_{timestamp}/benchmark_graph_base.csv
+output/workflow_{graph}_{timestamp}/benchmark_graph_fine.csv
+output/workflow_{graph}_{timestamp}/benchmark_graph_weighted_directed.csv
 ```
 
 - Performance metrics in CSV format
@@ -543,7 +600,7 @@ Error: schema "enc_west" does not exist
 
 - S-57 data not loaded into PostGIS
 - Convert S-57 ENCs first: See `docs/getting-started/setup.md`
-- Verify schema name in `maritime_workflow_config.yml`
+- Verify schema name in `config/workflow_config.yml`
 
 #### 3. Port Not Found
 ```
@@ -641,7 +698,7 @@ python scripts/maritime_graph_postgis_workflow.py --skip-base --skip-fine
 
 ### Using Custom Port Coordinates
 
-Override port definitions in `maritime_workflow_config.yml`:
+Override port definitions in `config/workflow_config.yml`:
 
 ```yaml
 base_graph:
@@ -665,20 +722,20 @@ The workflow generates exportable formats:
 The script automatically generates benchmark CSVs:
 
 ```bash
-# View benchmarks
-cat output/benchmark_graph_base.csv
-cat output/benchmark_graph_fine.csv
+# View benchmarks (output directory is printed at workflow startup)
+cat output/workflow_h3_20_20260416_142310/benchmark_graph_base.csv
+cat output/workflow_h3_20_20260416_142310/benchmark_graph_fine.csv
 ```
 
 Compare across runs:
 ```bash
-# Append new results
+# Run new pipeline
 python scripts/maritime_graph_postgis_workflow.py
 
-# Analyze performance trends
+# Analyze performance trends (replace with your output directory)
 python -c "
 import pandas as pd
-df = pd.read_csv('output/benchmark_graph_fine.csv')
+df = pd.read_csv('output/workflow_h3_20_20260416_142310/benchmark_graph_fine.csv')
 print(df[['timestamp', 'node_count', 'edge_count', 'total_pipeline_sec']])
 "
 ```
@@ -687,7 +744,7 @@ print(df[['timestamp', 'node_count', 'edge_count', 'total_pipeline_sec']])
 
 ### Related Files
 - **Script**: `scripts/maritime_graph_postgis_workflow.py`
-- **Configuration**: `docs/maritime_workflow_config.yml`
+- **Configuration**: `config/workflow_config.yml`
 - **Graph Config**: `src/nautical_graph_toolkit/data/graph_config.yml`
 - **Setup Guide**: `docs/getting-started/setup.md`
 - **Troubleshooting**: `docs/reference/troubleshooting.md`
