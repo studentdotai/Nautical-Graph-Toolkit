@@ -156,7 +156,20 @@ See [INSTALL.md Section 4](docs/getting-started/install.md#4-docker-postgis-setu
 
 ### Quick Start Example
 
-The toolkit provides comprehensive workflow scripts and Jupyter notebooks for building maritime routing graphs.
+**Interactive Launcher** (recommended for new users):
+
+```bash
+python scripts/ngt.py
+```
+
+This launches a guided, menu-driven interface for all three workflows:
+- **S-57 Import** — Convert ENC data with backend selection and validation
+- **Graph Pipeline** — Build routing graphs with port selection, graph mode, vessel parameters, and step-by-step customization
+- **Weights Pipeline** — Compute edge weights and run pathfinding with per-step overrides
+
+The launcher provides autocomplete port search, dry-run preview, config file selection, and pipeline step skipping — no manual CLI flags needed.
+
+---
 
 **Interactive Examples**: See the [Jupyter Notebooks](docs/notebooks/) for 13+ working examples covering:
 - ENC data import and conversion

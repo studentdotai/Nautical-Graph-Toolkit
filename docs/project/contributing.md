@@ -8,9 +8,9 @@ Thank you for your interest in contributing to the Nautical Graph Toolkit! This 
 
 **Contribution Timeline**:
 
-- **v0.1.x**: Core development in progress - internal contributions only
-- **v0.2.0**: Community contributions welcome - foundation & polish phase
-- **v0.3.0+**: Full collaborative development
+- **v0.1.x** (current: v0.1.5): Foundation completion in progress - internal contributions only
+- **v0.2.0**: Community contributions welcome - PyTorch integration & production readiness
+- **v0.3.0+**: Full collaborative development - QGIS integration & advanced features
 
 ## 🤝 How to Contribute (Starting v0.2.0)
 
@@ -45,7 +45,7 @@ mamba activate nautical
 pytest
 
 # Run specific test file
-pytest tests/core/test_s57_converter.py
+pytest tests/core/test_weights.py
 
 # Run with coverage report
 pytest --cov=nautical_graph_toolkit --cov-report=html
@@ -89,17 +89,19 @@ Follow PEP 8 and the project conventions:
 - **Naming**: snake_case for functions/variables, PascalCase for classes
 - **Docstrings**: Google-style on all public functions
 - **Type hints**: Required for all public methods
-- **Testing**: Unit tests in `tests/core/`, integration tests in `tests/integration/`
+- **Testing**: Unit tests in `tests/core/` and `tests/utils/`, integration tests in `tests/core__real_data/`
 
 See the project's development guidelines in `/dev/rules/` directory.
 
 ### Architecture
 
-The toolkit uses a clean, layered architecture:
+The toolkit uses a layered architecture under `src/nautical_graph_toolkit/`:
 
-- **Core**: S-57 conversion and graph generation
-- **Utils**: Database managers and utility functions
-- **Data**: S-57 reference data and configurations
+- **Core**: S-57 conversion, graph generation (`BaseGraph`, `FineGraph`, `H3Graph`), three-tier weighting system (`WeightCalculator`, `Weights`, `WeightsOpen`), and multi-pass A* pathfinding (`Astar`, `AstarImproved`, `AstarMaritime`, `AstarMaritimeSmooth`)
+- **Utils**: Database managers, geometry utilities (`Buffer`, `Bearing`), S-57 classification, and port utilities
+- **Data**: S-57 reference data, port index, and configurations
+- **Analysis**: Analytical tools and visualization
+- **Scripts**: CLI launcher (`ngt.py`), workflow scripts, benchmarks, and S-57 import tools
 
 ### Testing
 
@@ -108,7 +110,7 @@ The toolkit uses a clean, layered architecture:
 pytest
 
 # Run specific test file
-pytest tests/core/test_s57_converter.py
+pytest tests/core/test_weights.py
 
 # Run with coverage
 pytest --cov=nautical_graph_toolkit
@@ -192,7 +194,7 @@ When v0.2.0 opens contributions:
 1. **Automated checks**:
     - CI/CD pipeline runs tests
     - Code coverage must be ≥80%
-    - Style checks pass (flake8)
+    - Style checks pass (Ruff)
 
 2. **Manual review**:
     - Architecture & design
@@ -209,22 +211,23 @@ When v0.2.0 opens contributions:
 
 **High priority** (good for first-time contributors):
 
-- Documentation improvements
-- Test coverage expansion
-- Bug fixes
-- Performance optimization
+- Documentation improvements and examples
+- Test coverage expansion (current: 11 test files, target: 80% for v0.2.0)
+- Bug fixes and edge case handling
+- Notebook examples for new v0.1.5 features (weights, pathfinding variants, CLI)
 
 **Medium priority**:
 
-- New utility functions
-- Backend support enhancements
-- Configuration options
+- Cross-backend performance optimization
+- Configuration and workflow enhancements
+- RTZ 1.2 route export validation and testing
+- ML weight optimization pipeline (`GraphWeightOptimizer`)
 
 **Lower priority** (requires discussion):
 
-- New core features
-- Architecture changes
-- Dependency upgrades
+- PyTorch integration (planned for v0.2.0)
+- New core features or architecture changes
+- QGIS plugin development (planned for v0.3.0)
 
 ## 📜 License
 

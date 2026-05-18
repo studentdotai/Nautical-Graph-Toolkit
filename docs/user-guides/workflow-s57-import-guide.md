@@ -40,7 +40,7 @@ The tool performs automated S-57 conversion with the following features:
 - Python {{ python_version }}+
 - GDAL {{ gdal_version }}
 - PostgreSQL with PostGIS extension (for PostGIS output)
-- All dependencies listed in `pyproject.toml`
+- All dependencies listed in `environment.yml` and `requirements.in`
 
 ### Required Data
 - S-57 ENC files (`.000` base files, scanned recursively)

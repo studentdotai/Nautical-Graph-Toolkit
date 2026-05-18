@@ -583,6 +583,7 @@ class MaritimeWorkflow:
                 grid["combined_grid"],
                 spacing_nm=cfg['spacing_nm'],
                 keep_largest_component=True,
+                bridge_components=True,
                 max_points=max_points,
                 max_subdivision_factor=max_subdivision_factor
             )
@@ -913,6 +914,9 @@ class MaritimeWorkflow:
                 self.logger(f"Applying static weights (mode={mode})...")
                 config = weights_manager.load_config()
                 buffer_zones_cfg = cfg.get('buffer_zones', {})
+                _st = buffer_zones_cfg.get('simplify_tolerance', None)
+                if _st is not None:
+                    weights_manager._buffer_zone_simplify_tolerance = _st
 
                 weights_manager.apply_static_weights_gpkg(
                     graph_gpkg_path=str(target_file),

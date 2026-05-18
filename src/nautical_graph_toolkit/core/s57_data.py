@@ -61,7 +61,7 @@ try:
     import psutil
     import requests
     from bs4 import BeautifulSoup
-    from shapely.geometry import shape, mapping, Polygon, Point, MultiPolygon, LineString, box
+    from shapely.geometry import shape, mapping, Polygon, Point, MultiPolygon, LineString
     from shapely.geometry.base import BaseGeometry
     from shapely import wkt, wkb, unary_union, contains_xy
     from shapely.ops import nearest_points
@@ -4016,7 +4016,97 @@ class PostGISManager:
             logger.error(f"Error executing PostGIS grid creation: {e}")
             return {}
 
-    def create_grid_graph_nodes_and_edges(self, polygon: Union[Polygon, MultiPolygon], spacing: float, max_edge_factor: float = 2.0, max_points: int = 1000000, max_subdivision_factor: int = 4) -> Dict[str, Any]:
+    def _ensure_navigable_area_table(self, grid_schema: str, table_prefix: str) -> str:
+        """Creates the navigable area table with GiST index if not exists, truncates it."""
+        table_name = f"{table_prefix}_grid_navigable_area"
+
+        with self.engine.connect() as conn:
+            conn.execute(text(f'CREATE SCHEMA IF NOT EXISTS "{grid_schema}";'))
+            conn.execute(text(f"""
+                CREATE TABLE IF NOT EXISTS "{grid_schema}"."{table_name}" (
+                    id SERIAL PRIMARY KEY,
+                    geom GEOMETRY(Geometry, 4326)
+                );
+            """))
+            conn.execute(text(f"""
+                CREATE INDEX IF NOT EXISTS "idx_{table_prefix}_nav_area_geom"
+                ON "{grid_schema}"."{table_name}" USING GIST(geom);
+            """))
+            conn.execute(text(f'TRUNCATE "{grid_schema}"."{table_name}";'))
+            conn.commit()
+
+        logger.info(f"Ensured indexed navigable area table: {grid_schema}.{table_name}")
+        return table_name
+
+    def _write_polygon_to_indexed_table(self, polygon: Union[Polygon, MultiPolygon], grid_schema: str, table_name: str) -> None:
+        """Writes the navigable polygon to the indexed table using WKB for performance."""
+        wkb_hex = wkb.dumps(polygon, hex=True)
+
+        insert_sql = text(f"""
+            INSERT INTO "{grid_schema}"."{table_name}" (geom)
+            VALUES (ST_SetSRID(ST_GeomFromWKB(decode(:wkb_hex, 'hex')), 4326));
+        """)
+
+        with self.engine.connect() as conn:
+            conn.execute(insert_sql, {"wkb_hex": wkb_hex})
+            conn.commit()
+
+        logger.info(f"Wrote navigable polygon to {grid_schema}.{table_name} "
+                     f"(vertices: {getattr(polygon, 'exterior', polygon).coords.__len__() if hasattr(polygon, 'exterior') else 'N/A'})")
+
+    def _create_subdivided_table(self, grid_schema: str, table_prefix: str, nav_table: str, max_vertices: int = 256) -> str:
+        """Shatters the navigable polygon into small indexed pieces via ST_Subdivide.
+
+        Creates a new table with GiST index for fast point-in-polygon lookups.
+        Reads from the existing nav_table (avoids re-serializing through Python).
+        """
+        sub_table = f"{table_prefix}_grid_subdivided"
+
+        logger.info(f"Creating ST_Subdivide table {grid_schema}.{sub_table} (max_vertices={max_vertices})...")
+
+        with self.engine.connect() as conn:
+            conn.execute(text(f'DROP TABLE IF EXISTS "{grid_schema}"."{sub_table}"'))
+            conn.commit()
+
+        with self.engine.connect() as conn:
+            conn.execute(text(f"""
+                CREATE TABLE "{grid_schema}"."{sub_table}" AS
+                SELECT ST_Subdivide(geom, {max_vertices}) AS geom
+                FROM "{grid_schema}"."{nav_table}"
+            """))
+            conn.execute(text(f"""
+                ALTER TABLE "{grid_schema}"."{sub_table}"
+                ADD COLUMN IF NOT EXISTS id SERIAL PRIMARY KEY
+            """))
+            conn.execute(text(f"""
+                CREATE INDEX "idx_{table_prefix}_subdiv_geom"
+                ON "{grid_schema}"."{sub_table}" USING GIST(geom)
+            """))
+            conn.commit()
+
+        try:
+            with self.engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+                conn.execute(text(f'ANALYZE "{grid_schema}"."{sub_table}"'))
+        except Exception as e:
+            logger.warning(f"ANALYZE failed on {grid_schema}.{sub_table} (non-critical): {e}")
+
+        with self.engine.connect() as conn:
+            count = conn.execute(text(f'SELECT COUNT(*) FROM "{grid_schema}"."{sub_table}"')).scalar()
+
+        logger.info(f"ST_Subdivide table ready: {count} pieces in {grid_schema}.{sub_table}")
+        return sub_table
+
+    def _cleanup_subdivided_table(self, grid_schema: str, sub_table: str) -> None:
+        """Drops the subdivided pieces table. Non-critical if it fails."""
+        try:
+            with self.engine.connect() as conn:
+                conn.execute(text(f'DROP TABLE IF EXISTS "{grid_schema}"."{sub_table}"'))
+                conn.commit()
+            logger.info(f"Cleaned up subdivided table: {grid_schema}.{sub_table}")
+        except Exception as e:
+            logger.warning(f"Failed to cleanup subdivided table {grid_schema}.{sub_table}: {e}")
+
+    def create_grid_graph_nodes_and_edges(self, polygon: Union[Polygon, MultiPolygon], spacing: float, max_edge_factor: float = 2.0, max_points: int = 1000000, max_subdivision_factor: int = 4, table_prefix: str = "graph", grid_schema: str = "grid") -> Dict[str, Any]:
         """
         Creates graph nodes and edges using PostGIS spatial operations with spatial subdivision for large grids.
         Returns nodes and edges data that can be used to construct a NetworkX graph.
@@ -4029,7 +4119,13 @@ class PostGISManager:
             max_subdivision_factor: Maximum subdivision factor for grid subdivision (e.g., 4 = 4x4 = 16 regions).
                                     Higher values (5+) create more regions but use more memory. WARNING:
                                     Values > 4 may cause significant memory usage.
+            table_prefix: Prefix for the navigable area table name (e.g., graph name).
+            grid_schema: Schema for the navigable area table (default: "grid").
         """
+
+        # Write polygon to indexed table for GiST-accelerated ST_Contains
+        nav_table = self._ensure_navigable_area_table(grid_schema, table_prefix)
+        self._write_polygon_to_indexed_table(polygon, grid_schema, nav_table)
 
         # Warn user if using high subdivision factor
         if max_subdivision_factor > 4:
@@ -4053,21 +4149,14 @@ class PostGISManager:
         # Use spatial subdivision for large grids
         if expected_points > max_points:
             logger.info(f"Using spatial subdivision (threshold: {max_points:,} points)")
-            return self._create_grid_graph_subdivided(polygon, spacing, max_edge_factor, max_points, max_subdivision_factor)
+            return self._create_grid_graph_subdivided(polygon, spacing, max_edge_factor, max_points, max_subdivision_factor, grid_schema, nav_table, table_prefix=table_prefix)
         else:
             logger.info("Using single-query approach")
-            return self._create_grid_graph_single(polygon, spacing, max_edge_factor)
+            return self._create_grid_graph_single(spacing, max_edge_factor, minx, miny, maxx, maxy, grid_schema, nav_table)
 
-    def _create_grid_graph_single(self, polygon: Union[Polygon, MultiPolygon], spacing: float, max_edge_factor: float) -> Dict[str, Any]:
-        """
-        Creates graph nodes and edges for a single polygon using PostGIS.
-        """
-        minx, miny, maxx, maxy = polygon.bounds
-        max_edge_length = spacing * max_edge_factor
-
-        # Optimized SQL query that mimics numpy approach by using explicit directional offsets
-        # This avoids the expensive O(n²) cartesian join and creates edges more efficiently
-        grid_query = text("""
+    def _build_grid_query(self, contains_expr: str) -> text:
+        """Builds the grid graph SQL query with a parameterized ST_Contains expression."""
+        return text(f"""
         WITH grid_points AS (
             SELECT
                 series_x.x,
@@ -4083,19 +4172,7 @@ class PostGISManager:
         valid_points AS (
             SELECT x, y, geom
             FROM grid_points
-            WHERE ST_Contains(ST_GeomFromText(:polygon_wkt, 4326), geom)
-        ),
-        -- Define 8 directional offsets (like numpy approach)
-        directions AS (
-            VALUES
-                (CAST(:spacing AS numeric), 0),                      -- East
-                (0, CAST(:spacing AS numeric)),                      -- North
-                (-CAST(:spacing AS numeric), 0),                     -- West
-                (0, -CAST(:spacing AS numeric)),                     -- South
-                (CAST(:spacing AS numeric), CAST(:spacing AS numeric)),    -- Northeast
-                (CAST(:spacing AS numeric), -CAST(:spacing AS numeric)),   -- Southeast
-                (-CAST(:spacing AS numeric), CAST(:spacing AS numeric)),   -- Northwest
-                (-CAST(:spacing AS numeric), -CAST(:spacing AS numeric))   -- Southwest
+            WHERE {contains_expr}
         ),
         graph_edges AS (
             SELECT DISTINCT
@@ -4124,17 +4201,49 @@ class PostGISManager:
             (SELECT json_agg(json_build_object('source_x', source_x, 'source_y', source_y, 'target_x', target_x, 'target_y', target_y, 'weight', weight)) FROM graph_edges) AS edges
         """)
 
+    def _create_grid_graph_single(self, spacing: float, max_edge_factor: float,
+                                   minx: float, miny: float, maxx: float, maxy: float,
+                                   grid_schema: str, nav_table: str,
+                                   polygon: Union[Polygon, MultiPolygon, None] = None,
+                                   sub_table: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Creates graph nodes and edges for a bounded region using PostGIS.
+
+        Three modes:
+        - sub_table mode: GiST-indexed ST_Subdivide pieces (fastest for large polygons)
+        - polygon mode: inline WKT from clipped sub-polygon (fallback)
+        - single-query mode: scalar subquery from indexed nav_table (small grids)
+        """
+        max_edge_length = spacing * max_edge_factor
+
+        if sub_table is not None:
+            contains_expr = (
+                f'EXISTS (SELECT 1 FROM "{grid_schema}"."{sub_table}" sub '
+                f'WHERE ST_Contains(sub.geom, grid_points.geom))'
+            )
+            params = {
+                'minx': minx, 'miny': miny, 'maxx': maxx, 'maxy': maxy,
+                'spacing': spacing, 'max_edge_length': max_edge_length
+            }
+        elif polygon is not None:
+            contains_expr = "ST_Contains(ST_GeomFromText(:polygon_wkt, 4326), geom)"
+            params = {
+                'minx': minx, 'miny': miny, 'maxx': maxx, 'maxy': maxy,
+                'spacing': spacing, 'max_edge_length': max_edge_length,
+                'polygon_wkt': polygon.wkt
+            }
+        else:
+            contains_expr = f'ST_Contains((SELECT geom FROM "{grid_schema}"."{nav_table}" LIMIT 1), geom)'
+            params = {
+                'minx': minx, 'miny': miny, 'maxx': maxx, 'maxy': maxy,
+                'spacing': spacing, 'max_edge_length': max_edge_length
+            }
+
+        grid_query = self._build_grid_query(contains_expr)
+
         try:
             with self.engine.connect() as conn:
-                result = conn.execute(grid_query, {
-                    'minx': minx,
-                    'miny': miny,
-                    'maxx': maxx,
-                    'maxy': maxy,
-                    'spacing': spacing, # This is already a float
-                    'max_edge_length': max_edge_length,
-                    'polygon_wkt': polygon.wkt
-                }).fetchone()
+                result = conn.execute(grid_query, params).fetchone()
 
                 if not result:
                     logger.warning("PostGIS graph creation query returned no results.")
@@ -4146,35 +4255,33 @@ class PostGISManager:
 
                 return {
                     'nodes': nodes_json,
-                    'edges': edges_json
+                    'edges': edges_json,
+                    'subdivision_factor': 1
                 }
 
         except SQLAlchemyError as e:
             logger.error(f"Error executing PostGIS graph creation: {e}")
-            return {'nodes': [], 'edges': []}
+            return {'nodes': [], 'edges': [], 'subdivision_factor': 1}
 
-    def _create_grid_graph_subdivided(self, polygon: Union[Polygon, MultiPolygon], spacing: float, max_edge_factor: float, max_points: int, max_subdivision_factor: int = 4) -> Dict[str, Any]:
+    def _create_grid_graph_subdivided(self, polygon: Union[Polygon, MultiPolygon], spacing: float, max_edge_factor: float, max_points: int, max_subdivision_factor: int, grid_schema: str, nav_table: str, table_prefix: str = "graph") -> Dict[str, Any]:
         """
-        Creates graph nodes and edges using spatial subdivision for large polygons.
+        Creates graph nodes and edges using ST_Subdivide for large polygons.
 
-        Args:
-            polygon: The polygon/multipolygon to create grid within
-            spacing: Grid spacing in degrees
-            max_edge_factor: Maximum edge length as multiple of spacing
-            max_points: Maximum points per subdivision to avoid memory issues
-            max_subdivision_factor: Maximum subdivision factor for grid subdivision (e.g., 4 = 4x4 = 16 regions).
+        Shatters the navigable polygon into small indexed pieces, then queries
+        each spatial region against the GiST-indexed subdivided table for fast
+        point-in-polygon checks.
         """
 
         minx, miny, maxx, maxy = polygon.bounds
         expected_points = int((maxx - minx) / spacing) * int((maxy - miny) / spacing)
 
-        # Calculate subdivision factor based on expected points
         subdivision_factor = max(2, int((expected_points / max_points) ** 0.5) + 1)
-        subdivision_factor = min(subdivision_factor, max_subdivision_factor)  # Use max_subdivision_factor instead of hardcoded 4
+        subdivision_factor = min(subdivision_factor, max_subdivision_factor)
+
+        sub_table = self._create_subdivided_table(grid_schema, table_prefix, nav_table)
 
         logger.info(f"Subdividing into {subdivision_factor}x{subdivision_factor} grid ({subdivision_factor**2} regions)")
 
-        # Create subdivision grid
         x_step = (maxx - minx) / subdivision_factor
         y_step = (maxy - miny) / subdivision_factor
 
@@ -4182,47 +4289,58 @@ class PostGISManager:
         all_edges = []
         processed_regions = 0
 
-        for i in range(subdivision_factor):
-            for j in range(subdivision_factor):
-                # Create subdivision bounds
-                sub_minx = minx + i * x_step
-                sub_maxx = minx + (i + 1) * x_step
-                sub_miny = miny + j * y_step
-                sub_maxy = miny + (j + 1) * y_step
+        try:
+            for i in range(subdivision_factor):
+                for j in range(subdivision_factor):
+                    sub_minx = minx + i * x_step
+                    sub_maxx = minx + (i + 1) * x_step
+                    sub_miny = miny + j * y_step
+                    sub_maxy = miny + (j + 1) * y_step
 
-                # Create subdivision box and intersect with original polygon
-                sub_box = box(sub_minx, sub_miny, sub_maxx, sub_maxy)
-                sub_polygon = polygon.intersection(sub_box)
+                    processed_regions += 1
+                    logger.info(f"Processing region {processed_regions}/{subdivision_factor**2}: "
+                              f"({sub_minx:.4f}, {sub_miny:.4f}) to ({sub_maxx:.4f}, {sub_maxy:.4f})")
 
-                # Skip empty intersections
-                if sub_polygon.is_empty or sub_polygon.area < spacing**2:
-                    continue
+                    result = self._create_grid_graph_single(spacing, max_edge_factor,
+                                                             sub_minx, sub_miny, sub_maxx, sub_maxy,
+                                                             grid_schema, nav_table,
+                                                             sub_table=sub_table)
 
-                processed_regions += 1
-                logger.info(f"Processing region {processed_regions}/{subdivision_factor**2}: "
-                          f"({sub_minx:.4f}, {sub_miny:.4f}) to ({sub_maxx:.4f}, {sub_maxy:.4f})")
+                    if result['nodes']:
+                        all_nodes.extend(result['nodes'])
+                    if result['edges']:
+                        all_edges.extend(result['edges'])
 
-                # Process this subdivision
-                result = self._create_grid_graph_single(sub_polygon, spacing, max_edge_factor)
+            logger.info(f"Processed {processed_regions} regions. Total: {len(all_nodes):,} nodes, {len(all_edges):,} edges")
 
-                if result['nodes']:
-                    all_nodes.extend(result['nodes'])
-                if result['edges']:
-                    all_edges.extend(result['edges'])
+            # Deduplicate nodes — region boundary points appear in both adjacent regions
+            if all_nodes:
+                seen = set()
+                deduped_nodes = []
+                for n in all_nodes:
+                    key = (n['x'], n['y'])
+                    if key not in seen:
+                        seen.add(key)
+                        deduped_nodes.append(n)
+                dupe_count = len(all_nodes) - len(deduped_nodes)
+                if dupe_count > 0:
+                    logger.info(f"Deduplicated {dupe_count:,} boundary nodes")
+                all_nodes = deduped_nodes
 
-        logger.info(f"Processed {processed_regions} regions. Total: {len(all_nodes):,} nodes, {len(all_edges):,} edges")
+            # Connect boundary nodes between adjacent regions
+            if all_nodes:
+                logger.info("Connecting boundary nodes between regions...")
+                boundary_edges = self._connect_boundary_nodes(all_nodes, spacing, max_edge_factor)
+                all_edges.extend(boundary_edges)
+                logger.info(f"Added {len(boundary_edges):,} boundary connections")
 
-        # Connect boundary nodes between adjacent regions
-        if len(all_nodes) > 0:
-            logger.info("Connecting boundary nodes between regions...")
-            boundary_edges = self._connect_boundary_nodes(all_nodes, spacing, max_edge_factor)
-            all_edges.extend(boundary_edges)
-            logger.info(f"Added {len(boundary_edges):,} boundary connections")
-
-        return {
-            'nodes': all_nodes,
-            'edges': all_edges
-        }
+            return {
+                'nodes': all_nodes,
+                'edges': all_edges,
+                'subdivision_factor': subdivision_factor
+            }
+        finally:
+            self._cleanup_subdivided_table(grid_schema, sub_table)
 
     def _connect_boundary_nodes(self, nodes: List[Dict], spacing: float, max_edge_factor: float) -> List[Dict]:
         """

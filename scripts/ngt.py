@@ -12,6 +12,7 @@ Usage:
 
 import argparse
 import atexit
+import math
 import subprocess
 import sys
 import tempfile
@@ -41,6 +42,11 @@ try:
     from nautical_graph_toolkit import __version__
 except ImportError:
     __version__ = "dev"
+
+try:
+    from nautical_graph_toolkit.utils.port_utils import PortData
+except ImportError:
+    PortData = None  # type: ignore[assignment,misc]
 
 console = Console()
 
@@ -115,8 +121,68 @@ def discover_configs() -> list[str]:
     return sorted(p.name for p in CONFIG_DIR.glob("*.yml")) if CONFIG_DIR.exists() else []
 
 
+def discover_graph_files() -> list[str]:
+    """Discover .gpkg graph files in output/ and data/ directories.
+
+    Returns sorted list of unique graph names (file stems).
+    Filters out known non-graph files (ENC sources, routes, buffer geometry utils).
+    """
+    _skip = {
+        "enc_west", "maritime_routes", "base_graph",
+        "land_geometry_utils",
+    }
+    names: set[str] = set()
+    for search_dir in (DATA_DIR, PROJECT_ROOT / "output"):
+        if search_dir.exists():
+            for gpkg in search_dir.glob("*.gpkg"):
+                stem = gpkg.stem
+                if stem in _skip or stem.endswith("_geometry_utils"):
+                    continue
+                names.add(stem)
+    return sorted(names)
+
+
+def _compute_graph_names(cfg: dict) -> tuple[str, str]:
+    """Compute source/target graph names from config (mirrors WorkflowConfig)."""
+    fine_cfg = cfg.get("fine_graph", {})
+    mode = fine_cfg.get("mode", "fine")
+    suffix = fine_cfg.get("name_suffix", "20")
+    return f"{mode}_graph_{suffix}", f"{mode}_graph_wt_{suffix}"
+
+
+def prompt_graph_name(label: str, default: str, graph_files: list[str] | None = None) -> str | None:
+    """Prompt for a graph name with autocomplete if graph files discovered."""
+    if graph_files:
+        result = questionary.autocomplete(
+            f"{label} (type or select):",
+            choices=graph_files,
+            default=default,
+            style=DARK_STYLE,
+        ).ask()
+    else:
+        result = questionary.text(
+            f"{label}:",
+            default=default,
+            style=DARK_STYLE,
+        ).ask()
+    if result:
+        stripped = result.strip()
+        # Strip .gpkg extension if user pasted a filename
+        return stripped.rsplit(".gpkg", 1)[0] if stripped.endswith(".gpkg") else stripped
+    return None
+
+
+_BACK = object()
+
+
 def prompt_config() -> str | None:
-    """Prompt user to select a config file, or auto-select if only one exists."""
+    """Prompt user to select a config file, or auto-select if only one exists.
+
+    Returns:
+        str: path to selected config
+        None: no config files found (skip prompt)
+        _BACK: user selected Back / cancelled
+    """
     configs = discover_configs()
     if not configs:
         return None
@@ -129,7 +195,7 @@ def prompt_config() -> str | None:
         style=DARK_STYLE,
     ).ask()
     if selected is None or selected == BACK_OPTION:
-        return None
+        return _BACK
     return str(CONFIG_DIR / selected)
 
 
@@ -140,6 +206,17 @@ def show_title():
         border_style="cyan",
         padding=(1, 4),
     ))
+
+
+def _fmt_slice_str(fine_cfg: dict) -> str:
+    buf = f"{fine_cfg.get('buffer_size_nm', '?')} NM, slice={fine_cfg.get('slice_buffer', False)}"
+    if fine_cfg.get('slice_buffer'):
+        parts = []
+        for side in ('south', 'north', 'west', 'east'):
+            v = fine_cfg.get(f'slice_{side}_degree')
+            parts.append(f"{side[0].upper()}={'--' if v is None else f'{v:.2f}'}")
+        buf += f" [{', '.join(parts)}]"
+    return buf
 
 
 def show_config_table(cfg: dict):
@@ -162,7 +239,7 @@ def show_config_table(cfg: dict):
         ("Vessel",
          f"{vessel_cfg.get('vessel_type', '?')}, draft={vessel_cfg.get('draft', '?')}m"),
         ("Fine buffer",
-         f"{fine_cfg.get('buffer_size_nm', '?')} NM, slice={fine_cfg.get('slice_buffer', False)}"),
+         _fmt_slice_str(fine_cfg)),
         ("Weights class", str(wt_cfg.get('weights_class', 'weights'))),
         ("Buffer method", str(wt_cfg.get('buffer_method', 'auto'))),
         ("Aggr mode", str(wt_cfg.get('aggr_mode', 'exp'))),
@@ -227,7 +304,6 @@ def load_port_names() -> list[str] | None:
     Returns None if the port database is unavailable.
     """
     try:
-        from nautical_graph_toolkit.utils.port_utils import PortData
         port_db = PortData()
         return port_db.get_port_names()
     except Exception as e:
@@ -565,36 +641,147 @@ def flow_import(cfg: dict):
 
 # ── Graph flow ───────────────────────────────────────────────────────
 
-def expand_bounding_box(current_bbox: dict) -> dict:
-    """Expand bbox by degree increments. N/E increase, S/W decrease."""
-    increments = [0.001, 0.01, 0.1, 1.0]
+def _resolve_reference_bbox(cfg: dict) -> dict[str, float] | None:
+    """Derive a raw port-to-port bbox from config coords or port database.
+
+    Returns unexpanded boundaries — outward rounding in prompt_slice_boundaries
+    provides the expansion mechanism. Priority: fine_graph coords → base_graph
+    coords → port DB lookup.
+    """
+    def _coords_from_config(section: dict) -> tuple[tuple[float, float], tuple[float, float]] | None:
+        dep = section.get("departure_coords")
+        arr = section.get("arrival_coords")
+        if (dep and isinstance(dep, dict) and "lon" in dep and "lat" in dep
+                and arr and isinstance(arr, dict) and "lon" in arr and "lat" in arr):
+            return ((dep["lon"], dep["lat"]), (arr["lon"], arr["lat"]))
+        return None
+
+    fine_cfg = cfg.get("fine_graph", {})
+    base_cfg = cfg.get("base_graph", {})
+    coords = _coords_from_config(fine_cfg) or _coords_from_config(base_cfg)
+
+    if not coords:
+        dep_name = fine_cfg.get("departure_port") or base_cfg.get("departure_port")
+        arr_name = fine_cfg.get("arrival_port") or base_cfg.get("arrival_port")
+
+        if dep_name and arr_name:
+            try:
+                port_db = PortData()
+                dep_port = port_db.get_port_by_name(dep_name)
+                arr_port = port_db.get_port_by_name(arr_name)
+                if dep_port is not None and arr_port is not None:
+                    coords = (
+                        (dep_port.geometry.x, dep_port.geometry.y),
+                        (arr_port.geometry.x, arr_port.geometry.y),
+                    )
+            except Exception as e:
+                console.print(f"[dim]Port DB lookup failed: {e}[/dim]")
+
+    if coords:
+        dep, arr = coords
+        bbox = {
+            "south": min(dep[1], arr[1]),
+            "north": max(dep[1], arr[1]),
+            "west":  min(dep[0], arr[0]),
+            "east":  max(dep[0], arr[0]),
+        }
+        dep_name = fine_cfg.get("departure_port") or base_cfg.get("departure_port", "?")
+        arr_name = fine_cfg.get("arrival_port") or base_cfg.get("arrival_port", "?")
+        console.print(f"[dim]Slice defaults from: {dep_name} → {arr_name}[/dim]")
+        return bbox
+
+    console.print("[yellow]No port coordinates found — enter slice boundaries manually[/yellow]")
+    return None
+
+
+def _outward_round(value: float, decimals: int, side: str) -> float:
+    """Round value outward for the given bbox side.
+
+    South/West: floor (expand down/left).
+    North/East: ceil (expand up/right).
+    """
+    factor = 10 ** decimals
+    if side in ("south", "west"):
+        return math.floor(value * factor) / factor
+    return math.ceil(value * factor) / factor
+
+
+def prompt_slice_boundaries(current_bbox: dict, ref_bbox: dict | None = None) -> dict:
+    """Prompt user to set slice boundaries with outward-only rounding choices.
+
+    Each boundary offers: None (unrestricted), outward rounding levels, or keep current.
+    Rounding precisions are proportional to the reference bbox span.
+    When ref_bbox is None, uses 1.0° default span for rounding calculations.
+    """
+    lat_span = (ref_bbox["north"] - ref_bbox["south"]) if ref_bbox else 1.0
+    lon_span = (ref_bbox["east"] - ref_bbox["west"]) if ref_bbox else 1.0
+
     result = {}
 
-    boundaries = {
-        "North": (current_bbox["north"], +1),
-        "South": (current_bbox["south"], -1),
-        "East":  (current_bbox["east"],  +1),
-        "West":  (current_bbox["west"],  -1),
+    sides = {
+        "North": ("north", lat_span),
+        "South": ("south", lat_span),
+        "East":  ("east",  lon_span),
+        "West":  ("west",  lon_span),
     }
 
-    for name, (val, direction) in boundaries.items():
-        choices = []
-        for inc in increments:
-            new_val = round(val + inc * direction, 4)
-            default = " (default)" if inc == 0.001 else ""
-            choices.append(f"{new_val}°{default}")
+    for name, (key, span) in sides.items():
+        val = current_bbox.get(key)
+        val_str = f"{val:.4f}" if val is not None else "auto"
+        choices = ["None (unrestricted)"]
+        choice_values: list[float | None] = [None]
+
+        # Compute rounding precisions proportional to span
+        # span ~5° → decimals [3, 2, 1, 0]; span ~0.5° → [4, 3, 2, 1, 0]
+        base_precision = max(0, 1 - int(math.log10(max(span, 0.01))))
+        precisions = list(range(base_precision + 2, -2, -1))
+        precisions = [p for p in precisions if 0 <= p <= 4]
+
+        seen = set()
+        for dec in precisions:
+            rounded = _outward_round(val, dec, key)
+            rounded = round(rounded, max(dec, 0))
+            # If value is already at this rounding level, skip fine precisions
+            # and step one unit outward at coarser precisions (dec <= 0)
+            if rounded == val:
+                if dec >= 1:
+                    continue
+                step = 10.0 ** (-dec)
+                if key in ("south", "west"):
+                    rounded = val - step
+                else:
+                    rounded = val + step
+                rounded = round(rounded, max(dec, 0))
+            if rounded in seen:
+                continue
+            seen.add(rounded)
+            choices.append(f"{rounded:.{max(dec, 0)}f}°")
+            choice_values.append(rounded)
+
+        # Extra 1° outward step beyond degree-0 rounding
+        deg0 = _outward_round(val, 0, key)
+        extra = deg0 - 1.0 if key in ("south", "west") else deg0 + 1.0
+        extra = round(extra, 0)
+        if extra not in seen:
+            seen.add(extra)
+            choices.append(f"{extra:.0f}°")
+            choice_values.append(extra)
+
+        keep_label = f"Keep {val_str}° (current) (default)"
+        choices.append(keep_label)
+        choice_values.append(val)
 
         answer = questionary.select(
-            f"{name} boundary (current: {val}°):",
+            f"{name} boundary (current: {val_str}°):",
             choices=choices,
             style=DARK_STYLE,
         ).ask()
 
-        if answer is None:
-            return current_bbox
-
-        idx = choices.index(answer)
-        result[name.lower()] = round(val + increments[idx] * direction, 4)
+        if answer is None or answer == keep_label:
+            result[key] = val
+        else:
+            idx = choices.index(answer)
+            result[key] = choice_values[idx]
 
     return result
 
@@ -677,7 +864,7 @@ def prompt_base_graph_params(cfg: dict) -> dict:
 
 
 def prompt_fine_graph_params(cfg: dict) -> dict:
-    """Fine graph parameters: ports, buffer, slice_buffer with expand_bounding_box."""
+    """Fine graph parameters: ports, buffer, slice_buffer with outward rounding."""
     fine_cfg = cfg.get("fine_graph", {})
     result = {}
 
@@ -707,6 +894,17 @@ def prompt_fine_graph_params(cfg: dict) -> dict:
         except ValueError:
             pass
 
+    # Patch cfg so _resolve_reference_bbox sees the new ports.
+    # Clear stale hardcoded coords so the function falls through
+    # to a fresh port DB lookup with the correct coordinates.
+    fine_section = cfg.setdefault("fine_graph", {})
+    if "departure_port" in result:
+        fine_section["departure_port"] = result["departure_port"]
+        fine_section.pop("departure_coords", None)
+    if "arrival_port" in result:
+        fine_section["arrival_port"] = result["arrival_port"]
+        fine_section.pop("arrival_coords", None)
+
     use_slice = questionary.confirm(
         "Enable slice buffer?",
         default=fine_cfg.get("slice_buffer", False),
@@ -715,18 +913,49 @@ def prompt_fine_graph_params(cfg: dict) -> dict:
     result["slice_buffer"] = use_slice
 
     if use_slice:
-        current_bbox = {
-            "south": fine_cfg.get("slice_south_degree", 37.0),
-            "north": fine_cfg.get("slice_north_degree", 38.0),
-            "west":  fine_cfg.get("slice_west_degree", -123.5),
-            "east":  fine_cfg.get("slice_east_degree", -122.0),
-        }
-        console.print("\n[bold]Slice Buffer Boundaries[/bold] (select expansion per boundary)")
-        expanded = expand_bounding_box(current_bbox)
-        result["slice_south_degree"] = expanded.get("south", current_bbox["south"])
-        result["slice_north_degree"] = expanded.get("north", current_bbox["north"])
-        result["slice_west_degree"]  = expanded.get("west", current_bbox["west"])
-        result["slice_east_degree"]  = expanded.get("east", current_bbox["east"])
+        ref_bbox = _resolve_reference_bbox(cfg)
+
+        if ref_bbox:
+            current_bbox = {
+                "south": ref_bbox["south"],
+                "north": ref_bbox["north"],
+                "west":  ref_bbox["west"],
+                "east":  ref_bbox["east"],
+            }
+        else:
+            manual = questionary.form(
+                south=questionary.text("South boundary (°):", default="0.0", style=DARK_STYLE),
+                north=questionary.text("North boundary (°):", default="1.0", style=DARK_STYLE),
+                west=questionary.text("West boundary (°):", default="0.0", style=DARK_STYLE),
+                east=questionary.text("East boundary (°):", default="1.0", style=DARK_STYLE),
+            ).ask()
+            if not manual:
+                result["slice_buffer"] = False
+                return result
+            current_bbox = {}
+            for k in ("south", "north", "west", "east"):
+                try:
+                    current_bbox[k] = float(manual.get(k, "0").strip())
+                except ValueError:
+                    current_bbox[k] = None
+
+            if (current_bbox.get("south") is not None and current_bbox.get("north") is not None
+                    and current_bbox["south"] >= current_bbox["north"]):
+                console.print("[bold red]Invalid: South must be less than North. Slice buffer disabled.[/bold red]")
+                result["slice_buffer"] = False
+                return result
+            if (current_bbox.get("west") is not None and current_bbox.get("east") is not None
+                    and current_bbox["west"] >= current_bbox["east"]):
+                console.print("[bold red]Invalid: West must be less than East. Slice buffer disabled.[/bold red]")
+                result["slice_buffer"] = False
+                return result
+
+        console.print("\n[bold]Slice Buffer Boundaries[/bold] (select rounding per boundary)")
+        boundaries = prompt_slice_boundaries(current_bbox, ref_bbox)
+        result["slice_south_degree"] = boundaries.get("south", current_bbox.get("south"))
+        result["slice_north_degree"] = boundaries.get("north", current_bbox.get("north"))
+        result["slice_west_degree"]  = boundaries.get("west", current_bbox.get("west"))
+        result["slice_east_degree"]  = boundaries.get("east", current_bbox.get("east"))
 
     return result
 
@@ -873,6 +1102,8 @@ def flow_graph(cfg: dict):
         return
 
     config_path = prompt_config()
+    if config_path is _BACK:
+        return
     if config_path:
         cfg = load_config_from(config_path)
     else:
@@ -881,6 +1112,7 @@ def flow_graph(cfg: dict):
     dry_run = prompt_dry_run()
 
     graph_mode = cfg.get("fine_graph", {}).get("mode", "h3")
+    cmd_flags: list[str] = []
 
     if not dry_run:
         # ── BASIC SETUP (unchanged) ──────────────────────────────────────
@@ -947,7 +1179,6 @@ def flow_graph(cfg: dict):
 
         # ── CASCADING SKIP/EDIT PHASE ────────────────────────────────────
         skips = prompt_skip_steps()
-        cmd_flags = []
 
         # Map skips to CLI flags
         if skips["skip_base"]:
@@ -1096,7 +1327,7 @@ def get_extra_weights_flags() -> list[str]:
     return flags
 
 
-def prompt_workflow_overrides(cfg: dict, backend: str) -> list[str]:
+def prompt_workflow_overrides(backend: str) -> list[str]:
     """Workflow-level CLI overrides: output_dir, mode, data_dir."""
     edit = questionary.confirm("Workflow overrides?", default=False, style=DARK_STYLE).ask()
     if not edit:
@@ -1140,6 +1371,8 @@ def flow_weights(cfg: dict):
         return
 
     config_path = prompt_config()
+    if config_path is _BACK:
+        return
     if config_path:
         cfg = load_config_from(config_path)
     else:
@@ -1155,7 +1388,6 @@ def flow_weights(cfg: dict):
         if port_names:
             console.print("\n[bold]Port Selection[/bold] (Enter to keep current)")
             pf_cfg = cfg.get("pathfinding", {})
-            fine_cfg = cfg.get("fine_graph", {})
 
             pf_dep = prompt_port(
                 port_names, "Pathfinding departure port",
@@ -1191,31 +1423,30 @@ def flow_weights(cfg: dict):
         # ── Cascading parameter customization ──
         wt_cfg = cfg.get("weighting", {})
 
+        # Compute default graph names from config (mirrors WorkflowConfig logic)
+        default_source, default_target = _compute_graph_names(cfg)
+
+        # Discover existing graph files for GeoPackage autocomplete
+        graph_files = discover_graph_files() if backend == "geopackage" else None
+
         # Target graph: always needed (downstream steps depend on it)
-        graph_names = cfg.get("graph_names", {})
-        default_target = graph_names.get("fine_weighted", "")
         if prompt_step_edits("Target graph",
-            f"default: {default_target or '(auto)'}"):
-            target = questionary.text(
-                "Target directed graph:",
-                default=default_target,
-                style=DARK_STYLE,
-            ).ask()
+            f"default: {default_target}"):
+            target = prompt_graph_name(
+                "Target directed graph", default_target, graph_files,
+            )
             if target:
-                workflow_flags.extend(["--target-graph", target.strip()])
+                workflow_flags.extend(["--target-graph", target])
 
         # Source graph: only if directed conversion runs
-        default_source = graph_names.get("fine_undirected", "")
         if not skips["skip_directed"]:
             if prompt_step_edits("Directed conversion",
-                f"source: {default_source or '(auto)'}"):
-                source = questionary.text(
-                    "Source undirected graph:",
-                    default=default_source,
-                    style=DARK_STYLE,
-                ).ask()
+                f"source: {default_source}"):
+                source = prompt_graph_name(
+                    "Source undirected graph", default_source, graph_files,
+                )
                 if source:
-                    workflow_flags.extend(["--source-graph", source.strip()])
+                    workflow_flags.extend(["--source-graph", source])
 
         # Static weights
         if not skips["skip_static"]:
@@ -1267,7 +1498,7 @@ def flow_weights(cfg: dict):
                     config_path = _write_temp_config(cfg)
 
         # Workflow-level overrides (output_dir, usage_bands, mode, data_dir)
-        workflow_flags.extend(prompt_workflow_overrides(cfg, backend))
+        workflow_flags.extend(prompt_workflow_overrides(backend))
 
         # Build CLI flags from skips
         skip_flags = []

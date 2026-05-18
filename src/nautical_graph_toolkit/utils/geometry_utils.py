@@ -402,6 +402,7 @@ class Buffer:
         land_geometry: BaseGeometry,
         zone_distances_nm: Optional[List[float]] = None,
         buffer_mode: str = "fast",
+        simplify_tolerance: float = 0.0005,
     ) -> List[Dict[str, Any]]:
         """Build concentric ring zones around land geometry.
 
@@ -422,6 +423,9 @@ class Buffer:
         """
         if land_geometry is None or land_geometry.is_empty:
             raise ValueError("land_geometry must be a non-empty Shapely geometry")
+
+        if simplify_tolerance > 0:
+            land_geometry = land_geometry.simplify(simplify_tolerance, preserve_topology=True)
 
         if zone_distances_nm is None:
             zone_distances_nm = [3.0, 4.0, 12.0]
@@ -457,6 +461,7 @@ class Buffer:
         zone_distances_nm: Optional[List[float]] = None,
         buffer_mode: str = "fast",
         land_geom_col: str = "geometry",
+        simplify_tolerance: float = 0.0005,
     ) -> str:
         """Build SQL CTE string for concentric ring zones in PostGIS.
 
@@ -480,10 +485,18 @@ class Buffer:
 
         ctes: List[str] = []
 
-        # Land union CTE
+        # Land union CTE (double-simplify: individual polys first, then union result)
+        if simplify_tolerance > 0:
+            union_expr = (
+                f'ST_SimplifyPreserveTopology('
+                f'ST_Union(ST_SimplifyPreserveTopology("{land_geom_col}", {simplify_tolerance})), '
+                f'{simplify_tolerance})'
+            )
+        else:
+            union_expr = f'ST_Union("{land_geom_col}")'
         ctes.append(
             f'land AS (\n'
-            f'    SELECT ST_Union("{land_geom_col}") AS geom\n'
+            f'    SELECT {union_expr} AS geom\n'
             f'    FROM "{land_schema}"."{land_table}"\n'
             f')'
         )

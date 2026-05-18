@@ -4,15 +4,24 @@
 
 This unified quick-start guide covers all workflow types. Currently implemented:
 
-### PostGIS Workflow
-1. **`maritime_graph_postgis_workflow.py`** - Main executable script
+### Interactive CLI (Recommended)
+1. **`ngt.py`** - Interactive launcher with guided prompts, port autocomplete, and dry-run preview
 2. **`config/workflow_config.yml`** - Workflow configuration
-3. **`WORKFLOW_POSTGIS_GUIDE.md`** - Comprehensive documentation
 
-### GeoPackage/SpatiaLite Workflow
-1. **`maritime_graph_geopackage_workflow.py`** - Main executable script
+### Graph Pipeline (PostGIS)
+1. **`maritime_graph_postgis_workflow.py`** - Full pipeline script (base → fine → weights → routing)
+2. **`config/workflow_config.yml`** - Workflow configuration
+3. **[workflow-postgis-guide.md](../user-guides/workflow-postgis-guide.md)** - Comprehensive documentation
+
+### Graph Pipeline (GeoPackage)
+1. **`maritime_graph_geopackage_workflow.py`** - Full pipeline script
 2. **`config/workflow_config.yml`** - Workflow configuration (shared)
-3. **`WORKFLOW_GEOPACKAGE_GUIDE.md`** - Comprehensive documentation
+3. **[workflow-geopackage-guide.md](../user-guides/workflow-geopackage-guide.md)** - Comprehensive documentation
+
+### Weights Pipeline (Standalone)
+1. **`maritime_weights_workflow.py`** - Weight-only pipeline (enrich → static → directional → dynamic)
+2. **`config/workflow_config.yml`** - Workflow configuration (shared)
+3. **[workflow-weights-guide.md](../user-guides/workflow-weights-guide.md)** - Weights documentation
 
 ---
 
@@ -195,6 +204,20 @@ Download pre-processed ENC databases to skip the import step entirely — see th
 
 **IMPORTANT**: This assumes S-57 data has been imported. See "Prerequisites: Data Import Pipeline" above if you haven't run `import_s57.py` yet.
 
+### Interactive CLI (Easiest)
+
+```bash
+python scripts/ngt.py
+```
+
+The interactive launcher guides you through:
+- Workflow selection (S-57 Import, Graph Pipeline, Weights Pipeline)
+- Backend selection (PostGIS or GeoPackage)
+- Port selection with autocomplete
+- Vessel parameter configuration
+- Pipeline step skip/edit with dry-run preview
+- Command preview before execution
+
 ### PostGIS Workflow
 
 #### 1. Verify Configuration
@@ -341,14 +364,18 @@ python scripts/maritime_graph_postgis_workflow.py --config config/workflow_confi
 
 #### Step 5: Visualize Results
 ```bash
+# Workflow creates a timestamped output directory:
+# output/workflow_{graph}_{YYYYMMDD_HHMMSS}/
+ls output/
+
 # Check generated route
-cat output/detailed_route_7.5m_draft.geojson | head -50
+cat output/workflow_*/detailed_route_7.5m_draft.geojson | head -50
 
 # Open GeoPackage in QGIS
-open output/h3_graph_directed_pg_6_11.gpkg
+open output/workflow_*/h3_graph_directed_pg_6_11.gpkg
 
 # Check performance benchmarks
-cat output/benchmark_graph_base.csv
+cat output/workflow_*/benchmark_graph_base.csv
 ```
 
 ---
@@ -404,15 +431,15 @@ python scripts/maritime_graph_geopackage_workflow.py --config config/workflow_co
 
 #### Step 5: Share/Deploy
 ```bash
-# All outputs in single portable directory
-ls -lh output/
+# All outputs in timestamped portable directory
+ls -lh output/workflow_*/
 
 # Copy to USB drive or share
-tar -czf maritime_workflow.tar.gz output/*.gpkg docs/logs/
+tar -czf maritime_workflow.tar.gz output/workflow_*/ docs/logs/
 
 # On another machine, extract and open in QGIS (no server needed!)
 tar -xzf maritime_workflow.tar.gz
-open output/h3_graph_wt_20.gpkg
+open output/workflow_*/h3_graph_wt_20.gpkg
 ```
 
 ---
@@ -450,7 +477,7 @@ python scripts/maritime_graph_geopackage_workflow.py --config config/workflow_co
 # Previous: detailed_route_7.5m_draft.geojson (59.43 NM)
 # New: same file now has updated route
 
-cat output/detailed_route_7.5m_draft.geojson
+cat output/workflow_*/detailed_route_7.5m_draft.geojson
 ```
 
 ---
@@ -488,6 +515,9 @@ python scripts/maritime_graph_postgis_workflow.py --skip-base
 # Skip fine graph too
 python scripts/maritime_graph_postgis_workflow.py --skip-base --skip-fine
 
+# Only run pathfinding (skip base, fine, and weighting)
+python scripts/maritime_graph_postgis_workflow.py --skip-base --skip-fine --skip-weighting
+
 # Only run weighting and pathfinding
 python scripts/maritime_graph_postgis_workflow.py --skip-base --skip-fine
 ```
@@ -507,6 +537,23 @@ python scripts/maritime_graph_postgis_workflow.py --graph-mode fine
 python scripts/maritime_graph_postgis_workflow.py --vessel-draft 10.5
 
 # Override vessel in config file too for persistence
+```
+
+### Weight Manager Selection
+```bash
+# Use ML-optimized weights (per-layer tracking for GNN/PyTorch)
+python scripts/maritime_graph_postgis_workflow.py --weights-class weights-open
+
+# Default production weights (aggregated three-tier)
+python scripts/maritime_graph_postgis_workflow.py --weights-class weights
+```
+
+### Output Directory Override
+```bash
+# Override auto-generated timestamped directory
+python scripts/maritime_graph_postgis_workflow.py --output-dir output/my_custom_run
+
+# Default: auto-creates output/workflow_{graph}_{timestamp}/
 ```
 
 ### Debug Mode
@@ -551,17 +598,33 @@ fine_graph:
   buffer_size_nm: 24.0
   save_gpkg: true         # Save to GeoPackage
 
-# Vessel specifications
+# Three-tier weighting system
 weighting:
+  weights_class: "weights"    # "weights" (production) or "weights-open" (ML-optimized)
+  buffer_method: "auto"       # "auto", "fast" (degrees), "fine" (geodesic)
+  aggr_mode: exp              # "exp" (MULTIPLY) or "max" (GREATEST)
+  buffer_zones:
+    enabled: true             # Coastal proximity ring penalties
   vessel:
     draft: 7.5            # meters
     height: 30.0          # meters
     vessel_type: "cargo"
+  environment:
+    weather_factor: 1.2       # 1.0=good, >1.0=poor
+    visibility_factor: 1.1
+    time_of_day: "day"        # "day" or "night"
+
+# Pathfinding and route smoothing
+pathfinding:
+  astar_impl: "AstarMaritimeSmooth"  # "Astar", "AstarImproved", "AstarMaritime", "AstarMaritimeSmooth"
+  apply_smoothing: true                # Fillet smoothing on final route
 ```
 
-See `WORKFLOW_GUIDE.md` for complete reference.
+See the backend-specific guides for complete reference: [PostGIS guide](../user-guides/workflow-postgis-guide.md) or [GeoPackage guide](../user-guides/workflow-geopackage-guide.md).
 
 ## Output Files
+
+Workflow auto-creates timestamped output directories: `output/workflow_{graph}_{YYYYMMDD_HHMMSS}/`
 
 ### Database Tables (PostGIS)
 Auto-generated names from `fine_graph.mode` and `fine_graph.name_suffix`:
@@ -575,24 +638,30 @@ routes.base_routes                   # Base route
 ### GeoPackage Files
 Auto-generated names from `fine_graph.mode` and `fine_graph.name_suffix`:
 ```
-output/base_graph.gpkg
-output/{mode}_graph_{suffix}.gpkg         (e.g., h3_graph_20.gpkg)
-output/{mode}_graph_wt_{suffix}.gpkg      (e.g., h3_graph_wt_20.gpkg)
-output/maritime_routes.gpkg (GeoPackage only)
+output/workflow_{graph}_{timestamp}/base_graph.gpkg
+output/workflow_{graph}_{timestamp}/{mode}_graph_{suffix}.gpkg         (e.g., h3_graph_20.gpkg)
+output/workflow_{graph}_{timestamp}/{mode}_graph_wt_{suffix}.gpkg      (e.g., h3_graph_wt_20.gpkg)
+output/workflow_{graph}_{timestamp}/maritime_routes.gpkg (GeoPackage only)
 ```
 Open in QGIS for visualization
 
+### Debug GeoPackage (AstarMaritimeSmooth)
+```
+output/workflow_{graph}_{timestamp}/debug_*.gpkg    # Corridor, obstacles, paths for QGIS inspection
+```
+Generated when `pathfinding.debug_export_gpkg: true`
+
 ### Routes (GeoJSON)
 ```
-output/detailed_route_7.5m_draft.geojson
+output/workflow_{graph}_{timestamp}/detailed_route_7.5m_draft.geojson
 ```
 View in web map or GIS software
 
 ### Benchmarks (CSV)
 ```
-output/benchmark_graph_base.csv
-output/benchmark_graph_fine.csv
-output/benchmark_graph_weighted_directed.csv
+output/workflow_{graph}_{timestamp}/benchmark_graph_base.csv
+output/workflow_{graph}_{timestamp}/benchmark_graph_fine.csv
+output/workflow_{graph}_{timestamp}/benchmark_graph_weighted_directed.csv
 ```
 Track performance across runs
 
@@ -786,23 +855,30 @@ ls output/*.gpkg
 ```
 Project Root/
 ├── scripts/
+│   ├── ngt.py                                # Interactive CLI launcher (recommended entry point)
 │   ├── import_s57.py                        # S-57 import tool (Step 1)
-│   ├── maritime_graph_postgis_workflow.py   # PostGIS workflow (Step 2)
-│   └── maritime_graph_geopackage_workflow.py # GeoPackage workflow (Step 2)
+│   ├── maritime_graph_postgis_workflow.py   # PostGIS full pipeline (Step 2)
+│   ├── maritime_graph_geopackage_workflow.py # GeoPackage full pipeline (Step 2)
+│   ├── maritime_weights_workflow.py          # Standalone weights pipeline
+│   └── weight_benchmark.py                  # Cross-backend weight benchmarking
 │
 ├── config/
 │   ├── workflow_config.yml            # Workflow configuration (shared across backends)
 │   └── test_config.yml                # Integration test defaults (schemas, file paths)
 │
 ├── docs/
-│   ├── getting-started/               # Setup guides
-│   ├── user-guides/                   # Workflow documentation
-│   └── logs/                           # Auto-created log directory
+│   ├── getting-started/               # Setup guides (install, setup, this quickstart)
+│   ├── user-guides/                   # Workflow documentation (PostGIS, GeoPackage, weights, S-57 import)
+│   ├── project/                       # Changelog, roadmap, contributing
+│   ├── reference/                     # Technical specs, troubleshooting
+│   ├── notebooks/                     # Jupyter tutorials (13+ examples)
+│   └── logs/                          # Auto-created log directory
 │
-├── output/                             # Generated outputs (at project root)
-│   ├── *.gpkg                          # GeoPackage files (ENCs + graphs)
-│   ├── *.geojson                       # Route files
-│   └── benchmark_*.csv                 # Performance metrics
+├── output/                             # Generated outputs (timestamped subdirectories)
+│   └── workflow_{graph}_{timestamp}/   # Per-run output directory
+│       ├── *.gpkg                      # GeoPackage files (graphs + routes)
+│       ├── *.geojson                   # Route files
+│       └── benchmark_*.csv             # Performance metrics
 │
 ├── data/
 │   └── ENC_ROOT/                      # S-57 files (.000) - source data
@@ -829,13 +905,13 @@ Project Root/
 ## Complete Documentation
 
 ### Data Import (Step 1)
-- **WORKFLOW_S57_IMPORT_GUIDE.md** - Complete import reference (modes, backends, parameters)
-- **scripts/SCRIPTS_GUIDE.md** - Overview of all production scripts
+- **[workflow-s57-import-guide.md](../user-guides/workflow-s57-import-guide.md)** - Complete import reference (modes, backends, parameters)
+- **[scripts-guide.md](../user-guides/scripts-guide.md)** - Overview of all production scripts
 
 ### Maritime Workflows (Step 2)
-- **WORKFLOW_POSTGIS_GUIDE.md** - PostGIS backend deep dive
-- **WORKFLOW_GEOPACKAGE_GUIDE.md** - GeoPackage backend deep dive
-- **WORKFLOW_QUICKSTART.md** - This file (unified guide covering both)
+- **[workflow-postgis-guide.md](../user-guides/workflow-postgis-guide.md)** - PostGIS backend deep dive
+- **[workflow-geopackage-guide.md](../user-guides/workflow-geopackage-guide.md)** - GeoPackage backend deep dive
+- **[workflow-weights-guide.md](../user-guides/workflow-weights-guide.md)** - Weights pipeline documentation
 
 ### Configuration
 - **config/workflow_config.yml** - Workflow configuration (well-commented, shared across backends)

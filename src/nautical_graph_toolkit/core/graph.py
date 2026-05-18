@@ -242,6 +242,11 @@ class GraphUtils:
         return nautical_miles / 60.0
 
     @staticmethod
+    def _tuple_str(node) -> str:
+        """Stringify a coordinate tuple, ensuring plain Python floats."""
+        return str(tuple(float(c) for c in node))
+
+    @staticmethod
     def to_geojson_feature(geom):
         """
         Convert a Shapely geometry to GeoJSON string format.
@@ -274,15 +279,22 @@ class GraphUtils:
         Returns:
             Dict[int, Tuple[float, float]]: mapping node_id → (lon, lat) tuple
         """
+        def _parse(node_str):
+            try:
+                return ast.literal_eval(node_str)
+            except (ValueError, SyntaxError):
+                inner = node_str.strip()[1:-1]
+                return tuple(float(m.group(1)) for m in re.finditer(r'np\.\w+\(([-\d.e+]+)\)', inner))
+
         if isinstance(nodes_source, (str, Path)):
             nodes_gdf = gpd.read_file(nodes_source, layer='nodes')
             return {
-                int(row['id']): ast.literal_eval(row['node_str'])
+                int(row['id']): _parse(row['node_str'])
                 for _, row in nodes_gdf.iterrows()
             }
         elif hasattr(nodes_source, 'iterrows'):  # GeoDataFrame / DataFrame
             return {
-                int(row['id']): ast.literal_eval(row['node_str'])
+                int(row['id']): _parse(row['node_str'])
                 for _, row in nodes_source.iterrows()
             }
         else:  # NetworkX graph fallback
@@ -841,7 +853,7 @@ class BaseGraph:
 
         return final_result
 
-    def create_base_graph(self, grid_data: Union[str, Dict[str, Any]], spacing_nm: float = 0.1, keep_largest_component: bool = False, max_points: int = 1000000, max_edge_factor: float = 3, bridge_components: bool = False, max_subdivision_factor: int = 4) -> nx.Graph:
+    def create_base_graph(self, grid_data: Union[str, Dict[str, Any]], spacing_nm: float = 0.1, keep_largest_component: bool = False, max_points: int = 1000000, max_edge_factor: float = 3, bridge_components: bool = False, max_subdivision_factor: int = 4, table_prefix: str = None, grid_schema: str = "grid") -> nx.Graph:
         """
         Constructs a graph from a grid GeoJSON or grid dictionary from create_base_grid.
 
@@ -860,6 +872,8 @@ class BaseGraph:
             max_subdivision_factor (int): Maximum subdivision factor for grid subdivision (e.g., 4 = 4x4 = 16 regions).
                                           Higher values (5+) create more regions but use more memory. WARNING:
                                           Values > 4 may cause significant memory usage. Only used by PostGIS backend.
+            table_prefix (str): Prefix for the navigable area table (PostGIS only). Defaults to None.
+            grid_schema (str): Schema for the navigable area table (PostGIS only). Defaults to "grid".
 
         Returns:
             nx.Graph: The constructed graph.
@@ -928,11 +942,12 @@ class BaseGraph:
         self.performance.record_metric("polygon_type", type(polygon).__name__)
 
         logger.info(f"Starting subgraph creation for {type(polygon).__name__} with area {polygon_area:.6f} deg²")
-        graph = self.create_grid_subgraph(polygon, spacing_deg, max_points=max_points, max_edge_factor=max_edge_factor, max_subdivision_factor=max_subdivision_factor)
+        graph = self.create_grid_subgraph(polygon, spacing_deg, max_points=max_points, max_edge_factor=max_edge_factor, max_subdivision_factor=max_subdivision_factor, table_prefix=table_prefix, grid_schema=grid_schema)
 
         # Bridge disconnected components if requested
         if bridge_components and graph.number_of_nodes() > 0:
-            graph = self._bridge_disconnected_components(graph, spacing_deg, max_edge_factor)
+            actual_subdivision = graph.graph.get('subdivision_factor', 1)
+            graph = self._bridge_disconnected_components(graph, spacing_deg, max_edge_factor, actual_subdivision)
 
         if keep_largest_component and graph.number_of_nodes() > 0:
             self.performance.start_timer("largest_component_selection_time")
@@ -958,21 +973,16 @@ class BaseGraph:
 
         return graph
 
-    def _bridge_disconnected_components(self, graph: nx.Graph, spacing_deg: float, max_edge_factor: float) -> nx.Graph:
+    def _bridge_disconnected_components(self, graph: nx.Graph, spacing_deg: float, max_edge_factor: float, subdivision_factor: int = 1) -> nx.Graph:
         """
         Bridges nearby disconnected components in the graph by adding edges between close nodes.
-
-        This method addresses the issue where fine grids (<0.1 NM) can have artificial gaps due to
-        numerical precision or slight misalignments. It identifies disconnected components and adds
-        bridge edges between components that are within max_edge_factor * spacing distance.
-
-        The method is optimized for graphs created with spatial subdivision, targeting boundary
-        regions where subdivisions meet (common source of disconnections).
 
         Args:
             graph: The input graph with potential disconnected components
             spacing_deg: Grid spacing in decimal degrees
             max_edge_factor: Multiplier for maximum bridge distance (relative to spacing)
+            subdivision_factor: Actual subdivision grid size used by the database (e.g., 4 = 4×4).
+                                Pass 1 for single-query (no subdivision).
 
         Returns:
             Graph with bridge edges added between nearby components
@@ -1010,19 +1020,8 @@ class BaseGraph:
         range_x = max_x - min_x
         range_y = max_y - min_y
 
-        # Estimate grid size based on graph size (larger graphs = finer subdivision)
-        # Note: Database subdivides based on expected_points (polygon_area / spacing^2),
-        # while we only know actual node count after querying. Actual nodes are typically
-        # 40-60% of expected points due to land exclusion, so we use adjusted thresholds.
-        n_nodes = graph.number_of_nodes()
-        if n_nodes > 250_000:
-            grid_size = 4  # 4x4 = 16 regions (matches database's 4x4 for >~400K expected points)
-        elif n_nodes > 60_000:
-            grid_size = 3  # 3x3 = 9 regions (matches database's 3x3 for >~100K expected points)
-        elif n_nodes > 25_000:
-            grid_size = 2  # 2x2 = 4 regions (matches database's 2x2 for >~40K expected points)
-        else:
-            grid_size = 1  # No subdivision
+        # Use actual subdivision factor from database, not a node-count heuristic
+        grid_size = subdivision_factor
 
         # Generate all subdivision line coordinates
         subdivision_x_lines = []
@@ -1130,16 +1129,13 @@ class BaseGraph:
                     pair_distances = distances[close_pairs]
                     sorted_indices = np.argsort(pair_distances)
 
-                    # Determine bridging strategy based on node types
-                    if using_subdivision_i and using_subdivision_j:
-                        # FULL SEAM: Connect all close pairs at subdivision boundaries
-                        # This ensures proper navigation across region boundaries
-                        max_bridges_per_pair = len(sorted_indices)  # Connect all close pairs
-                        bridge_strategy = "seam"
-                    else:
-                        # LIMITED: Only a few connections for general boundaries
-                        max_bridges_per_pair = 3
-                        bridge_strategy = "sparse"
+                    # Bridge all close pairs regardless of boundary type.
+                    # The max_bridge_distance threshold already limits which nodes
+                    # qualify — capping non-seam connections to 3 edges causes
+                    # geographic gaps (sea area discontinuities) to remain only
+                    # partially connected.
+                    max_bridges_per_pair = len(sorted_indices)
+                    bridge_strategy = "seam" if (using_subdivision_i and using_subdivision_j) else "general"
 
                     added_for_pair = 0
 
@@ -1151,8 +1147,7 @@ class BaseGraph:
                         node_j = tuple(nodes_j[node_j_idx])
 
                         # Skip if either node already has enough bridge connections globally
-                        # For seam bridging, allow more connections per node
-                        max_connections_per_node = 8 if bridge_strategy == "seam" else 1
+                        max_connections_per_node = 8
 
                         if (global_bridge_connections.get(node_i, 0) >= max_connections_per_node or
                             global_bridge_connections.get(node_j, 0) >= max_connections_per_node):
@@ -1201,7 +1196,7 @@ class BaseGraph:
 
         return graph
 
-    def create_grid_subgraph(self, polygon: Union[Polygon, MultiPolygon], spacing: float, max_edge_factor: float = 2.0, max_points: int = 1000000, max_subdivision_factor: int = 4) -> nx.Graph:
+    def create_grid_subgraph(self, polygon: Union[Polygon, MultiPolygon], spacing: float, max_edge_factor: float = 2.0, max_points: int = 1000000, max_subdivision_factor: int = 4, table_prefix: str = None, grid_schema: str = "grid") -> nx.Graph:
         """
         Creates a graph for a single grid polygon with specified spacing.
         Uses database-side operations when possible to avoid memory issues.
@@ -1241,12 +1236,12 @@ class BaseGraph:
         # Try database-side graph creation first
         if hasattr(self.factory.manager, 'create_grid_graph_nodes_and_edges'):
             logger.info("Using database-side graph creation for improved performance")
-            return self._create_grid_subgraph_database_side(polygon, spacing, max_edge_factor, max_points, max_subdivision_factor)
+            return self._create_grid_subgraph_database_side(polygon, spacing, max_edge_factor, max_points, max_subdivision_factor, table_prefix=table_prefix, grid_schema=grid_schema)
         else:
             logger.info("Falling back to memory-based graph creation")
             return self._create_grid_subgraph_memory_based(polygon, spacing, max_edge_factor)
 
-    def _create_grid_subgraph_database_side(self, polygon: Union[Polygon, MultiPolygon], spacing: float, max_edge_factor: float = 2.0, max_points: int = 1000000, max_subdivision_factor: int = 4) -> nx.Graph:
+    def _create_grid_subgraph_database_side(self, polygon: Union[Polygon, MultiPolygon], spacing: float, max_edge_factor: float = 2.0, max_points: int = 1000000, max_subdivision_factor: int = 4, table_prefix: str = None, grid_schema: str = "grid") -> nx.Graph:
         """
         Creates a graph using database-side operations for better performance on large grids.
 
@@ -1268,7 +1263,9 @@ class BaseGraph:
             if manager_type == 'PostGISManager':
                 # PostGIS version supports max_points and max_subdivision_factor
                 graph_data = self.factory.manager.create_grid_graph_nodes_and_edges(
-                    polygon, spacing, max_edge_factor, max_points, max_subdivision_factor
+                    polygon, spacing, max_edge_factor, max_points, max_subdivision_factor,
+                    table_prefix=table_prefix or "graph",
+                    grid_schema=grid_schema
                 )
             else:
                 # GeoPackage/SpatiaLite versions don't support max_points or max_subdivision_factor
@@ -1302,6 +1299,7 @@ class BaseGraph:
 
             self.performance.record_metric("final_nodes", G.number_of_nodes())
             self.performance.record_metric("final_edges", G.number_of_edges())
+            G.graph['subdivision_factor'] = graph_data.get('subdivision_factor', 1)
 
             logger.info(f"NetworkX assembly completed in {assembly_time:.3f}s")
             logger.info(f"Database-side grid subgraph created: {G.number_of_nodes():,} nodes, {G.number_of_edges():,} edges in {total_time:.3f}s")
@@ -1471,7 +1469,7 @@ class BaseGraph:
             x, y = node
             nodes_data.append({
                 'id': node_id,
-                'node_str': str(node),
+                'node_str': GraphUtils._tuple_str(node),
                 'x': x,
                 'y': y,
                 'geometry': Point(node)
@@ -1494,8 +1492,8 @@ class BaseGraph:
                 'id': i,
                 'source_id': node_to_id[u],
                 'target_id': node_to_id[v],
-                'source_str': str(u),
-                'target_str': str(v),
+                'source_str': GraphUtils._tuple_str(u),
+                'target_str': GraphUtils._tuple_str(v),
                 'source_x': source_x,
                 'source_y': source_y,
                 'target_x': target_x,
@@ -1828,7 +1826,9 @@ class BaseGraph:
             edge_attrs = {}
             for col in edges_gdf.columns:
                 if col not in ['source_str', 'target_str', 'geometry', 'fid']:
-                    edge_attrs[col] = row[col]
+                    value = row[col]
+                    if pd.notna(value):
+                        edge_attrs[col] = value
 
             # Always include geometry
             edge_attrs['geom'] = row['geometry'].__geo_interface__
@@ -2392,7 +2392,7 @@ class BaseGraph:
                 x, y = node
                 nodes_data.append({
                     'id': node_id,
-                    'node_str': str(node),
+                    'node_str': GraphUtils._tuple_str(node),
                     'x': x,
                     'y': y,
                     'geometry': Point(node)
@@ -2733,7 +2733,7 @@ class BaseGraph:
                 x, y = node
                 nodes_data.append({
                     'id': node_id,
-                    'node_str': str(node),
+                    'node_str': GraphUtils._tuple_str(node),
                     'x': x,
                     'y': y,
                     'geometry': Point(node)

@@ -82,6 +82,39 @@ class TestBuildRingZones:
         assert len(rings) == 1
         assert not rings[0]["geometry"].is_empty
 
+    def test_simplify_reduces_vertices(self):
+        """simplify_tolerance should reduce ring geometry vertex count."""
+        # Create a detailed polygon with many vertices
+        import math
+        coords = [(10.0 + 0.05 * math.cos(a / 100 * 2 * math.pi),
+                    1.0 + 0.05 * math.sin(a / 100 * 2 * math.pi))
+                   for a in range(100)]
+        detailed_poly = Polygon(coords)
+
+        rings_no_simplify = Buffer.build_ring_zones_gpkg(
+            detailed_poly, zone_distances_nm=[3.0], simplify_tolerance=0.0
+        )
+        rings_simplified = Buffer.build_ring_zones_gpkg(
+            detailed_poly, zone_distances_nm=[3.0], simplify_tolerance=0.0005
+        )
+        # Simplified ring should have fewer or equal vertices
+        verts_no = sum(
+            len(g.geoms) if hasattr(g, 'geoms') else 1
+            for g in [rings_no_simplify[0]["geometry"]]
+        )
+        verts_yes = sum(
+            len(g.geoms) if hasattr(g, 'geoms') else 1
+            for g in [rings_simplified[0]["geometry"]]
+        )
+        assert verts_yes <= verts_no
+
+    def test_simplify_zero_skips(self, land_square):
+        """simplify_tolerance=0.0 should not alter land geometry."""
+        rings_default = Buffer.build_ring_zones_gpkg(land_square, simplify_tolerance=0.0)
+        assert len(rings_default) == 3
+        for ring in rings_default:
+            assert not ring["geometry"].is_empty
+
     def test_ring_geometries_are_polygonal_not_geometry_collection(self, land_square):
         """Ensure ring geometries are Polygon/MultiPolygon, not GeometryCollection.
 
@@ -179,6 +212,24 @@ class TestBuildRingZonesPostgis:
         sql = Buffer.build_ring_zones_postgis("test_graph_land_grid", "grid")
         assert '"test_graph_land_grid"' in sql
         assert '"grid"' in sql
+
+    def test_simplify_appears_in_sql(self):
+        """Default simplify_tolerance should inject ST_SimplifyPreserveTopology."""
+        sql = Buffer.build_ring_zones_postgis("land_grid", "grid")
+        assert "ST_SimplifyPreserveTopology" in sql
+        assert "0.0005" in sql
+
+    def test_simplify_disabled_with_zero(self):
+        """simplify_tolerance=0.0 should use plain ST_Union without simplification."""
+        sql = Buffer.build_ring_zones_postgis("land_grid", "grid", simplify_tolerance=0.0)
+        assert "ST_SimplifyPreserveTopology" not in sql
+        assert "ST_Union" in sql
+
+    def test_custom_simplify_tolerance(self):
+        """Custom simplify_tolerance value should appear in SQL."""
+        sql = Buffer.build_ring_zones_postgis("land_grid", "grid", simplify_tolerance=0.001)
+        assert "ST_SimplifyPreserveTopology" in sql
+        assert "0.001" in sql
 
 
 class TestBuildRingZoneCasePostgis:

@@ -45,7 +45,7 @@ The workflow performs four major steps:
 ### Required Software
 - Python {{ python_version }}+
 - GDAL {{ gdal_version }} (for S-57 conversion)
-- All dependencies listed in `pyproject.toml`
+- All dependencies listed in `environment.yml` and `requirements.in`
 - No database server required (file-based storage)
 
 ### Required Data

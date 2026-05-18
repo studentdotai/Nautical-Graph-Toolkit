@@ -704,10 +704,12 @@ def main():
     args = parser.parse_args()
 
     # Setup logging
+    log_dir = Path(__file__).parent / 'logs'
+    log_dir.mkdir(parents=True, exist_ok=True)
     logger = setup_logging(
         verbose=args.verbose,
         quiet=args.quiet,
-        log_file='s57_import.log'
+        log_file=str(log_dir / 's57_import.log')
     )
 
     logger.info("S-57 ENC Data Import Tool Starting")

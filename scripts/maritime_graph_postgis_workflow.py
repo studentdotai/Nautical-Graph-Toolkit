@@ -518,18 +518,22 @@ class MaritimeWorkflow:
             max_points = graph_config.get('max_points_per_subdivision', 1000000)
             max_subdivision_factor = 4  # Default for PostGIS base graphs
 
+            base_graph_name = self.config.graph_names['base']
+
             G = bg.create_base_graph(
                 grid["combined_grid"],
                 spacing_nm=cfg['spacing_nm'],
                 keep_largest_component=True,
+                bridge_components=True,
                 max_points=max_points,
-                max_subdivision_factor=max_subdivision_factor
+                max_subdivision_factor=max_subdivision_factor,
+                table_prefix=base_graph_name,
+                grid_schema=self.config.get('database.grid_schema', 'grid')
             )
             self.logger(f"{ICONS['OK']} Graph created: {G.number_of_nodes():,} nodes, {G.number_of_edges():,} edges")
 
             # Save graph
             self.logger("Saving graph...")
-            base_graph_name = self.config.graph_names['base']
             output_file = self.output_dir / f"{base_graph_name}.gpkg"
             bg.save_graph_to_gpkg(G, output_file)
             self.logger(f"{ICONS['OK']} Saved to GeoPackage: {output_file.name}")
@@ -633,7 +637,11 @@ class MaritimeWorkflow:
             if cfg.get('slice_buffer', False):
                 self.logger("Slicing buffer to reduce area...")
                 active_buffer = Slicer.slice_by_bbox(
-                    route_buffer, south=cfg['slice_south_degree']
+                    route_buffer,
+                    south=cfg.get('slice_south_degree'),
+                    north=cfg.get('slice_north_degree'),
+                    west=cfg.get('slice_west_degree'),
+                    east=cfg.get('slice_east_degree'),
                 )
                 self.logger(f"{ICONS['OK']} Buffer sliced")
 
@@ -668,6 +676,8 @@ class MaritimeWorkflow:
                 max_points = graph_config.get('max_points_per_subdivision', 1000000)
                 max_subdivision_factor = 4  # Default for PostGIS graphs
 
+                fine_graph_name = self.config.graph_names['fine_undirected']
+
                 G = fg.create_base_graph(
                     grid_data=fg_grid["combined_grid"],
                     spacing_nm=cfg['fine_spacing_nm'],
@@ -675,12 +685,13 @@ class MaritimeWorkflow:
                     bridge_components=cfg['fine_bridge_components'],
                     keep_largest_component=True,
                     max_points=max_points,
-                    max_subdivision_factor=max_subdivision_factor
+                    max_subdivision_factor=max_subdivision_factor,
+                    table_prefix=fine_graph_name,
+                    grid_schema=self.config.get('database.grid_schema', 'grid')
                 )
                 self.logger(f"{ICONS['OK']} Fine graph created: {G.number_of_nodes():,} nodes, {G.number_of_edges():,} edges")
 
                 # Save fine graph
-                fine_graph_name = self.config.graph_names['fine_undirected']
 
                 if cfg['save_gpkg']:
                     output_file = self.output_dir / f"{fine_graph_name}.gpkg"
@@ -831,6 +842,9 @@ class MaritimeWorkflow:
                 self.logger("Applying static weights...")
                 config = weights_manager.load_config()
                 buffer_zones_cfg = cfg.get('buffer_zones', {})
+                _st = buffer_zones_cfg.get('simplify_tolerance', None)
+                if _st is not None:
+                    weights_manager._buffer_zone_simplify_tolerance = _st
 
                 enc_schema = self.config.get('database.enc_schema', 'enc_west')
                 weights_manager.apply_static_weights_postgis(

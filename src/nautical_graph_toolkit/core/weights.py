@@ -123,6 +123,7 @@ class BaseWeights(ABC):
         # Buffer zone config (coastal proximity ring classification)
         self._buffer_zone_distances = buf_cfg.get('distances_nm', [3.0, 4.0, 12.0])
         self._buffer_zone_mode      = buf_cfg.get('buffer_mode', 'fast')
+        self._buffer_zone_simplify_tolerance = buf_cfg.get('simplify_tolerance', 0.0005)
         self._zone_penalties = {
             float(k): float(v)
             for k, v in buf_cfg.get('zone_penalties', {0.0: 1.0, 3.0: 2.5, 4.0: 1.8, 12.0: 1.3}).items()
@@ -5145,7 +5146,7 @@ class BaseWeights(ABC):
 
         n_edges = len(edges_gdf)
         logger.info(
-            f"=== _apply_static_weights_core_gdf | {n_edges:,} edges | {len(static_layers)} layers ==="
+            f"=== Static weights | {n_edges:,} edges | {len(static_layers)} layers ==="
         )
 
         stats = {'blocking': 0, 'penalty': 0, 'bonus': 0}
@@ -5506,6 +5507,7 @@ class BaseWeights(ABC):
         land_geometry=None,
         zone_distances_nm: Optional[List[float]] = None,
         buffer_mode: Optional[str] = None,
+        simplify_tolerance: float = 0.0005,
     ) -> "gpd.GeoDataFrame":
         """Classify edges into coastal proximity zones (GDF backend).
 
@@ -5538,7 +5540,7 @@ class BaseWeights(ABC):
         logger.info(f"[BUFFER ZONES] Building ring zones: {distances} NM, mode={mode}")
         start = time.perf_counter()
 
-        rings = Buffer.build_ring_zones_gpkg(land_geom, distances, mode)
+        rings = Buffer.build_ring_zones_gpkg(land_geom, distances, mode, simplify_tolerance=simplify_tolerance)
 
         # Init column
         edges_gdf["ft_buffer_zone_dist"] = 0.0
@@ -5563,10 +5565,15 @@ class BaseWeights(ABC):
         save_rings: bool = False,
         grid_schema: str = "grid",
         save_land_grid: bool = True,
+        simplify_tolerance: float = 0.0005,
     ) -> Dict[str, Any]:
         """Classify edges into coastal proximity zones (PostGIS backend).
 
-        Uses CTE→UPDATE FROM pattern consistent with existing enrichment queries.
+        Pre-materializes ring geometries into GiST-indexed tables, then
+        classifies edges via indexed spatial joins.  This avoids the OOM
+        crash that occurs when a single mega-CTE re-materializes complex
+        ring geometries per-row for millions of edges.
+
         Grid tables (land_grid, buffer_zone rings) are stored in ``grid_schema``
         with ``{graph_name}_`` prefixed names.
 
@@ -5579,6 +5586,8 @@ class BaseWeights(ABC):
             save_rings: Persist buffer zone ring geometries as PostGIS tables.
             grid_schema: Schema for grid tables (default: ``"grid"``).
             save_land_grid: Persist land_grid to grid schema (default: True).
+            simplify_tolerance: Douglas-Peucker tolerance in degrees for land
+                geometry simplification. ``0`` disables. Default ``0.0005`` (~55m).
 
         Returns:
             Dict with ``zones_classified`` count and ``zone_counts`` breakdown.
@@ -5605,15 +5614,14 @@ class BaseWeights(ABC):
         logger.info(f"[BUFFER ZONES PostGIS] Classifying edges: {distances} NM, mode={mode}")
         start = time.perf_counter()
 
-        # Ensure grid schema exists
+        # --- Ensure grid schema + land_grid table exist (before main txn) ---
         with engine.begin() as conn:
             conn.execute(text(f'CREATE SCHEMA IF NOT EXISTS "{grid_schema}"'))
 
-        # Tier 1 reuse: check if prefixed land_grid already exists in grid schema
         _check_grid_sql = text(
             "SELECT EXISTS ("
             "  SELECT 1 FROM information_schema.tables "
-            f"  WHERE table_schema = :schema AND table_name = :table"
+            "  WHERE table_schema = :schema AND table_name = :table"
             ")"
         )
         with engine.connect() as _chk:
@@ -5629,34 +5637,75 @@ class BaseWeights(ABC):
             if save_land_grid:
                 logger.info(f"[BUFFER ZONES PostGIS] Created {land_grid_table} in {grid_schema}")
 
-        # Ensure ft_buffer_zone_dist column exists
+        # --- Main transaction: column, materialize rings, classify edges ---
+        cte_sql = Buffer.build_ring_zones_postgis(
+            land_grid_table, grid_schema, distances, mode,
+            simplify_tolerance=simplify_tolerance,
+        )
+
         with engine.begin() as conn:
+            # Bump work_mem for spatial operations
+            try:
+                with conn.begin_nested():
+                    conn.execute(text("SET temp_buffers = '512MB'"))
+            except Exception:
+                logger.debug("SET temp_buffers skipped (already set)")
+            conn.execute(text("SET work_mem = '256MB'"))
+
+            # Ensure column exists
             conn.execute(text(
                 f'ALTER TABLE "{schema_name}"."{edges_table}" '
                 f'ADD COLUMN IF NOT EXISTS ft_buffer_zone_dist DOUBLE PRECISION DEFAULT 0.0'
             ))
 
-        # Build and execute CTE→UPDATE
-        cte_sql = Buffer.build_ring_zones_postgis(
-            land_grid_table, grid_schema, distances, mode
-        )
-        case_sql = Buffer.build_ring_zone_case_postgis(
-            distances, edge_geom='e.geometry'
-        )
-        update_sql = (
-            f"{cte_sql},\n"
-            f"zone_calc AS (\n"
-            f"    SELECT e.id, {case_sql} AS zone_dist\n"
-            f'    FROM "{schema_name}"."{edges_table}" e\n'
-            f")\n"
-            f'UPDATE "{schema_name}"."{edges_table}" e\n'
-            f"SET ft_buffer_zone_dist = z.zone_dist\n"
-            f"FROM zone_calc z\n"
-            f"WHERE e.id = z.id"
-        )
-        with engine.begin() as conn:
-            result = conn.execute(text(update_sql))
-            rows_affected = result.rowcount
+            # Phase B: Materialize each ring into a GiST-indexed table
+            for nm in distances:
+                tag = str(nm).replace(".", "_")
+                ring_table = f"_ring_{graph_name}_{tag}"
+                conn.execute(text(f'DROP TABLE IF EXISTS "{grid_schema}"."{ring_table}"'))
+                conn.execute(text(
+                    f'CREATE TABLE "{grid_schema}"."{ring_table}" AS\n'
+                    f'{cte_sql}\n'
+                    f'SELECT ST_MakeValid(geom) AS geom FROM ring_{tag}'
+                ))
+                conn.execute(text(
+                    f'CREATE INDEX "idx_{ring_table}_geom" '
+                    f'ON "{grid_schema}"."{ring_table}" USING GIST (geom)'
+                ))
+                logger.info(f"[BUFFER ZONES PostGIS] Materialized ring {nm} NM → {ring_table}")
+
+            # Phase C: Classify edges — reset then largest→smallest (nearest wins)
+            conn.execute(text(
+                f'UPDATE "{schema_name}"."{edges_table}" SET ft_buffer_zone_dist = 0.0'
+            ))
+            for nm in sorted(distances, reverse=True):
+                tag = str(nm).replace(".", "_")
+                ring_table = f"_ring_{graph_name}_{tag}"
+                result = conn.execute(text(
+                    f'UPDATE "{schema_name}"."{edges_table}" e '
+                    f'SET ft_buffer_zone_dist = :nm '
+                    f'FROM "{grid_schema}"."{ring_table}" r '
+                    f'WHERE ST_Intersects(e.geometry, r.geom)'
+                ), {'nm': nm})
+
+            # Phase D: Save or cleanup ring tables
+            for nm in distances:
+                tag = str(nm).replace(".", "_")
+                working = f"_ring_{graph_name}_{tag}"
+                if save_rings:
+                    final_name = f"{graph_name}_buffer_zone_{tag}"
+                    conn.execute(text(f'DROP TABLE IF EXISTS "{grid_schema}"."{final_name}"'))
+                    conn.execute(text(
+                        f'ALTER TABLE "{grid_schema}"."{working}" '
+                        f'RENAME TO "{final_name}"'
+                    ))
+                else:
+                    conn.execute(text(f'DROP TABLE IF EXISTS "{grid_schema}"."{working}"'))
+
+        if save_rings:
+            logger.info(
+                f"[BUFFER ZONES PostGIS] Saved {len(distances)} ring tables to schema '{grid_schema}'"
+            )
 
         # Gather zone counts
         count_sql = (
@@ -5669,22 +5718,8 @@ class BaseWeights(ABC):
                 float(row[0]): int(row[1])
                 for row in conn.execute(text(count_sql))
             }
-
-        # Persist ring geometries used for classification (same CTE → identical shapes)
-        if save_rings:
-            for nm in distances:
-                tag = str(nm).replace(".", "_")
-                table_name = f"{graph_name}_buffer_zone_{tag}"
-                with engine.begin() as conn:
-                    conn.execute(text(f'DROP TABLE IF EXISTS "{grid_schema}"."{table_name}"'))
-                    conn.execute(text(
-                        f'CREATE TABLE "{grid_schema}"."{table_name}" AS\n'
-                        f'{cte_sql}\n'
-                        f'SELECT geom FROM ring_{tag}'
-                    ))
-            logger.info(
-                f"[BUFFER ZONES PostGIS] Saved {len(distances)} ring tables to schema '{grid_schema}'"
-            )
+            # Total classified (all rows including 0.0)
+            rows_affected = sum(zone_counts.values())
 
         elapsed = time.perf_counter() - start
         logger.info(
@@ -5700,6 +5735,7 @@ class BaseWeights(ABC):
         zone_distances_nm: Optional[List[float]] = None,
         buffer_mode: Optional[str] = None,
         conn=None,
+        simplify_tolerance: float = 0.0005,
     ) -> Dict[str, Any]:
         """Classify edges into coastal proximity zones (SpatiaLite/GPKG backend).
 
@@ -5733,7 +5769,7 @@ class BaseWeights(ABC):
         start = time.perf_counter()
 
         # Precompute rings in Python
-        rings = Buffer.build_ring_zones_gpkg(land_geom, distances, mode)
+        rings = Buffer.build_ring_zones_gpkg(land_geom, distances, mode, simplify_tolerance=simplify_tolerance)
 
         # Load edges
         edges_gdf = gpd.read_file(
@@ -6879,7 +6915,8 @@ class Weights(BaseWeights):
             if buffer_zones and self._last_land_geom is not None:
                 graph_path = Path(graph_gpkg_path)
                 buf_result = self.build_buffer_zones_sql(
-                    str(graph_path), self._last_land_geom, conn=conn_graph
+                    str(graph_path), self._last_land_geom, conn=conn_graph,
+                    simplify_tolerance=self._buffer_zone_simplify_tolerance,
                 )
                 self._apply_zone_penalties_sql(str(graph_path), conn=conn_graph)
                 summary['buffer_zones_classified'] = True
@@ -7021,7 +7058,10 @@ class Weights(BaseWeights):
 
             # Buffer zone classification (optional)
             if buffer_zones and self._last_land_geom is not None:
-                enriched = self.build_buffer_zones_gdf(enriched, self._last_land_geom)
+                enriched = self.build_buffer_zones_gdf(
+                    enriched, self._last_land_geom,
+                    simplify_tolerance=self._buffer_zone_simplify_tolerance,
+                )
                 enriched = self._apply_zone_penalties_gdf(enriched)
                 # Re-write edges with buffer zone columns (ft_buffer_zone_dist + wt_zone_penalty)
                 self._gpkg_write_edges(enriched, str(graph_path), engine=engine)
@@ -7029,7 +7069,8 @@ class Weights(BaseWeights):
 
                 if save_buffer_zones:
                     rings = Buffer.build_ring_zones_gpkg(
-                        self._last_land_geom, self._buffer_zone_distances, self._buffer_zone_mode
+                        self._last_land_geom, self._buffer_zone_distances, self._buffer_zone_mode,
+                        simplify_tolerance=self._buffer_zone_simplify_tolerance,
                     )
                     for ring in rings:
                         _nm_tag = str(ring['distance_nm']).replace('.', '_')
@@ -7696,6 +7737,7 @@ class Weights(BaseWeights):
                 save_rings=save_buffer_zones,
                 grid_schema=grid_schema,
                 save_land_grid=save_land_grid,
+                simplify_tolerance=self._buffer_zone_simplify_tolerance,
             )
             summary['buffer_zones_classified'] = True
             summary['buffer_zone_counts'] = buf_result.get('zone_counts', {})
@@ -8488,13 +8530,17 @@ class WeightsOpen(BaseWeights):
                 result_extra['land_grid_saved'] = True
 
             if buffer_zones and self._last_land_geom is not None:
-                enriched = self.build_buffer_zones_gdf(enriched, self._last_land_geom)
+                enriched = self.build_buffer_zones_gdf(
+                    enriched, self._last_land_geom,
+                    simplify_tolerance=self._buffer_zone_simplify_tolerance,
+                )
                 enriched = self._apply_zone_penalties_gdf(enriched)
                 self._gpkg_write_edges(enriched, str(graph_path), engine=engine)
                 result_extra['buffer_zones_classified'] = True
                 if save_buffer_zones:
                     rings = Buffer.build_ring_zones_gpkg(
-                        self._last_land_geom, self._buffer_zone_distances, self._buffer_zone_mode
+                        self._last_land_geom, self._buffer_zone_distances, self._buffer_zone_mode,
+                        simplify_tolerance=self._buffer_zone_simplify_tolerance,
                     )
                     for ring in rings:
                         _nm_tag = str(ring['distance_nm']).replace('.', '_')
@@ -8561,14 +8607,18 @@ class WeightsOpen(BaseWeights):
                         logger.warning(f"[BUFFER ZONES] Cannot load land_grid for buffer zone classification: {exc}")
 
                 if land_geom is not None:
-                    buf_result = self.build_buffer_zones_sql(str(graph_path), land_geom)
+                    buf_result = self.build_buffer_zones_sql(
+                        str(graph_path), land_geom,
+                        simplify_tolerance=self._buffer_zone_simplify_tolerance,
+                    )
                     self._apply_zone_penalties_sql(str(graph_path))
                     result['buffer_zones_classified'] = True
                     result['buffer_zone_counts'] = buf_result.get('zone_counts', {})
 
                     if save_buffer_zones:
                         rings = Buffer.build_ring_zones_gpkg(
-                            land_geom, self._buffer_zone_distances, self._buffer_zone_mode
+                            land_geom, self._buffer_zone_distances, self._buffer_zone_mode,
+                            simplify_tolerance=self._buffer_zone_simplify_tolerance,
                         )
                         for ring in rings:
                             _nm_tag = str(ring['distance_nm']).replace('.', '_')
@@ -9228,6 +9278,7 @@ class WeightsOpen(BaseWeights):
                     save_rings=save_buffer_zones,
                     grid_schema=grid_schema,
                     save_land_grid=save_land_grid,
+                    simplify_tolerance=self._buffer_zone_simplify_tolerance,
                 )
                 summary['buffer_zones_classified'] = True
                 summary['buffer_zone_counts'] = buf_result.get('zone_counts', {})

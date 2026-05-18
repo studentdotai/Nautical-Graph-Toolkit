@@ -98,11 +98,9 @@ graph.export_route_geojson(route, "la_to_sf_route.geojson")
 
 ## 🌐 Pre-Generated Examples & Large Datasets (pCloud Repository) {: #-pre-generated-examples--large-datasets-pcloud-repository}
 
-For users who want to skip lengthy data processing or validate their outputs against known-good examples, we provide a comprehensive collection of pre-generated outputs and source databases.
+For users who want to skip lengthy data processing or validate their outputs against known-good examples, we provide a comprehensive collection of pre-generated workflow bundles and source databases.
 
 **🔗 Access Repository**: [ENC-Graph-test-files on pCloud](https://u.pcloud.link/publink/show?code=kZVUYM5Zm87H47h2G1XBANXHwhIfcJA681Oy)
-
-**Repository Contents**: 16 files (14.5 GB total)
 
 ### 📊 Source ENC Databases
 
@@ -110,10 +108,10 @@ For users who want to skip lengthy data processing or validate their outputs aga
 
 Ready-to-use ENC databases that can be directly queried for graph generation without requiring the import step:
 
-| File | Size | Coverage | Resolution | Best For |
-|------|------|----------|------------|----------|
-| **enc_west.gpkg** | 209 MB | Western US Coast | Complete | Quick testing, moderate-scale workflows |
-| **us_enc_all.gpkg** | 6.97 GB | All US coastal waters | Complete | Production-scale testing, comprehensive coverage |
+| File | Size | Coverage | Best For |
+|------|------|----------|----------|
+| **enc_west.gpkg** | 209 MB | Western US Coast | Quick testing, moderate-scale workflows |
+| **us_enc_all.gpkg** | 6.97 GB | All US coastal waters | Production-scale testing, comprehensive coverage |
 
 **Usage Example** (Skip the import step entirely):
 
@@ -132,60 +130,53 @@ graph.build()
 
 ---
 
-### 📈 Pre-Generated Maritime Graphs
+### 📦 Workflow Bundles (v0.1.5)
 
-These are production-quality graphs generated from the SF→LA test dataset (47 ENCs, 400km route). Use them to:
+Each bundle is a complete 4-step workflow output packaged as a `.7z` archive. These are production-quality runs generated from the `enc_west` dataset (SF→LA route, 400km). Use them to:
 
 - **Validate** your installation produces similar outputs
 - **Compare** performance against known benchmarks
-- **Learn** from example graph structures before generating your own
 - **Skip** hours of computation for testing/development
-- **Visualize** in QGIS to understand graph topology
+- **Visualize** in QGIS to understand graph topology and routing behavior
 
-#### H3 Hexagonal Graphs (Multi-Resolution)
+#### Bundle Contents
 
-| File | Backend | Weights | Nodes | H3 Res | Size | Gen. Time |
-|------|---------|---------|-------|--------|------|-----------|
-| **h3_graph_pg_6_11_v2.gpkg** | PostGIS | No | ~894K | 6-11 | 923 MB | ~107 min |
-| **h3_graph_wt_pg_6_11_v2.gpkg** | PostGIS | Yes | ~894K | 6-11 | 2.22 GB | ~107 min |
-| **h3_graph_gpkg_6_11_v2.gpkg** | GeoPackage | No | ~768K | 6-11 | 791 MB | ~180 min |
-| **h3_graph_wt_gpkg_6_11_v2.gpkg** | GeoPackage | Yes | ~768K | 6-11 | 1.90 GB | ~180 min |
+Each `.7z` archive contains the complete output from a 4-step workflow run:
 
-**Naming Convention:**
+| File | Description |
+|------|-------------|
+| `base_graph.gpkg` | Base graph (0.3 NM spacing) for initial route estimation |
+| `debug_pathfinding.gpkg` | 13-layer pathfinding debug output |
+| `detailed_route_8.0m_draft.geojson` | Smoothed route segments |
+| `detailed_route_8.0m_draft_segments.geojson` | Route edge features with attributes |
+| `{mode}_graph_{suffix}.gpkg` | Unweighted high-resolution graph |
+| `{mode}_graph_wt_{suffix}.gpkg` | Weighted + directed graph (includes Land Grid and Buffer Ring Grid layers in GeoPackage bundles) |
 
-- `_pg_` = Generated from PostGIS backend (2.0-2.4× faster)
-- `_gpkg_` = Generated from GeoPackage backend
+#### PostGIS Bundles
+
+Stage columns: **Base** = Step 1 Base Graph, **Fine/H3** = Step 2 Graph Creation, **Weight** = Step 3 Weighting & Enrichment, **Path** = Step 4 Pathfinding & Route Export.
+
+| Bundle (.7z) | .7z Size | Extracted | Mode | Nodes | Edges | Base | Fine/H3 | Weight | Path | Total |
+|---|---:|---:|---|---:|---:|---:|---:|---:|---:|---:|
+| **workflow_fine_pg_20** | 40 MB | ~569 MB | FINE 0.2 NM | 80K | 317K | 28s | 41s | 260s | 81s | ~7 min |
+| **workflow_fine_pg_10** | 150 MB | ~2.1 GB | FINE 0.1 NM | 322K | 1.28M | 20s | 127s | 682s | 338s | ~19 min |
+| **workflow_h3_pg_5_11** | 488 MB | ~2.4 GB | H3 res 5-11 | 455K | 1.37M | 20s | 168s | 740s | 413s | ~22 min |
+
+#### GeoPackage Bundles
+
+| Bundle (.7z) | .7z Size | Extracted | Mode | Nodes | Edges | Base | Fine/H3 | Weight | Path | Total |
+|---|---:|---:|---|---:|---:|---:|---:|---:|---:|---:|
+| **workflow_fine_gpkg_20** | 40 MB | ~586 MB | FINE 0.2 NM | 80K | 315K | 10s | 15s | 257s | 96s | ~6 min |
+| **workflow_fine_gpkg_10** | 140 MB | ~2.2 GB | FINE 0.1 NM | 321K | 1.27M | 10s | 44s | 720s | 380s | ~19 min |
+| **workflow_h3_gpkg_5_11** | 521 MB | ~2.4 GB | H3 res 5-11 | 455K | 1.37M | 10s | 114s | 717s | 457s | ~22 min |
+
+#### Naming Convention
+
+- `_pg_` = Generated from PostGIS backend (faster graph creation, weighting similar)
+- `_gpkg_` = Generated from GeoPackage backend (more portable, faster base graph)
 - `_wt_` = Includes weight calculations (static, directional, dynamic)
-- `6_11` = H3 resolution range
-
-#### Fine Grid Graphs (0.1 NM Spacing) - RECOMMENDED
-
-Optimal balance of detail and performance for production routing:
-
-| File | Backend | Weights | Nodes | Spacing | Size | Gen. Time |
-|------|---------|---------|-------|---------|------|-----------|
-| **fine_graph_pg_10_v2.gpkg** | PostGIS | No | ~185K | 0.1 NM | 249 MB | ~21 min |
-| **fine_graph_wt_pg_10_v2.gpkg** | PostGIS | Yes | ~185K | 0.1 NM | 545 MB | ~21 min |
-| **fine_graph_gpkg_10_v2.gpkg** | GeoPackage | No | ~174K | 0.1 NM | 290 MB | ~52 min |
-| **fine_graph_wt_gpkg_10_v2.gpkg** | GeoPackage | Yes | ~174K | 0.1 NM | 655 MB | ~52 min |
-
-**Naming Convention:**
-
+- `5_11` = H3 resolution range (5–11)
 - `10` = fine_spacing_nm coefficient (10 × 0.01 = 0.1 NM spacing)
-
-#### Fine Grid Graphs (0.2 NM Spacing) - Fast Prototyping
-
-Coarser grid for rapid testing and proof-of-concept work:
-
-| File | Backend | Weights | Nodes | Spacing | Size | Gen. Time |
-|------|---------|---------|-------|---------|------|-----------|
-| **fine_graph_pg_20.gpkg** | PostGIS | No | ~46K | 0.2 NM | 109 MB | ~7 min |
-| **fine_graph_wt_pg_20.gpkg** | PostGIS | Yes | ~46K | 0.2 NM | 134 MB | ~7 min |
-| **fine_graph_gpkg_20_v2.gpkg** | GeoPackage | No | ~43K | 0.2 NM | 71 MB | ~14 min |
-| **fine_graph_wt_gpkg_20_v2.gpkg** | GeoPackage | Yes | ~43K | 0.2 NM | 162 MB | ~14 min |
-
-**Naming Convention:**
-
 - `20` = fine_spacing_nm coefficient (20 × 0.01 = 0.2 NM spacing)
 
 ---
@@ -194,9 +185,9 @@ Coarser grid for rapid testing and proof-of-concept work:
 
 **Installation Validation & Quick Start:**
 
-1. Download `enc_west.gpkg` (209 MB) - manageable for most users
-2. Download 1-2 `fine_graph_pg_10` variants (500-550 MB)
-3. Load in QGIS to compare your outputs
+1. Download `enc_west.gpkg` (209 MB)
+2. Download `workflow_fine_gpkg_20.7z` (40 MB) — smallest bundle, fastest to validate
+3. Extract and load in QGIS to compare against your own outputs
 4. Compare your outputs against the [reference data](../reference/technical-specs.md)
 
 **Skip Initial Processing (Development/Testing):**
@@ -208,28 +199,28 @@ Coarser grid for rapid testing and proof-of-concept work:
 
 **Performance Benchmarking:**
 
-1. Download matching graph types you're testing
-2. Compare your generation times against reference data
+1. Download matching bundle for the graph type you're testing
+2. Compare your generation times against the table above
 3. Verify node/edge counts match expectations
-4. Identify performance bottlenecks (weighting dominates 37-89% of time)
+4. Weighting dominates 60-70% of total runtime
 
 **Learn Graph Structure:**
 
-1. Download weighted (`_wt_`) vs non-weighted versions
-2. Examine in QGIS to understand:
+1. Download a bundle and examine files in QGIS
+2. Compare unweighted vs weighted graph files to understand:
     - Node placement patterns and density
     - Edge connectivity and directionality
-    - Weight distribution across graph
+    - Weight distribution across the graph
     - Feature enrichment with S-57 data
 3. Compare fine grid (0.1 vs 0.2 NM) to understand trade-offs
-4. Compare PostGIS vs GeoPackage outputs (should be identical)
+4. Compare PostGIS vs GeoPackage outputs (should be visually identical)
 
 **Backend Comparison:**
 
-1. Download same graph from both PostGIS (`_pg_`) and GeoPackage (`_gpkg_`)
+1. Download same graph type from both PostGIS (`_pg_`) and GeoPackage (`_gpkg_`)
 2. Compare in QGIS (should be visually identical)
-3. Reference [performance](../reference/technical-specs.md) for timing details
-4. PostGIS is 2.0-2.4× faster overall; GeoPackage is more portable
+3. Reference [performance](../reference/technical-specs.md) for detailed timing analysis
+4. PostGIS is faster for graph creation steps; GeoPackage is more portable and faster for base graph
 
 ---
 
@@ -242,21 +233,20 @@ Coarser grid for rapid testing and proof-of-concept work:
 
 **Step 2: Select Files for Your Use Case**
 
-| Use Case | Recommended Files | Total Size |
-|----------|------------------|------------|
-| Quick validation | enc_west.gpkg + fine_graph_pg_10_v2.gpkg | ~500 MB |
-| Full testing | enc_west.gpkg + all fine_graph variants | ~2.5 GB |
-| Comprehensive | All source + all pre-generated graphs | 14.5 GB |
+| Use Case | Recommended Downloads | Total Download |
+|----------|----------------------|---------------|
+| Quick validation | enc_west.gpkg + workflow_fine_gpkg_20.7z | ~249 MB |
+| Full testing | enc_west.gpkg + all fine bundles (4) | ~589 MB |
+| Comprehensive | enc_west.gpkg + all 6 bundles | ~1.6 GB |
 
-**Step 3: Place Files**
+**Step 3: Extract Bundles**
 ```bash
 # Place ENC databases in data/ directory
 cp enc_west.gpkg /path/to/project/data/
 
-# Place pre-generated graphs in notebooks output directory
-cp fine_graph_pg_10_v2.gpkg /path/to/project/docs/notebooks/output/
-cp h3_graph_pg_6_11_v2.gpkg /path/to/project/docs/notebooks/output/
-# ... other graph files ...
+# Extract bundles into output directory
+7z x workflow_fine_gpkg_20.7z -o/path/to/project/output/
+7z x workflow_h3_pg_5_11.7z -o/path/to/project/output/
 ```
 
 **Step 4: Load in QGIS**
@@ -265,10 +255,10 @@ cp h3_graph_pg_6_11_v2.gpkg /path/to/project/docs/notebooks/output/
 qgis &
 
 # File → Open Data Source → GeoPackage
-# Select: fine_graph_pg_10_v2.gpkg
+# Select: fine_graph_gpkg_20.gpkg (from extracted bundle)
 # Choose layers:
-#   - {graph_prefix}_nodes (point layer)
-#   - {graph_prefix}_edges (line layer)
+#   - fine_graph_gpkg_20_nodes (point layer)
+#   - fine_graph_gpkg_20_edges (line layer)
 ```
 
 ---
@@ -277,16 +267,16 @@ qgis &
 
 **File Sizes & Bandwidth:**
 
-- **Small graphs** (FINE 0.2nm): 70-162 MB per file
-- **Medium graphs** (FINE 0.1nm): 249-655 MB per file
-- **Large graphs** (H3 hexagonal): 791 MB - 2.22 GB per file
-- **ENC databases**: 209 MB - 6.97 GB
+- **Small bundles** (FINE 0.2 NM): 40 MB compressed / ~580 MB extracted
+- **Medium bundles** (FINE 0.1 NM): 140–150 MB compressed / ~2.1 GB extracted
+- **Large bundles** (H3 5-11): 488–521 MB compressed / ~2.4 GB extracted
+- **ENC databases**: 209 MB – 6.97 GB
 
-Download selectively based on your bandwidth and storage constraints. Start with enc_west.gpkg (209 MB) and one FINE graph example.
+Download selectively based on your bandwidth and storage constraints. Start with `enc_west.gpkg` (209 MB) and `workflow_fine_gpkg_20.7z` (40 MB).
 
 **Version Compatibility:**
 
-These graphs were generated with toolkit v0.1.1. If using a different version:
+These bundles were generated with toolkit v0.1.5. If using a different version:
 
 - Minor differences in output structure are expected
 - Overall graph topology should match
@@ -295,7 +285,7 @@ These graphs were generated with toolkit v0.1.1. If using a different version:
 
 **Data Currency:**
 
-- ENC data reflects chart editions available as of November 2025
+- ENC data reflects chart editions available as of May 2026
 - For current navigational use, always download latest charts from NOAA: https://charts.noaa.gov/ENCs/ENCs.shtml
 - These files are for testing/validation, not production navigation
 
@@ -317,7 +307,7 @@ print("✓ RTREE support available")
 
 ### 📚 Related Documentation
 
-- **Performance Benchmarks**: [technical-specs.md](../reference/technical-specs.md)- Detailed timing analysis by backend and graph mode
+- **Performance Benchmarks**: [technical-specs.md](../reference/technical-specs.md) - Detailed timing analysis by backend and graph mode
 - **Workflow Guides**:
     - [Quick Start](../getting-started/workflow-quickstart.md) - End-to-end examples
     - [PostGIS Backend Setup](../user-guides/workflow-postgis-guide.md) - PostGIS backend configuration

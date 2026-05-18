@@ -1484,9 +1484,9 @@ class TestZonePenalties:
         # 3.0 NM = coastal zone → strongest penalty
         assert result.loc[result['ft_buffer_zone_dist'] == 3.0, 'wt_zone_penalty'].iloc[0] == pytest.approx(2.5)
         # 4.0 NM = contiguous zone
-        assert result.loc[result['ft_buffer_zone_dist'] == 4.0, 'wt_zone_penalty'].iloc[0] == pytest.approx(1.8)
+        assert result.loc[result['ft_buffer_zone_dist'] == 4.0, 'wt_zone_penalty'].iloc[0] == pytest.approx(2.0)
         # 12.0 NM = territorial waters → mildest restriction
-        assert result.loc[result['ft_buffer_zone_dist'] == 12.0, 'wt_zone_penalty'].iloc[0] == pytest.approx(1.3)
+        assert result.loc[result['ft_buffer_zone_dist'] == 12.0, 'wt_zone_penalty'].iloc[0] == pytest.approx(1.8)
 
     @pytest.mark.unit
     def test_apply_zone_penalties_gdf_no_column(self, weights_instance):

@@ -110,3 +110,12 @@ class TestBuildBufferZonesGdf:
         )
         result = BaseWeights.build_buffer_zones_gdf(w, edges, land)
         assert result["ft_buffer_zone_dist"].iloc[0] == 0.0
+
+    def test_simplify_tolerance_passthrough(self, land_square, edges_gdf):
+        """simplify_tolerance should be passed through to build_ring_zones_gpkg."""
+        w = _make_mock()
+        result = BaseWeights.build_buffer_zones_gdf(
+            w, edges_gdf, land_square, simplify_tolerance=0.0
+        )
+        assert "ft_buffer_zone_dist" in result.columns
+        assert (result["ft_buffer_zone_dist"] >= 0).all()

@@ -46,7 +46,7 @@ The workflow performs four major steps:
 - Python {{ python_version }}+
 - PostgreSQL with PostGIS extension
 - GDAL {{ gdal_version }} (for S-57 conversion)
-- All dependencies listed in `pyproject.toml`
+- All dependencies listed in `environment.yml` and `requirements.in`
 
 ### Required Data
 - S-57 ENC charts in PostGIS database

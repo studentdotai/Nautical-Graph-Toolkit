@@ -65,7 +65,7 @@ The workflow takes an existing undirected graph and performs up to seven steps:
 ### Required Software
 - Python {{ python_version }}+
 - GDAL {{ gdal_version }} (for S-57 data access)
-- All dependencies listed in `pyproject.toml`
+- All dependencies listed in `environment.yml` and `requirements.in`
 
 ### Required Data
 - An existing undirected graph (created by the full pipeline scripts)

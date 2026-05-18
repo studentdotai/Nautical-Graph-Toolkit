@@ -100,7 +100,7 @@ from nautical_graph_toolkit.core.graph import (
 )
 from nautical_graph_toolkit.core.weights import Weights, WeightsOpen
 from nautical_graph_toolkit.core.s57_data import ENCDataFactory
-from nautical_graph_toolkit.core.pathfinding_lite import Route, Astar, AstarImproved, AstarMaritime
+from nautical_graph_toolkit.core.pathfinding_lite import Route, Astar, AstarImproved, AstarMaritime, AstarMaritimeSmooth
 from nautical_graph_toolkit.utils.port_utils import PortData
 from nautical_graph_toolkit.utils.logging_utils import ICONS, SafeStreamHandler
 
@@ -328,6 +328,7 @@ class MaritimeWeightsWorkflow:
         self.skip_pathfinding = skip_pathfinding
         self.skip_export = skip_export
         self.astar_impl = astar_impl if astar_impl is not None else AstarMaritime
+        self.logger(f"A* implementation: {self.astar_impl.__name__}")
 
         # Performance tracking
         self.perf = PerformanceTracker()
@@ -342,10 +343,10 @@ class MaritimeWeightsWorkflow:
         self.source_graph = source_graph or self.config.graph_names['fine_undirected']
         self.target_graph = target_graph or self.config.graph_names['fine_weighted']
 
-        # Resolve target file path for GeoPackage backend (must be unconditional)
+        # Resolve file paths for GeoPackage backend
         if self.backend == "geopackage":
-            self.target_file = self.output_dir / f"{self.target_graph}.gpkg"
-            self.source_file = self._resolve_geopackage_source()
+            self.source_file = self._resolve_geopackage_file(self.source_graph)
+            self.target_file = self._resolve_geopackage_file(self.target_graph)
 
         # Initialize weights manager based on class selection
         if weights_class == "weights_open":
@@ -487,30 +488,38 @@ class MaritimeWeightsWorkflow:
             self.logger_error(f"Failed to initialize GeoPackage backend: {e}")
             raise
 
-    def _resolve_geopackage_source(self) -> Path:
-        """Resolve the source graph GeoPackage file path.
+    def _resolve_geopackage_file(self, graph_name: str) -> Path:
+        """Resolve a GeoPackage file path for source or target graph.
 
-        Tries: absolute path, output_dir, data_dir.
+        Tries: absolute path, output_dir, output_base_dir, data_dir.
+        Falls back to output_dir for new files (full pipeline runs).
         """
-        # If source_graph looks like a path (contains / or .gpkg), use directly
-        source = self.source_graph
-        if '/' in source or source.endswith('.gpkg'):
-            p = Path(source)
+        filename = f"{graph_name}.gpkg"
+
+        # If graph_name looks like a path (contains / or .gpkg), use directly
+        if '/' in graph_name or graph_name.endswith('.gpkg'):
+            p = Path(graph_name)
             if p.exists():
                 return p
 
         # Try output_dir first (most common — graph was created in a previous workflow run)
-        candidate = self.output_dir / f"{source}.gpkg"
+        candidate = self.output_dir / filename
+        if candidate.exists():
+            return candidate
+
+        # Try output base directory (e.g., output/ — where standalone graph runs put files)
+        output_base = PROJECT_ROOT / self.config.get('output.base_dir', 'output')
+        candidate = output_base / filename
         if candidate.exists():
             return candidate
 
         # Try data_dir
-        candidate = self.data_dir / f"{source}.gpkg"
+        candidate = self.data_dir / filename
         if candidate.exists():
             return candidate
 
-        # Return output_dir path as default (validation will catch missing file)
-        return self.output_dir / f"{source}.gpkg"
+        # Default: output_dir (new file will be created here)
+        return self.output_dir / filename
 
     def _validate_configuration(self) -> bool:
         """Validate workflow configuration."""
@@ -528,11 +537,13 @@ class MaritimeWeightsWorkflow:
                         self.logger_error(f"Missing database parameter: {key} (check .env file)")
                         return False
             else:
-                # GeoPackage: verify source graph file exists
-                if not self.source_file.exists():
+                # GeoPackage: verify source graph file exists (skip in dry-run)
+                if not self.dry_run and not self.source_file.exists():
+                    output_base = PROJECT_ROOT / self.config.get('output.base_dir', 'output')
                     self.logger_error(
                         f"Source graph file not found: {self.source_file}\n"
-                        f"Searched in: output_dir ({self.output_dir}), data_dir ({self.data_dir})"
+                        f"Searched in: output_dir ({self.output_dir}), "
+                        f"output_base ({output_base}), data_dir ({self.data_dir})"
                     )
                     return False
 
@@ -683,6 +694,9 @@ class MaritimeWeightsWorkflow:
             buffer_cfg = self.config.get('weighting', {}).get('buffer_zones', {})
             buffer_zones_enabled = buffer_cfg.get('enabled', False)
             save_buffer_zones = buffer_cfg.get('save_buffer_zones', False)
+            simplify_tolerance = buffer_cfg.get('simplify_tolerance', None)
+            if simplify_tolerance is not None:
+                self.weights_manager._buffer_zone_simplify_tolerance = simplify_tolerance
 
             if buffer_zones_enabled:
                 self.logger("Buffer zone processing: ENABLED")
@@ -847,12 +861,29 @@ class MaritimeWeightsWorkflow:
 
             # Calculate route
             self.logger("Calculating optimal route...")
+
+            # Build pathfinder kwargs from config
+            pathfinder_kwargs = {}
+            for key in ('corridor_buffer_nm', 'include_tss', 'tss_bbox_extend_factor',
+                        'sp_buffer_nm', 'use_land_grid'):
+                if key in cfg:
+                    pathfinder_kwargs[key] = cfg[key]
+
+            # Smoothing and debug params
+            apply_smoothing = cfg.get('apply_smoothing', False)
+            debug_export_path = None
+            if cfg.get('debug_export_gpkg', False):
+                debug_export_path = str(self.output_dir / 'debug_pathfinding.gpkg')
+
             route = Route(graph=G, data_manager=self.factory.manager)
             route_detail = route.detailed_route(
                 astar_impl=self.astar_impl,
                 departure_point=dep_port.geometry,
                 arrival_point=arr_port.geometry,
-                weight_key=weight_key
+                weight_key=weight_key,
+                apply_smoothing=apply_smoothing,
+                debug_export_path=debug_export_path,
+                **pathfinder_kwargs,
             )
             self.logger(f"{ICONS['OK']} Route calculated")
 
@@ -1039,13 +1070,14 @@ Examples:
     # A* implementation selection
     parser.add_argument(
         '--astar-impl',
-        choices=['astar', 'astar_improved', 'astar_maritime'],
-        default='astar_maritime',
+        choices=['astar', 'astar_improved', 'astar_maritime', 'astar_maritime_smooth'],
+        default=None,
         help=(
-            'A* pathfinding implementation (default: astar_maritime). '
+            'A* pathfinding implementation. Default reads from config (fallback: astar_maritime). '
             'astar: base algorithm; '
             'astar_improved: domain-specific heuristics; '
-            'astar_maritime: two-pass corridor routing with TSS awareness (recommended)'
+            'astar_maritime: two-pass corridor routing with TSS awareness; '
+            'astar_maritime_smooth: three-pass with string-pulling smoothing (recommended)'
         )
     )
 
@@ -1194,20 +1226,33 @@ Examples:
         print(f"Error: Configuration file not found: {args.config}")
         sys.exit(1)
 
-    # Resolve A* implementation class
+    # Create log directory
+    log_dir = Path(__file__).parent / 'logs'
+
+    # Load configuration
+    config = WorkflowConfig(args.config)
+
+    # Resolve weights class: CLI override > config file > hardcoded default
+    weights_class = args.weights_class or config.get('weighting.weights_class', 'weights')
+
+    # Resolve A* implementation class: CLI override > config file > default
     _astar_map = {
         'astar': Astar,
         'astar_improved': AstarImproved,
         'astar_maritime': AstarMaritime,
+        'astar_maritime_smooth': AstarMaritimeSmooth,
     }
-    astar_impl = _astar_map[args.astar_impl]
-
-    # Create log directory
-    log_dir = Path(__file__).parent / 'logs'
-
-    # Resolve weights class: CLI override > config file > hardcoded default
-    config = WorkflowConfig(args.config)
-    weights_class = args.weights_class or config.get('weighting.weights_class', 'weights')
+    _astar_name_map = {
+        'Astar': Astar,
+        'AstarImproved': AstarImproved,
+        'AstarMaritime': AstarMaritime,
+        'AstarMaritimeSmooth': AstarMaritimeSmooth,
+    }
+    if args.astar_impl:
+        astar_impl = _astar_map[args.astar_impl]
+    else:
+        config_astar = config.get('pathfinding.astar_impl', 'astar_maritime')
+        astar_impl = _astar_name_map.get(config_astar) or _astar_map.get(config_astar.lower(), AstarMaritime)
 
     # Create workflow
     workflow = MaritimeWeightsWorkflow(

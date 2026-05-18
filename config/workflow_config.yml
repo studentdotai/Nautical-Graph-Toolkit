@@ -66,7 +66,7 @@ base_graph:
   # Graph generation parameters
   layer_table: "seaare"           # Primary navigable layer from S-57
   spacing_nm: 0.3                 # Node spacing in nautical miles
-  reduce_distance_nm: 0           # Safety buffer reduction (0 = no reduction)
+  reduce_distance_nm: 3           # Safety buffer reduction (0 = no reduction, 3 = standard maritime safety)
 
   # Output naming conventions
   graph_name: "base_graph"        # Table/file name for base graph
@@ -96,9 +96,9 @@ fine_graph:
   # Useful for: memory-constrained systems, testing, or regional analysis
   slice_buffer: false
   slice_south_degree: 37.0        # Southern latitude limit (if slice_buffer=true)
-  slice_north_degree: 38.0        # Northern latitude limit (if slice_buffer=true)
-  slice_west_degree: -123.5       # Western longitude limit (if slice_buffer=true) - negative = West
-  slice_east_degree: -122.0       # Eastern longitude limit (if slice_buffer=true) - negative = West
+  slice_north_degree: 38.1        # Northern latitude limit (if slice_buffer=true)
+  #slice_west_degree: None #-123.5       # Western longitude limit (if slice_buffer=true) - negative = West
+  #slice_east_degree: None #-122.0       # Eastern longitude limit (if slice_buffer=true) - negative = West
 
   # Fine grid specific parameters (when mode: "fine")
   # Regular rectangular grid for high-precision routing
@@ -220,6 +220,7 @@ weighting:
   buffer_zones:
     enabled: true                 # Enable buffer zone processing during static weights
     save_buffer_zones: true        # Persist buffer zone geometries as separate PostGIS/GeoPackage tables
+    simplify_tolerance: 0.0005    # Land geometry simplification tolerance (degrees). 0 disables. 0.0005 ≈ 55m
 
 # ===============================================
 # STEP 4: PATHFINDING CONFIGURATION
@@ -259,7 +260,7 @@ pathfinding:
   astar_impl: "AstarMaritimeSmooth"  # Default: AstarMaritime for maritime routing with TSS awareness
 
   # AstarMaritime / AstarMaritimeSmooth corridor parameters
-  corridor_buffer_nm: 6.0       # Corridor width around Pass-1 rough path (NM) for Pass-2 optimization
+  corridor_buffer_nm: 18.0       # Corridor width around Pass-1 rough path (NM) for Pass-2 optimization
   include_tss: true             # Force-include TSS lanes in corridor (prevents "blind buffer" trap)
   tss_bbox_extend_factor: 0.5   # Extend TSS detection bbox by this factor (0.5 = 50% expansion)
 
