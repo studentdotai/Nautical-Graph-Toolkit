@@ -171,7 +171,7 @@ The launcher provides autocomplete port search, dry-run preview, config file sel
 
 ---
 
-**Interactive Examples**: See the [Jupyter Notebooks](docs/notebooks/) for 13+ working examples covering:
+**Interactive Examples**: See the [Jupyter Notebooks](docs/notebooks/) for 17+ working examples covering:
 - ENC data import and conversion
 - Graph creation (BaseGraph, FineGraph, H3Graph)
 - Route optimization with A* pathfinding
@@ -370,7 +370,7 @@ Built with **MkDocs** using the Material theme.
 - **[Quick Start Workflow](docs/getting-started/workflow-quickstart.md)** - 5-minute introduction
 - **[PostGIS Guide](docs/user-guides/workflow-postgis-guide.md)** - Production-scale setup
 - **[GeoPackage Guide](docs/user-guides/workflow-geopackage-guide.md)** - Portable single-file setup
-- **[Jupyter Notebooks](docs/notebooks/)** - 13 interactive examples and tutorials
+- **[Jupyter Notebooks](docs/notebooks/)** - 17 interactive examples and tutorials
 
 ### Preview Documentation Locally
 
@@ -394,18 +394,20 @@ The toolkit uses a clean, layered architecture:
 ```
 nautical_graph_toolkit/
    core/                    # Main conversion and routing classes
-      graph.py             # Graph classes (BaseGraph, FineGraph, H3Graph, Weights)
+      graph.py             # Graph classes (BaseGraph, FineGraph, H3Graph)
+      weights.py           # Weight classes (BaseWeights, Weights, WeightsOpen)
       weight_calculator.py # Stateless weight calculation engine (three-tier)
+      weight_optimization.py # ML pipeline utilities (export, validate, PyTorch)
       s57_data.py          # S-57 conversion classes and database managers
       pathfinding_lite.py  # A* pathfinding engine (Maritime, Smooth, Improved)
-      postgis_table_manager.py # PostGIS TEMP table lifecycle manager
-      route_utils.py       # Route export utilities
    utils/                   # Database and utility connectors
       db_utils.py          # Database operations (PostGIS, GeoPackage, SpatiaLite)
+      postgis_table_manager.py # PostGIS TEMP table lifecycle manager
       s57_utils.py         # S-57 attribute lookups and NOAA database
       port_utils.py        # World Port Index integration
       s57_classification.py # S-57 feature classification
       geometry_utils.py    # Geometric operations (Buffer, Bearing)
+      route_utils.py       # Route export utilities
       misc_utils.py        # Coordinate conversion and helpers
       plot_utils.py        # Plotly visualization utilities
       notebook_utils.py    # Jupyter notebook benchmarking
@@ -441,7 +443,7 @@ nautical_graph_toolkit/
 | `AstarMaritimeSmooth` | Three-pass A* routing | Optimal route with string-pulling |
 | `AstarMaritime` | Two-pass corridor routing | Maritime A* with corridor refinement |
 | `AstarImproved` | Pilot quantity heuristic | Straighter path optimization |
-| `PostisTableManager` | PostGIS bulk operations | TEMP table lifecycle and CTAS |
+| `PostgisTableManager` | PostGIS bulk operations | TEMP table lifecycle and CTAS |
 | `Route` | Route management | Export and analysis |
 | `NoaaDatabase` | NOAA ENC catalog | Chart metadata and updates |
 | `PortData` | Port information | World Port Index integration |
@@ -631,7 +633,7 @@ AGPL-3.0 means:
 
 ## 🤝 Contributing
 
-**Note:** This project is currently in active early development (v{{ project_version }}). We will begin accepting community contributions starting with **v0.2.0** as the codebase stabilizes and comprehensive contribution guidelines are established. See the [Roadmap](#-roadmap) for timeline details.
+**Note:** This project is currently in active early development (v0.1.5). We will begin accepting community contributions starting with **v0.2.0** as the codebase stabilizes and comprehensive contribution guidelines are established. See the [Roadmap](#-roadmap) for timeline details.
 
 In the meantime, you can:
 - Report bugs or request features on [GitHub Issues](https://github.com/studentdotai/Nautical-Graph-Toolkit/issues)
@@ -662,7 +664,7 @@ While the core development is a one-person effort carried out part-time (often a
 
 ### Flagship Product: Nautical Graph Toolkit
 
-Our first step toward this vision is the **Nautical Graph Toolkit (v{{ project_version }})**. It is an open-source engine designed to bridge the gap between raw hydrographic data (S-57 ENCs) and intelligent routing. It transforms static charts into vessel-aware, weighted graphs, allowing developers and mariners to analyze the marine environment without the barriers of legacy software.
+Our first step toward this vision is the **Nautical Graph Toolkit (v0.1.5)**. It is an open-source engine designed to bridge the gap between raw hydrographic data (S-57 ENCs) and intelligent routing. It transforms static charts into vessel-aware, weighted graphs, allowing developers and mariners to analyze the marine environment without the barriers of legacy software.
 
 ### Why We Need Your Support: The Hardware Fund
 

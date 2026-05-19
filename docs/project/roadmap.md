@@ -152,7 +152,7 @@ This release represents a major milestone: transitioning the toolkit to PyTorch 
 - **[ ] API Reference**: Generate with mkdocstrings (MkDocs integration, replacing Sphinx approach)
 - **[ ] PyTorch Tutorials**: New notebooks for ML-based routing workflows
 - **[ ] Migration Guide**: Upgrading from NumPy-based to PyTorch-based weights
-- **[x] Expanded Tutorials**: 13 Jupyter notebooks (v0.1.2) + 5 new notebooks in v0.1.5 (WeightsOpen PostGIS, edge inspection, pathfinding comparison, geometry utils, updated GeoPackage v3)
+- **[x] Expanded Tutorials**: 13 Jupyter notebooks (v0.1.2) + 4 new notebooks in v0.1.5 (edge inspection, pathfinding comparison, geometry utils, performance metrics)
 
 ### 🧪 Testing & Quality
 

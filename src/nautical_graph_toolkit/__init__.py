@@ -23,7 +23,7 @@ This package requires GDAL 3.10.3 (installed via Conda). Install via:
 See https://github.com/studentdotai/Nautical-Graph-Toolkit for detailed guides.
 """
 
-__version__ = "0.1.2"
+__version__ = "0.1.5"
 __author__ = "Viktor Kolbasov"
 __email__ = "contact@studentdotai.com"
 __license__ = "AGPL-3.0-only"

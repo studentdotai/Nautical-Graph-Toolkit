@@ -183,13 +183,13 @@ This release restructures the entire weighting architecture from a monolithic `W
 
 #### Notebooks
 
-- **`graph_weighted_open_Postgis.ipynb`** — WeightsOpen workflow with PostGIS
+- **`graph_weighted_directed_Postgis_v2.ipynb`** — Updated PostGIS workflow
   - Per-layer weight tracking demonstration
   - ML feature extraction for GNN pipelines
 - **`inspect_edge.ipynb`** — Cross-backend edge inspection tool
   - Side-by-side attribute comparison
   - Tolerance checking for numerical differences
-- **`graph_weighted_directed_GeoPackage_v3.ipynb`** — Updated GeoPackage workflow
+- **`graph_weighted_directed_GeoPackage_v2.ipynb`** — Updated GeoPackage workflow
   - Mode selection (mem vs sql) for SpatiaLite processing
   - Comprehensive benchmarking
 - **`pathfinding_compare.ipynb`** — Pathfinding algorithm comparison
@@ -237,7 +237,7 @@ This release restructures the entire weighting architecture from a monolithic `W
 - **`weights.py`** — `build_buffer_zones_postgis()` refactored: consolidated 4 separate transactions into single txn with `temp_buffers`/`work_mem` tuning; ring geometries materialized into GiST-indexed tables instead of inline CTEs; edge classification uses multi-UPDATE with indexed spatial joins (largest zone first, nearest land wins); ring tables renamed on save or dropped on cleanup
 - **`weights.py`** — `build_buffer_zones_gdf()`, `build_buffer_zones_sql()`: added `simplify_tolerance` parameter passthrough to `Buffer.build_ring_zones_gpkg()`
 - **`geometry_utils.py`** — `Buffer.build_ring_zones_postgis()` and `build_ring_zones_gpkg()`: added `simplify_tolerance` parameter for land geometry simplification
-- **`weights_legacy.py`** → Renamed from original `weights.py`; preserved for reference only
+- **`weights_legacy.py`** → Removed; legacy code fully refactored into modular `weights.py` architecture
 - **`graph.py`**: Multiple `convert_to_directed` backends replacing single NetworkX conversion
   - `_bridge_disconnected_components()`: Uses actual subdivision factor from database instead of node-count heuristic; removed 3-edge cap on non-seam bridges that caused geographic gaps at subdivision boundaries
   - `create_base_graph()` / `create_grid_subgraph()` / `_create_grid_subgraph_database_side()`: Pass through `table_prefix`/`grid_schema` for indexed table management

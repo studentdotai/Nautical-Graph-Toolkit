@@ -26,12 +26,12 @@ _For detailed technical changes including method signatures and internal archite
 - **Database health monitoring**: Active query inspection, table lock/bloat detection, backend termination (with dry-run), and combined diagnostic suite in `db_utils.py`.
 - **Workflow configuration** (`workflow_config.yml`): Four-step pipeline control, vessel parameters, A* algorithm selection, three-tier coastal buffer zones, and benchmarking with CSV export.
 - **S-57 object definitions**: 232-entry S-57 object class reference data (`s57object_definitions.csv`).
-- **5 new notebooks**: WeightsOpen PostGIS workflow, edge inspection tool, updated GeoPackage v3 workflow, pathfinding comparison, and geometry utilities demo.
-- **11 new test files** (~6,600 lines): Unit tests for weights, buffer zones, directed conversion, bearing, and smoothing; integration tests for cross-backend weight parity, bearing parity, buffer methods, and feature enrichment.
+- **4 new notebooks**: Edge inspection tool, pathfinding comparison, geometry utilities demo, and performance benchmarking.
+- **16 new test files** (~9,800 lines): Unit tests for weights, buffer zones, directed conversion, bearing, smoothing, and string pulling; integration tests for cross-backend weight parity, bearing parity, buffer methods, and feature enrichment.
 
 ### Changed
 
-- **Weight system**: Legacy monolithic `weights.py` renamed to `weights_legacy.py` (preserved for reference). New `weights.py` provides the modular three-tier system with `BaseWeights` ABC.
+- **Weight system**: Legacy monolithic `weights.py` fully refactored into modular three-tier architecture. New `weights.py` provides `BaseWeights` ABC with `Weights` (production) and `WeightsOpen` (ML-optimized) subclasses.
 - **Directed graph conversion**: Multi-backend support (GeoDataFrame, SpatiaLite SQL, PostGIS) replacing single NetworkX conversion, with deterministic ID assignment.
 - **PostGIS grid creation**: Server-side `ST_Subdivide` with GiST-indexed point-in-polygon replaces Python-side polygon clipping.
 - **Static weight computation**: Fully vectorized with shapely 2.0 + pandas groupby replacing row-by-row processing.
@@ -831,7 +831,7 @@ Focus on PyTorch integration, production deployment, and security:
 - **PyPI Distribution**: Easy installation via `pip install nautical-graph-toolkit`
 - **Security**: OWASP Top 10 audit, input validation, dependency scanning
 - **Documentation**: Complete API reference, PyTorch tutorials, migration guide
-- **Testing & CI/CD**: GitHub Actions automation, >80% code coverage (v0.1.5 added ~6,600 lines of tests)
+- **Testing & CI/CD**: GitHub Actions automation, >80% code coverage (v0.1.5 added ~9,800 lines of tests)
 - **Deployment**: Official Docker images (PostGIS + GDAL + Toolkit + PyTorch), Docker Compose, Kubernetes/Helm support
 - **Performance**: Official benchmark publication, PyTorch vs NumPy comparison
 

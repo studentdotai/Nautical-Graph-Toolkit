@@ -35,6 +35,15 @@ Helper functions and data inspection tools.
 
 - **[Port Utilities](port_utils.ipynb)** - World Port Index integration & port queries
 - **[Layer Inspection](layers_inspect_v2.ipynb)** - Analyze ENC layer contents and attributes
+- **[Geometry Utilities](geometry_utils.ipynb)** - Buffer and Bearing operations demo
+- **[Edge Inspection](inspect_edge.ipynb)** - Edge weight inspection and analysis
+
+### Advanced Analysis
+
+Performance benchmarking and algorithm comparison.
+
+- **[Pathfinding Comparison](pathfinding_compare.ipynb)** - A* algorithm variant comparison
+- **[Performance Metrics](performance_metrics.ipynb)** - Workflow performance benchmarking
 
 ## 🚀 How to Use
 
@@ -80,6 +89,7 @@ Deep dives into specific features.
 - [FineGraph Refinement](graph_fine_PostGIS_v2.ipynb)
 - [Port Utilities & Integration](port_utils.ipynb)
 - [Layer Inspection & Analysis](layers_inspect_v2.ipynb)
+- [Geometry Utilities](geometry_utils.ipynb)
 
 ### Advanced
 Production workflows and optimization.
@@ -87,6 +97,9 @@ Production workflows and optimization.
 - [Weighted Routing & Pathfinding](graph_weighted_directed_Postgis_v2.ipynb)
 - [ENC Factory Deep Processing](import_deeptest.ipynb)
 - [S-57 Attribute Analysis](s57utils.ipynb)
+- [Edge Inspection & Analysis](inspect_edge.ipynb)
+- [Pathfinding Comparison](pathfinding_compare.ipynb)
+- [Performance Benchmarking](performance_metrics.ipynb)
 
 ## 💾 Backend Comparison
 
