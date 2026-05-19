@@ -1003,7 +1003,7 @@ PostgreSQL uses POSIX shared memory (`/dev/shm`) during VACUUM operations. Docke
 Check the actual shm_size of your running container:
 
 ```bash
-docker inspect postgis_nautical --format '{{.HostConfig.ShmSize}}'
+docker inspect postgis_nautical --format '{% raw %}{{.HostConfig.ShmSize}}{% endraw %}'
 # 67108864  ← 64MB (Docker default)
 # should be 4294967296 (4GB) if docker-compose.linux.yml was applied correctly
 ```
@@ -1024,7 +1024,7 @@ The `postgis_data` volume is persistent — **no data will be lost**.
 After restart, verify:
 
 ```bash
-docker inspect postgis_nautical --format '{{.HostConfig.ShmSize}}'
+docker inspect postgis_nautical --format '{% raw %}{{.HostConfig.ShmSize}}{% endraw %}'
 # 4294967296  ← 4GB ✓
 ```
 
