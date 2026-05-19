@@ -13,14 +13,14 @@
 2. [Visual Architecture Diagram](#visual-architecture-diagram)
 3. [Decision Trees](#decision-trees)
 4. [Architecture Flow](#architecture-flow)
-5. [Feature Absorption (ft_* columns)](#feature-absorption)
-6. [Static Weights (wt_static_*, wt_layer_*)](#static-weights)
-7. [Directional Weights (dir_*)](#directional-weights)
-8. [Dynamic Weights (wt_dynamic_*)](#dynamic-weights)
+5. [Feature Absorption (ft_* columns)](#stage-1-feature-absorption-enrich_edges_with_features)
+6. [Static Weights (wt_static_*, wt_layer_*)](#stage-2-static-weights-apply_static_weights)
+7. [Directional Weights (dir_*)](#stage-3-directional-weights-calculate_directional_weights)
+8. [Dynamic Weights (wt_dynamic_*)](#stage-4-dynamic-weights-calculate_dynamic_weights)
 9. [Weight Aggregation Formula](#weight-aggregation-formula)
 10. [Column Naming Convention](#column-naming-convention)
 11. [PyTorch ML Support](#pytorch-ml-support)
-12. [Migration Guide: Weights → WeightsOpen](#migration-guide-weights--weightsopen)
+12. [Migration Guide: Weights → WeightsOpen](#migration-guide-weights-weightsopen)
 13. [Configuration Files](#configuration-files)
 14. [File Reference](#file-reference)
 15. [Example Workflow](#example-workflow)
@@ -240,7 +240,7 @@ S-57 ENCs → Feature Extraction → Static Weights → Directional → Dynamic 
 
 ## Architecture Flow
 
-### Stage 1: Feature Absorption (`enrich_edges_with_features`) {#feature-absorption}
+### Stage 1: Feature Absorption (`enrich_edges_with_features`)
 
 **Purpose:** Extract S-57 attribute data via spatial intersection between graph edges and ENC features.
 
@@ -273,7 +273,7 @@ Features from higher usage bands override lower bands:
 
 ---
 
-### Stage 2: Static Weights (`apply_static_weights`) {#static-weights}
+### Stage 2: Static Weights (`apply_static_weights`)
 
 **Purpose:** Apply distance-based weights from maritime features using the S-57 classification system.
 
@@ -337,7 +337,7 @@ Static weights change based on proximity to features:
 
 ---
 
-### Stage 3: Directional Weights (`calculate_directional_weights`) {#directional-weights}
+### Stage 3: Directional Weights (`calculate_directional_weights`)
 
 **Purpose:** Optimize for traffic flow alignment based on feature orientation.
 
@@ -381,7 +381,7 @@ For features with `TRAFIC = 4` (two-way traffic):
 
 ---
 
-### Stage 4: Dynamic Weights (`calculate_dynamic_weights`) {#dynamic-weights}
+### Stage 4: Dynamic Weights (`calculate_dynamic_weights`)
 
 **Purpose:** Apply vessel-specific constraints based on ship specifications and extracted features.
 
@@ -628,7 +628,7 @@ optimizer = GraphWeightOptimizer()  # no arguments needed
 
 ---
 
-## Migration Guide: Weights → WeightsOpen {#migration-guide-weights--weightsopen}
+## Migration Guide: Weights → WeightsOpen
 
 ### Overview
 
