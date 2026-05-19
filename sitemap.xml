@@ -2,74 +2,86 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://studentdotai.github.io/Nautical-Graph-Toolkit/</loc>
-         <lastmod>2026-02-11</lastmod>
+         <lastmod>2026-05-19</lastmod>
     </url>
     <url>
          <loc>https://studentdotai.github.io/Nautical-Graph-Toolkit/api/</loc>
-         <lastmod>2026-02-11</lastmod>
+         <lastmod>2026-05-19</lastmod>
     </url>
     <url>
          <loc>https://studentdotai.github.io/Nautical-Graph-Toolkit/getting-started/install/</loc>
-         <lastmod>2026-02-11</lastmod>
+         <lastmod>2026-05-19</lastmod>
     </url>
     <url>
          <loc>https://studentdotai.github.io/Nautical-Graph-Toolkit/getting-started/setup/</loc>
-         <lastmod>2026-02-11</lastmod>
+         <lastmod>2026-05-19</lastmod>
     </url>
     <url>
          <loc>https://studentdotai.github.io/Nautical-Graph-Toolkit/getting-started/workflow-quickstart/</loc>
-         <lastmod>2026-02-11</lastmod>
+         <lastmod>2026-05-19</lastmod>
     </url>
     <url>
          <loc>https://studentdotai.github.io/Nautical-Graph-Toolkit/notebooks/</loc>
-         <lastmod>2026-02-11</lastmod>
+         <lastmod>2026-05-19</lastmod>
     </url>
     <url>
          <loc>https://studentdotai.github.io/Nautical-Graph-Toolkit/project/changelog/</loc>
-         <lastmod>2026-02-11</lastmod>
+         <lastmod>2026-05-19</lastmod>
     </url>
     <url>
          <loc>https://studentdotai.github.io/Nautical-Graph-Toolkit/project/contributing/</loc>
-         <lastmod>2026-02-11</lastmod>
+         <lastmod>2026-05-19</lastmod>
+    </url>
+    <url>
+         <loc>https://studentdotai.github.io/Nautical-Graph-Toolkit/project/devlog/</loc>
+         <lastmod>2026-05-19</lastmod>
     </url>
     <url>
          <loc>https://studentdotai.github.io/Nautical-Graph-Toolkit/project/roadmap/</loc>
-         <lastmod>2026-02-11</lastmod>
+         <lastmod>2026-05-19</lastmod>
     </url>
     <url>
          <loc>https://studentdotai.github.io/Nautical-Graph-Toolkit/reference/technical-specs/</loc>
-         <lastmod>2026-02-11</lastmod>
+         <lastmod>2026-05-19</lastmod>
     </url>
     <url>
          <loc>https://studentdotai.github.io/Nautical-Graph-Toolkit/reference/troubleshooting/</loc>
-         <lastmod>2026-02-11</lastmod>
+         <lastmod>2026-05-19</lastmod>
+    </url>
+    <url>
+         <loc>https://studentdotai.github.io/Nautical-Graph-Toolkit/reference/weights_system/</loc>
+         <lastmod>2026-05-19</lastmod>
     </url>
     <url>
          <loc>https://studentdotai.github.io/Nautical-Graph-Toolkit/user-guides/data-guide/</loc>
-         <lastmod>2026-02-11</lastmod>
+         <lastmod>2026-05-19</lastmod>
     </url>
     <url>
          <loc>https://studentdotai.github.io/Nautical-Graph-Toolkit/user-guides/database-backend-guide/</loc>
-         <lastmod>2026-02-11</lastmod>
+         <lastmod>2026-05-19</lastmod>
     </url>
     <url>
          <loc>https://studentdotai.github.io/Nautical-Graph-Toolkit/user-guides/scripts-guide/</loc>
-         <lastmod>2026-02-11</lastmod>
+         <lastmod>2026-05-19</lastmod>
     </url>
     <url>
          <loc>https://studentdotai.github.io/Nautical-Graph-Toolkit/user-guides/weights-workflow-example/</loc>
-         <lastmod>2026-02-11</lastmod>
+         <lastmod>2026-05-19</lastmod>
     </url>
     <url>
          <loc>https://studentdotai.github.io/Nautical-Graph-Toolkit/user-guides/workflow-geopackage-guide/</loc>
-         <lastmod>2026-02-11</lastmod>
+         <lastmod>2026-05-19</lastmod>
     </url>
     <url>
          <loc>https://studentdotai.github.io/Nautical-Graph-Toolkit/user-guides/workflow-postgis-guide/</loc>
-         <lastmod>2026-02-11</lastmod>
+         <lastmod>2026-05-19</lastmod>
     </url>
     <url>
          <loc>https://studentdotai.github.io/Nautical-Graph-Toolkit/user-guides/workflow-s57-import-guide/</loc>
-         <lastmod>2026-02-11</lastmod>
+         <lastmod>2026-05-19</lastmod>
+    </url>
+    <url>
+         <loc>https://studentdotai.github.io/Nautical-Graph-Toolkit/user-guides/workflow-weights-guide/</loc>
+         <lastmod>2026-05-19</lastmod>
     </url>
 </urlset>
