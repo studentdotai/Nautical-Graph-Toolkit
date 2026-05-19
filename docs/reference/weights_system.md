@@ -240,7 +240,7 @@ S-57 ENCs → Feature Extraction → Static Weights → Directional → Dynamic 
 
 ## Architecture Flow
 
-### Stage 1: Feature Absorption (`enrich_edges_with_features`)
+### Stage 1: Feature Absorption (`enrich_edges_with_features`) {#feature-absorption}
 
 **Purpose:** Extract S-57 attribute data via spatial intersection between graph edges and ENC features.
 
@@ -273,7 +273,7 @@ Features from higher usage bands override lower bands:
 
 ---
 
-### Stage 2: Static Weights (`apply_static_weights`)
+### Stage 2: Static Weights (`apply_static_weights`) {#static-weights}
 
 **Purpose:** Apply distance-based weights from maritime features using the S-57 classification system.
 
@@ -337,7 +337,7 @@ Static weights change based on proximity to features:
 
 ---
 
-### Stage 3: Directional Weights (`calculate_directional_weights`)
+### Stage 3: Directional Weights (`calculate_directional_weights`) {#directional-weights}
 
 **Purpose:** Optimize for traffic flow alignment based on feature orientation.
 
@@ -381,7 +381,7 @@ For features with `TRAFIC = 4` (two-way traffic):
 
 ---
 
-### Stage 4: Dynamic Weights (`calculate_dynamic_weights`)
+### Stage 4: Dynamic Weights (`calculate_dynamic_weights`) {#dynamic-weights}
 
 **Purpose:** Apply vessel-specific constraints based on ship specifications and extracted features.
 
@@ -628,7 +628,7 @@ optimizer = GraphWeightOptimizer()  # no arguments needed
 
 ---
 
-## Migration Guide: Weights → WeightsOpen
+## Migration Guide: Weights → WeightsOpen {#migration-guide-weights--weightsopen}
 
 ### Overview
 
