@@ -220,7 +220,7 @@ weighting:
   buffer_zones:
     enabled: true                 # Enable buffer zone processing during static weights
     save_buffer_zones: true        # Persist buffer zone geometries as separate PostGIS/GeoPackage tables
-    simplify_tolerance: 0.0005    # Land geometry simplification tolerance (degrees). 0 disables. 0.0005 ≈ 55m
+    simplify_tolerance: 0.0001    # Land geometry simplification tolerance (degrees). 0 disables. 0.0005 ≈ 55m, 0.0001 ≈ 11m
 
 # ===============================================
 # STEP 4: PATHFINDING CONFIGURATION

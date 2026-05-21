@@ -44,3 +44,14 @@ Source,Workflow ID,Backend,Graph Mode,Precision,NGT Ver,Base Graph Creation (s),
 50,workflow_fine_mia_kw_20260514_212232,PostGIS,FINE,0.2,0.1.5,42.1,91.6,Not in source,Not in source,Not in source,211444,836494,Linux
 51,workflow_fine_mia_kw2_20260514_214307,PostGIS,FINE,0.2,0.1.5,40.9,90.1,Not in source,Not in source,Not in source,211444,836494,Linux
 53,workflow_fine_sf_test_20260513_092531,GeoPackage,FINE,0.2,0.1.5,57.0,13.2,193.4,Not in source,Not in source,59099,464632,Linux
+54,workflow_fine_test_bm_20_20260520_104318,PostGIS,FINE,0.2,0.1.5,118.3,125.5,522.4,289.4,1055.6,297143,1179778,Linux
+55,workflow_fine_test_bz6_20_20260520_143515,GeoPackage,FINE,0.2,0.1.5,54.8,62.6,3103.5,501.4,3722.2,434254,1725286,Linux
+56,workflow_fine_test_fix_20260520_193925,PostGIS,FINE,0.2,0.1.5,18.9,29.8,118.8,75.4,243.0,76220,303037,Linux
+57,workflow_fine_test_fix2_20260520_194436,GeoPackage,FINE,0.2,0.1.5,9.4,12.6,160.3,88.6,270.8,76172,301345,Linux
+58,workflow_fine_final_fix_20260520_200703,PostGIS,FINE,0.2,0.1.5,49.2,123.1,581.4,322.1,1075.8,319921,1301126,Linux
+59,workflow_fine_pg_20_20260518_180541,PostGIS,FINE,0.2,0.1.5,28.4,40.6,260.0,80.9,409.8,79965,316142,Linux
+60,workflow_fine_pg_10_20260518_181350,PostGIS,FINE,0.1,0.1.5,20.0,126.6,682.2,337.5,1166.2,321361,1279356,Linux
+61,workflow_fine_gpkg_20_20260518_183745,GeoPackage,FINE,0.2,0.1.5,10.3,14.9,256.8,96.1,378.2,80127,315399,Linux
+62,workflow_h3_gpkg_5_11_20260518_184730,GeoPackage,H3,5/11,0.1.5,10.1,114.0,717.1,456.6,1297.9,455212,1372448,Linux
+63,workflow_fine_gpkg_10_20260518_213617,GeoPackage,FINE,0.1,0.1.5,10.1,44.0,720.2,379.8,1154.1,320842,1271878,Linux
+64,workflow_h3_pg_5_11_20260518_220510,PostGIS,H3,5/11,0.1.5,19.7,168.3,740.1,413.2,1341.4,454931,1371595,Linux

@@ -6921,6 +6921,12 @@ class Weights(BaseWeights):
                 self._apply_zone_penalties_sql(str(graph_path), conn=conn_graph)
                 summary['buffer_zones_classified'] = True
                 summary['buffer_zone_counts'] = buf_result.get('zone_counts', {})
+            elif buffer_zones:
+                logger.warning(
+                    "[BUFFER ZONES] Skipped: no land geometry available "
+                    "(progressive_grid returned empty). "
+                    "Check that ENC data has lndare/seaare layers matching the filtered ENC names."
+                )
 
                 if save_buffer_zones:
                     rings = Buffer.build_ring_zones_gpkg(
@@ -7083,6 +7089,12 @@ class Weights(BaseWeights):
                         f"[BUFFER ZONES] Saved {len(rings)} buffer zone layers to GPKG"
                     )
                     result_extra['buffer_zones_saved'] = True
+            elif buffer_zones:
+                logger.warning(
+                    "[BUFFER ZONES] Skipped: no land geometry available "
+                    "(progressive_grid returned empty). "
+                    "Check that ENC data has lndare/seaare layers matching the filtered ENC names."
+                )
 
             blocking_updates = int((enriched['wt_static_blocking'] > 1.0).sum())
             penalty_updates = int((enriched['wt_static_penalty'] > 1.0).sum())
@@ -7745,8 +7757,15 @@ class Weights(BaseWeights):
             summary['grid_schema'] = buf_result.get('grid_schema', grid_schema)
             if save_buffer_zones:
                 summary['buffer_zones_saved'] = buf_result.get('ring_tables_saved', False)
+        elif buffer_zones:
+            logger.warning(
+                "[BUFFER ZONES] Skipped: no land geometry available "
+                "(progressive_grid returned empty). "
+                "Check that enc_west schema has seaare/lndare data matching the filtered ENC names."
+            )
 
-            # Convert ft_buffer_zone_dist → wt_zone_penalty using config zone_penalties
+        # Convert ft_buffer_zone_dist → wt_zone_penalty using config zone_penalties
+        if buffer_zones:
             edges_table_pg = f"{graph_name}_edges"
             sorted_zones = sorted((nm, v) for nm, v in self._zone_penalties.items() if nm > 0)
             engine_pg = self.factory.manager.engine
@@ -8550,6 +8569,12 @@ class WeightsOpen(BaseWeights):
                             str(graph_path), layer=layer_name, driver='GPKG', engine=engine
                         )
                     result_extra['buffer_zones_saved'] = True
+            elif buffer_zones:
+                logger.warning(
+                    "[BUFFER ZONES] Skipped: no land geometry available "
+                    "(progressive_grid returned empty). "
+                    "Check that ENC data has lndare/seaare layers matching the filtered ENC names."
+                )
 
             blocking_updates = int((enriched['wt_static_blocking'] > 1.0).sum())
             penalty_updates = int((enriched['wt_static_penalty'] > 1.0).sum())

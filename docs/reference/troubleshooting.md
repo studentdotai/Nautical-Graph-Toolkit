@@ -17,12 +17,13 @@ This guide covers common issues you may encounter when working with the Nautical
 8. [Port Selection Issues](#port-selection-issues)
 9. [Database Connection Issues](#database-connection-issues)
     - VACUUM ANALYZE fails with "No space left on device" (Docker shm)
-10. [Data Source Issues](#data-source-issues)
-11. [S57Updater: File-Based Backend Safety](#s57updater-file-based-backend-safety) ⚠️ **Important**
-12. [Graph Creation Issues](#graph-creation-issues)
-13. [Performance Issues](#performance-issues)
-14. [Visualization Issues](#visualization-issues)
-15. [Pathfinding Issues](#pathfinding-issues)
+10. [Buffer Zone TopologyException](#buffer-zone-topology-exception) ⚠️ **PostGIS Complex Coastlines**
+11. [Data Source Issues](#data-source-issues)
+12. [S57Updater: File-Based Backend Safety](#s57updater-file-based-backend-safety) ⚠️ **Important**
+13. [Graph Creation Issues](#graph-creation-issues)
+14. [Performance Issues](#performance-issues)
+15. [Visualization Issues](#visualization-issues)
+16. [Pathfinding Issues](#pathfinding-issues)
 
 ---
 
@@ -1047,6 +1048,54 @@ services:
       -c maintenance_work_mem=1GB  # Used by VACUUM
       -c work_mem=128MB
 ```
+
+---
+
+## Buffer Zone TopologyException {: #buffer-zone-topology-exception}
+
+### Issue: `TopologyException: unable to assign free hole to a shell` during buffer zone classification
+
+**Symptoms:**
+```
+psycopg2.errors.InternalError_: lwgeom_unaryunion_prec: GEOS Error: TopologyException:
+unable to assign free hole to a shell at -117.905029 33.613684999999997
+```
+
+Occurs during `[BUFFER ZONES PostGIS]` step, typically at the first ring materialization (`ring_3_0`).
+
+**Root Cause:**
+
+`ST_SimplifyPreserveTopology` collapses narrow coastal waterways (rivers, channels, harbor inlets) when the tolerance exceeds the feature width. This creates isolated interior rings ("free holes") in the land polygon — polygons with holes that have no valid parent shell in GEOS's topology graph.
+
+The error fires inside `ST_Difference(buffer, land)` when GEOS tries to node the intersection of two very complex geometries. Even `ST_MakeValid` and `ST_Buffer(geom, 0)` cannot fix it because the topology break occurs internally during the boolean operation, not in the input geometries.
+
+**Affected coordinate:** -117.905, 33.614 (Newport Beach / Long Beach harbor area, Southern California). Other complex coastlines with narrow channels may also trigger it.
+
+**Workaround:**
+
+Reduce `simplify_tolerance` in your config. The default `0.0005` (~55m) can collapse channels narrower than 55m. Reducing to `0.0001` (~11m) preserves most narrow features:
+
+```yaml
+# config/workflow_config.yml
+weighting:
+  buffer_zones:
+    simplify_tolerance: 0.0001   # ~11m (default was 0.0005 ~55m)
+```
+
+Trade-off: lower tolerance = larger land geometry = slightly longer buffer zone processing time.
+
+**What the code already does:**
+
+The `build_ring_zones_postgis()` CTE includes a `land_filled` step that strips interior rings from the land polygon before buffering. This prevents holes created by simplification from reaching `ST_Difference`, but cannot prevent topology breaks caused by sheer geometry complexity at complex coastlines.
+
+**Future fix:**
+
+A `ST_Subdivide` fallback is planned — if direct `ST_Difference` fails, the buffer will be broken into small tiles, each differenced locally against a clipped land fragment, then the partial rings unioned back together. This makes each individual GEOS operation tractable regardless of coastline complexity.
+
+**See also:**
+
+- `src/nautical_graph_toolkit/utils/geometry_utils.py` — `Buffer.build_ring_zones_postgis()`
+- `docs/project/devlog.md` — v0.1.5 Buffer Zone TopologyException entry
 
 ---
 

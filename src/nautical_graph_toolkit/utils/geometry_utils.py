@@ -461,12 +461,26 @@ class Buffer:
         zone_distances_nm: Optional[List[float]] = None,
         buffer_mode: str = "fast",
         land_geom_col: str = "geometry",
-        simplify_tolerance: float = 0.0005,
+        simplify_tolerance: float = 0.0001,
     ) -> str:
         """Build SQL CTE string for concentric ring zones in PostGIS.
 
-        Returns a ``WITH ...`` CTE containing ``land``, ``buf_<nm>``, and
-        ``ring_<nm>`` CTEs ready to prepend to an UPDATE or SELECT.
+        Returns a ``WITH ...`` CTE containing ``land``, ``land_filled``,
+        ``buf_<nm>``, and ``ring_<nm>`` CTEs ready to prepend to an UPDATE
+        or SELECT.
+
+        The ``land_filled`` CTE strips all interior rings (holes) from the
+        simplified land geometry before buffering. This prevents
+        simplification-created orphan holes from causing GEOS
+        ``TopologyException`` errors during ``ST_Difference``.
+
+        .. note::
+           For complex coastlines (harbors, narrow channels), tolerance
+           values above ~0.0002° may collapse channels narrower than the
+           tolerance, producing ``TopologyException: unable to assign free
+           hole to a shell`` in ``ST_Difference``. Use 0.0001 (~11m) for
+           such areas. See ``docs/reference/troubleshooting.md`` — Buffer
+           Zone TopologyException.
 
         Args:
             land_table: PostGIS table with land geometry.
@@ -500,6 +514,16 @@ class Buffer:
             f'    FROM "{land_schema}"."{land_table}"\n'
             f')'
         )
+        ctes.append(
+            'land_filled AS (\n'
+            '    SELECT ST_CollectionExtract(\n'
+            '        ST_BuildArea(\n'
+            '            ST_Collect(ST_ExteriorRing((dump).geom))\n'
+            '        ), 3\n'
+            '    ) AS geom\n'
+            '    FROM land, LATERAL ST_Dump(land.geom) AS dump\n'
+            ')'
+        )
 
         # Buffer CTEs
         for nm in zone_distances_nm:
@@ -512,7 +536,7 @@ class Buffer:
                 buf_expr = f"ST_Buffer(geom::geography, {nm * 1852.0})::geometry"
             ctes.append(
                 f'buf_{tag} AS (\n'
-                f'    SELECT {buf_expr} AS geom FROM land\n'
+                f'    SELECT {buf_expr} AS geom FROM land_filled\n'
                 f')'
             )
 
@@ -520,7 +544,7 @@ class Buffer:
         for i, nm in enumerate(zone_distances_nm):
             tag = str(nm).replace(".", "_")
             if i == 0:
-                inner_ref = "land"
+                inner_ref = "land_filled"
             else:
                 prev_tag = str(zone_distances_nm[i - 1]).replace(".", "_")
                 inner_ref = f"buf_{prev_tag}"

@@ -338,3 +338,35 @@ Updated benchmarking infrastructure and technical documentation to reflect the f
 - **GeoPackage weighting penalty**: 2,806s vs 782s at ~1.2M edges (3.6×) — row-by-row SpatiaLite vs bulk PostGIS with GiST-indexed spatial joins
 - **Weighted storage explosion**: 10–14× unweighted size in PostGIS due to 15–25 additional columns per directed edge; edge tables 95%+ of total
 - **Pathfinding scales sub-linearly**: A* corridor search with string-pulling remains efficient even at 6.5M+ directed edges
+
+---
+
+### Buffer Zone TopologyException Fix (2026-05-20)
+
+#### Problem
+
+`ST_Difference` in `build_ring_zones_postgis()` threw `TopologyException: unable to assign free hole to a shell` at coordinate -117.905, 33.614 (Newport Beach, CA). The error occurred during buffer zone ring materialization (`ring_3_0`) when computing the difference between a 3 NM geography buffer and simplified land geometry.
+
+#### Root Cause
+
+`ST_SimplifyPreserveTopology` with tolerance 0.0005° (~55m) collapses narrow coastal waterways (rivers, harbor channels) narrower than the tolerance. This creates isolated interior rings in the land polygon. When GEOS computes `ST_Difference(buffer, land)`, the noding of two very complex geometries produces the "free hole" topology break internally. Neither `ST_MakeValid` nor `ST_Buffer(geom, 0)` on the inputs fixes this because the error occurs inside the boolean operation, not in the input geometries.
+
+#### Investigation
+
+Attempted fixes that did not resolve the issue:
+1. `ST_MakeValid` wrapping on both `ST_Difference` operands — error persists inside GEOS
+2. `ST_Buffer(ST_MakeValid(...), 0)` — same result, topology rebuild doesn't help
+3. `land_filled` CTE using `ST_BuildArea(ST_Collect(ST_ExteriorRing(...)))` to strip all interior rings — correctly removes holes from land but the `ST_Difference` of complex buffer vs complex land still fails at Newport
+
+#### Changes
+
+- **`geometry_utils.py`** — Added `land_filled` CTE to `build_ring_zones_postgis()` that strips all interior rings from land before buffering and differencing. Uses `LATERAL ST_Dump` + `ST_ExteriorRing` + `ST_BuildArea` pattern. Prevents simplification-created holes from reaching the ring difference step.
+- **`geometry_utils.py`** — Changed `simplify_tolerance` default from `0.0005` to `0.0001` (~11m). Lower tolerance preserves narrow channels, preventing the free-hole condition at complex coastlines.
+
+#### Workaround
+
+For datasets with complex coastlines, set `simplify_tolerance: 0.0001` in `workflow_config.yml` or `graph_config.yml`. Trade-off: larger land geometry → slightly longer buffer zone processing.
+
+#### Open TODO
+
+- `ST_Subdivide` fallback: if direct `ST_Difference` fails, break the buffer into small tiles, difference each tile locally against a clipped land fragment, union the partial rings. This would make the operation robust for any coastline complexity regardless of simplification tolerance.
