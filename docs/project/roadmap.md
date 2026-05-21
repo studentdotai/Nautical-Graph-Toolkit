@@ -66,11 +66,36 @@ Complete documentation overhaul with MkDocs and expanded learning resources.
 
 ---
 
+## ✅ Version 0.1.5 - Weights System Restructuring & ML Pipeline Foundation
+
+**Status**: ✅ Released (May 2026)
+
+**Depends on**: v0.1.2
+
+Major architectural restructuring of the weighting system with ML pipeline foundation, new routing algorithms, and interactive tooling.
+
+- **[x] Modular Weight System**: Three-tier architecture (`WeightCalculator` stateless engine, `Weights` production manager, `WeightsOpen` per-layer ML tracking) replacing the monolithic legacy class. Cross-backend parity (GeoDataFrame, GeoPackage, PostGIS) with cross-validation.
+- **[x] New A* Routing Variants**: `AstarImproved` (straighter paths), `AstarMaritime` (two-pass corridor routing), `AstarMaritimeSmooth` (three-pass with string-pulling post-processing). Optional Rustworkx backend for ~10x faster Pass 1.
+- **[x] Interactive CLI Launcher** (`ngt.py`): Rich/Questionary-based UI with port autocomplete, backend selection, vessel parameter forms, dry-run preview, and cascading skip/edit for pipeline steps.
+- **[x] Buffer Zone OOM Fix**: GiST-indexed ring tables replace single mega-CTE — resolves PostgreSQL OOM killer on large schemas (6,933 ENC / 1.67M edges).
+- **[x] PostGIS Subdivision Pipeline**: Server-side `ST_Subdivide` with GiST-indexed point-in-polygon replaces Python-side polygon clipping.
+- **[x] Buffer & Bearing Utilities**: Extracted `Buffer` and `Bearing` classes from geometry module with vectorized operations and SQL fragment support.
+- **[x] Standalone Weight Workflow** (`maritime_weights_workflow.py`): Weight-only pipeline supporting both GeoPackage and PostGIS backends.
+- **[x] Test Coverage**: 11 new test files (~6,600 lines) including cross-backend integration tests with real S-57 data.
+- **[ ] RTZ 1.2 Route Export**: XML route export format — still in development (experimental, not yet validated).
+- **[ ] ML Weight Optimization** (`GraphWeightOptimizer`): Validate/export/import ML weight data — still in development (experimental, not yet validated).
+- **[x] Smooth Weight Mode**: Continuous exp/log weight functions for gradient-based ML optimization across all backends.
+- **[x] Database Health Monitoring**: Active query inspection, table lock/bloat detection, backend termination with dry-run.
+
+**Statistics**: 51 files changed, 50,417 insertions, 1,061 deletions.
+
+---
+
 ## 🔧 Version 0.1.x - Foundation Completion
 
 **Status**: 🚧 In Progress
 
-**Latest**: v0.1.2 (February 2026)
+**Latest**: v0.1.5 (May 2026)
 
 **Goal**: Complete foundation work before PyTorch transition in v0.2.0
 
@@ -81,19 +106,19 @@ Complete documentation overhaul with MkDocs and expanded learning resources.
     - **[ ] Input Validation**: S-57 file signature verification, Pydantic config validation
     - **[ ] Dependency Scanning**: Audit third-party libraries for CVEs
 
-- **[ ] Weights Class Refactor**:
-    - **[ ] Open weights format**: Prepare for PyTorch tensor migration
-    - **[ ] Serialization**: Save/load weights for model training
+- **[x] Weights Class Refactor** (completed in v0.1.5):
+    - **[x]** Open weights format: `WeightsOpen` per-layer tracking with PyTorch export support
+    - **[x]** Serialization: `GraphWeightOptimizer` validate/export/import pipeline (experimental)
 
 - **[ ] Test Coverage**:
-    - **[ ] pytest 80% coverage**: Required before v0.2.0 development begins
-    - **[ ] Integration tests**: Real S-57 ENC datasets
+    - **[ ] pytest 80% coverage**: Required before v0.2.0 development begins (v0.1.5 added 11 test files, ~6,600 lines)
+    - **[x]** Integration tests with real S-57 ENC datasets (completed in v0.1.5)
 
 - **[ ] Documentation**:
     - **[ ] Ongoing polishing**: Improve clarity and completeness
     - **[ ] Code examples**: More usage patterns
 
-- **[ ] Bug Fixes**: Critical issues as they arise
+- **[x] Bug Fixes**: Major fixes shipped in v0.1.5 (OOM crash, seam gaps, NaN attributes, subdivision factor mismatch)
 
 ---
 
@@ -101,14 +126,14 @@ Complete documentation overhaul with MkDocs and expanded learning resources.
 
 **Status**: 📋 Planned
 
-**Depends on**: v0.1.x completion (80% test coverage, security audit, Weights class refactor)
+**Depends on**: v0.1.x completion (80% test coverage, security audit)
 
 This release represents a major milestone: transitioning the toolkit to PyTorch for ML-powered maritime routing and production deployment.
 
 ### 🔬 PyTorch Integration (Core Focus)
 
-- **[ ] Weights Class Migration**: Refactor to PyTorch tensors with open weights format
-- **[ ] ML Infrastructure**: Setup PyTorch training pipeline for traffic pattern learning
+- **[ ] Weights Class Migration**: Refactor to PyTorch tensors. `WeightsOpen` (v0.1.5) already provides open weights format with per-layer tracking; next step is tensor-native representation. `GraphWeightOptimizer` export/import is experimental.
+- **[ ] ML Infrastructure**: Build PyTorch training pipeline for traffic pattern learning. `WeightsOpen` per-layer tracking and smooth mode (continuous exp/log functions) provide the data foundation from v0.1.5.
 - **[ ] Model Architecture**: Design neural network for maritime route prediction (research phase)
 - **[ ] GPU Support**: CUDA acceleration for graph operations (experimental)
 
@@ -127,14 +152,14 @@ This release represents a major milestone: transitioning the toolkit to PyTorch 
 - **[ ] API Reference**: Generate with mkdocstrings (MkDocs integration, replacing Sphinx approach)
 - **[ ] PyTorch Tutorials**: New notebooks for ML-based routing workflows
 - **[ ] Migration Guide**: Upgrading from NumPy-based to PyTorch-based weights
-- **[x] Expanded Tutorials**: 13 Jupyter notebooks covering advanced use cases (✅ completed in v0.1.2)
+- **[x] Expanded Tutorials**: 13 Jupyter notebooks (v0.1.2) + 4 new notebooks in v0.1.5 (edge inspection, pathfinding comparison, geometry utils, performance metrics)
 
 ### 🧪 Testing & Quality
 
-- **[ ] Test Coverage**: Achieve 80% coverage (inherited from v0.1.x requirement)
+- **[ ] Test Coverage**: Achieve 80% coverage (inherited from v0.1.x requirement). v0.1.5 added ~6,600 lines of new tests.
 - **[ ] CI/CD Pipeline**: GitHub Actions for automated testing
 - **[ ] Performance Benchmarks**: PyTorch vs NumPy comparison for weighting operations
-- **[x] Publish Official Benchmarks**: Initial version published in `docs/reference/technical-specs.md` (🔄 evolving document)
+- **[x] Publish Official Benchmarks**: Published in `docs/reference/technical-specs.md` (evolving document)
 
 ### 🛡️ Security & Stability
 
@@ -152,15 +177,11 @@ This release represents a major milestone: transitioning the toolkit to PyTorch 
 
 ## 🔌 Version 0.3.0 - QGIS Integration (Proof of Concept)
 
-**Status**: 🔒 Blocked (awaiting QGIS 4.0 - February 20, 2026)
+**Status**: 📋 Planned
 
-**Depends on**: v0.2.0, QGIS 4.0 release
+**Depends on**: v0.2.0
 
-This release marks the beginning of our journey to integrate the toolkit with QGIS. Development will be closely tied to the QGIS major release schedule.
-
-- **📌 Key Dependency**: This work will commence after the official release of **QGIS 4.0** (scheduled for **February 20, 2026**), which will be the first stable release with **Qt6** support.
-    - **Rationale**: While Qt6 packages are available with QGIS 3.44 on Linux and Windows, dedicating development time to the pre-4.0 development cycle would require rework upon QGIS 4.0 stable release. Given this is a part-time project, the strategic choice is to wait for the stable release rather than invest time rebuilding.
-    - **Early Prototyping Option**: If time permits, lightweight proof-of-concept experiments may be conducted with QGIS 3.44 Qt6 packages (Linux/Windows) to validate integration approaches, with the understanding that code will be rebuilt for QGIS 4.0 stable.
+This release marks the beginning of our journey to integrate the toolkit with QGIS, leveraging the **QGIS 4.0** stable release with **Qt6** support.
 
 - **🔌 Plugin Development**:
     - **[ ] Initial Plugin Scaffolding**: Create the basic structure for a QGIS plugin.

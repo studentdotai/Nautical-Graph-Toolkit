@@ -207,10 +207,12 @@ This file tracks conversion operations for development notebooks.
 
             # Try to import the fallback libraries
             try:
-                import nbformat
-                from nbconvert import PythonExporter, MarkdownExporter
-                print("   ✓ Fallback packages available")
-                return True
+                import importlib.util
+                if (importlib.util.find_spec('nbformat') is not None
+                        and importlib.util.find_spec('nbconvert') is not None):
+                    print("   ✓ Fallback packages available")
+                    return True
+                raise ImportError("nbformat or nbconvert not found")
             except ImportError as e:
                 print(f"   ✗ Fallback packages not available: {e}")
                 print("\n💡 To fix this, install nbconvert:")
@@ -396,6 +398,8 @@ This file tracks conversion operations for development notebooks.
             # Fallback: try using nbconvert Python API
             print("  jupyter command not found, trying Python API fallback...")
             try:
+                import nbformat
+                from nbconvert import PythonExporter
 
                 with open(notebook_path, 'r', encoding='utf-8') as f:
                     notebook = nbformat.read(f, as_version=4)
@@ -415,7 +419,7 @@ This file tracks conversion operations for development notebooks.
                 print(f"  Fallback conversion error: {e}")
                 return False
         except subprocess.TimeoutExpired:
-            print(f"  Conversion timeout after 30s")
+            print("  Conversion timeout after 30s")
             return False
         except PermissionError as e:
             print(f"  Permission denied: {e}")
@@ -477,6 +481,9 @@ This file tracks conversion operations for development notebooks.
         except FileNotFoundError:
             # Fallback: try using nbconvert Python API
             try:
+                import nbformat
+                from nbconvert import MarkdownExporter
+                from traitlets.config import Config
 
                 with open(notebook_path, 'r', encoding='utf-8') as f:
                     notebook = nbformat.read(f, as_version=4)
@@ -510,7 +517,7 @@ This file tracks conversion operations for development notebooks.
                 print(f"  Fallback conversion error: {e}")
                 return False
         except subprocess.TimeoutExpired:
-            print(f"  Conversion timeout after 30s")
+            print("  Conversion timeout after 30s")
             return False
         except PermissionError as e:
             print(f"  Permission denied: {e}")
@@ -770,8 +777,8 @@ This file tracks conversion operations for development notebooks.
         if direction == MergeDirection.AUTO:
             detected = self.determine_merge_direction(sync_pair)
             if not detected and not force:
-                print(f"  ⚠️  Cannot auto-detect merge direction (same timestamp)")
-                print(f"     Use --merge-direction to specify explicitly")
+                print("  ⚠️  Cannot auto-detect merge direction (same timestamp)")
+                print("     Use --merge-direction to specify explicitly")
                 return False
             direction = detected
 
@@ -811,7 +818,7 @@ This file tracks conversion operations for development notebooks.
         else:
             # Manual merge required for .py/.md
             print(f"  ℹ️  Manual merge required for {sync_pair.format.value} files")
-            print(f"     Dev file has changes that need review:")
+            print("     Dev file has changes that need review:")
             print(f"     1. Review: dev/{sync_pair.dev_file.name}")
             print(f"     2. Update: {sync_pair.source_ipynb.name}")
             print(
@@ -871,7 +878,7 @@ This file tracks conversion operations for development notebooks.
                 self._append_changelog("Refreshed dev from source (reconverted)", [sync_pair.dev_file.name])
                 return True
             else:
-                print(f"  ✗ Failed to reconvert")
+                print("  ✗ Failed to reconvert")
                 return False
 
     def _format_to_flag(self, fmt: FileFormat) -> str:
@@ -1053,7 +1060,7 @@ Examples:
             print("⚠️  No sync pairs found")
             return 1
 
-        print(f"\n🔄 Notebook Sync Report (Conversion-Based Comparison)")
+        print("\n🔄 Notebook Sync Report (Conversion-Based Comparison)")
         print("=" * 60)
 
         results = []

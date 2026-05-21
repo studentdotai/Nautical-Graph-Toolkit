@@ -40,7 +40,7 @@ The tool performs automated S-57 conversion with the following features:
 - Python {{ python_version }}+
 - GDAL {{ gdal_version }}
 - PostgreSQL with PostGIS extension (for PostGIS output)
-- All dependencies listed in `pyproject.toml`
+- All dependencies listed in `environment.yml` and `requirements.in`
 
 ### Required Data
 - S-57 ENC files (`.000` base files, scanned recursively)
@@ -280,7 +280,7 @@ python scripts/import_s57.py \
   --mode advanced \
   --input-path data/ENC_ROOT \
   --output-format postgis \
-  --schema us_enc_all \
+  --schema enc_west \
   --enable-parallel \
   --max-workers 4 \
   --memory-limit-mb 4096 \
@@ -348,7 +348,7 @@ python scripts/import_s57.py \
   --mode advanced \
   --input-path data/ENC_ROOT \
   --output-format postgis \
-  --schema us_enc_all \
+  --schema enc_west \
   --enable-parallel \
   --max-workers 8 \
   --memory-limit-mb 8192 \

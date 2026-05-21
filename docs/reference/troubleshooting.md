@@ -16,12 +16,14 @@ This guide covers common issues you may encounter when working with the Nautical
 7. [GDAL/PROJ Database Warnings](#gdal-proj-database-warnings)
 8. [Port Selection Issues](#port-selection-issues)
 9. [Database Connection Issues](#database-connection-issues)
-10. [Data Source Issues](#data-source-issues)
-11. [S57Updater: File-Based Backend Safety](#s57updater-file-based-backend-safety) ⚠️ **Important**
-12. [Graph Creation Issues](#graph-creation-issues)
-13. [Performance Issues](#performance-issues)
-14. [Visualization Issues](#visualization-issues)
-15. [Pathfinding Issues](#pathfinding-issues)
+    - VACUUM ANALYZE fails with "No space left on device" (Docker shm)
+10. [Buffer Zone TopologyException](#buffer-zone-topology-exception) ⚠️ **PostGIS Complex Coastlines**
+11. [Data Source Issues](#data-source-issues)
+12. [S57Updater: File-Based Backend Safety](#s57updater-file-based-backend-safety) ⚠️ **Important**
+13. [Graph Creation Issues](#graph-creation-issues)
+14. [Performance Issues](#performance-issues)
+15. [Visualization Issues](#visualization-issues)
+16. [Pathfinding Issues](#pathfinding-issues)
 
 ---
 
@@ -977,6 +979,123 @@ ProgrammingError: schema "enc_west" does not exist
    ```python
    pg_factory = ENCDataFactory(source=db_params, schema="enc_west")
    ```
+
+### Issue: VACUUM ANALYZE fails with "No space left on device" (Docker shm)
+
+**Symptoms:**
+```
+WARNING - VACUUM ANALYZE failed (non-critical, autovacuum will handle it):
+(psycopg2.errors.DiskFull) could not resize shared memory segment
+"/PostgreSQL.4141375306" to 67128832 bytes: No space left on device
+
+[SQL: VACUUM ANALYZE "graph"."fine_graph_open11_20_edges"]
+```
+
+**This appears after `enrich_edges_with_features_postgis()` completes successfully.**
+
+**Root Cause:**
+
+Despite the "No space left on device" message, this is **not** a disk space error. It is a **Docker container shared memory exhaustion** issue.
+
+PostgreSQL uses POSIX shared memory (`/dev/shm`) during VACUUM operations. Docker containers have a default `/dev/shm` limit of **64MB**, regardless of how much RAM your host machine has. The VACUUM resize request of ~64MB hits this container limit.
+
+**Diagnosis:**
+
+Check the actual shm_size of your running container:
+
+```bash
+docker inspect postgis_nautical --format '{% raw %}{{.HostConfig.ShmSize}}{% endraw %}'
+# 67108864  ← 64MB (Docker default)
+# should be 4294967296 (4GB) if docker-compose.linux.yml was applied correctly
+```
+
+If the container shows `67108864` (64MB), it was started without the `shm_size: 4gb` setting from the compose file (e.g., started manually or before the setting was added).
+
+**Solution:**
+
+Recreate the container so the `shm_size: 4gb` in `docker-compose.linux.yml` takes effect:
+
+```bash
+docker compose -f docker-compose.linux.yml down
+docker compose -f docker-compose.linux.yml up -d
+```
+
+The `postgis_data` volume is persistent — **no data will be lost**.
+
+After restart, verify:
+
+```bash
+docker inspect postgis_nautical --format '{% raw %}{{.HostConfig.ShmSize}}{% endraw %}'
+# 4294967296  ← 4GB ✓
+```
+
+**Impact:**
+
+- The enrichment itself (spatial joins, feature updates) **completes successfully** — VACUUM is post-processing only
+- PostgreSQL's autovacuum will eventually reclaim dead tuples from the UPDATE-heavy enrichment loop
+- Re-running enrichment on a restarted container will complete the VACUUM ANALYZE step
+
+**Configuration reference (`docker-compose.linux.yml`):**
+
+```yaml
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    shm_size: 4gb          # ← This sets /dev/shm inside the container
+    command: >
+      postgres
+      -c shared_buffers=4GB
+      -c maintenance_work_mem=1GB  # Used by VACUUM
+      -c work_mem=128MB
+```
+
+---
+
+## Buffer Zone TopologyException {: #buffer-zone-topology-exception}
+
+### Issue: `TopologyException: unable to assign free hole to a shell` during buffer zone classification
+
+**Symptoms:**
+```
+psycopg2.errors.InternalError_: lwgeom_unaryunion_prec: GEOS Error: TopologyException:
+unable to assign free hole to a shell at -117.905029 33.613684999999997
+```
+
+Occurs during `[BUFFER ZONES PostGIS]` step, typically at the first ring materialization (`ring_3_0`).
+
+**Root Cause:**
+
+`ST_SimplifyPreserveTopology` collapses narrow coastal waterways (rivers, channels, harbor inlets) when the tolerance exceeds the feature width. This creates isolated interior rings ("free holes") in the land polygon — polygons with holes that have no valid parent shell in GEOS's topology graph.
+
+The error fires inside `ST_Difference(buffer, land)` when GEOS tries to node the intersection of two very complex geometries. Even `ST_MakeValid` and `ST_Buffer(geom, 0)` cannot fix it because the topology break occurs internally during the boolean operation, not in the input geometries.
+
+**Affected coordinate:** -117.905, 33.614 (Newport Beach / Long Beach harbor area, Southern California). Other complex coastlines with narrow channels may also trigger it.
+
+**Workaround:**
+
+Reduce `simplify_tolerance` in your config. The default `0.0005` (~55m) can collapse channels narrower than 55m. Reducing to `0.0001` (~11m) preserves most narrow features:
+
+```yaml
+# config/workflow_config.yml
+weighting:
+  buffer_zones:
+    simplify_tolerance: 0.0001   # ~11m (default was 0.0005 ~55m)
+```
+
+Trade-off: lower tolerance = larger land geometry = slightly longer buffer zone processing time.
+
+**What the code already does:**
+
+The `build_ring_zones_postgis()` CTE includes a `land_filled` step that strips interior rings from the land polygon before buffering. This prevents holes created by simplification from reaching `ST_Difference`, but cannot prevent topology breaks caused by sheer geometry complexity at complex coastlines.
+
+**Future fix:**
+
+A `ST_Subdivide` fallback is planned — if direct `ST_Difference` fails, the buffer will be broken into small tiles, each differenced locally against a clipped land fragment, then the partial rings unioned back together. This makes each individual GEOS operation tractable regardless of coastline complexity.
+
+**See also:**
+
+- `src/nautical_graph_toolkit/utils/geometry_utils.py` — `Buffer.build_ring_zones_postgis()`
+- `docs/project/devlog.md` — v0.1.5 Buffer Zone TopologyException entry
 
 ---
 

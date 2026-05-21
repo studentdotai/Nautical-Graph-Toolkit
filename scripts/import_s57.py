@@ -20,11 +20,11 @@ Usage:
 
   # S57Advanced conversion to PostGIS with verification
   python scripts/import_s57.py --mode advanced --input-path data/ENC_ROOT \\
-    --output-format postgis --schema us_enc_all --verify
+    --output-format postgis --schema enc_west --verify
 
   # S57Updater - force update specific ENCs
   python scripts/import_s57.py --mode update --update-source data/ENC_ROOT_UPDATE \\
-    --output-format postgis --schema us_enc_all \\
+    --output-format postgis --schema enc_west \\
     --enc-filter US3CA52M US1GC09M --force-update
 """
 
@@ -543,16 +543,16 @@ Examples:
 
   # S57Advanced - Layer-centric conversion to PostGIS
   python scripts/import_s57.py --mode advanced --input-path data/ENC_ROOT \\
-    --output-format postgis --schema us_enc_all --verify
+    --output-format postgis --schema enc_west --verify
 
   # S57Updater - Force update specific ENCs
   python scripts/import_s57.py --mode update --update-source data/ENC_ROOT_UPDATE \\
-    --output-format postgis --schema us_enc_all \\
+    --output-format postgis --schema enc_west \\
     --enc-filter US3CA52M US1GC09M --force-update
 
   # With parallel processing and benchmarking
   python scripts/import_s57.py --mode advanced --input-path data/ENC_ROOT \\
-    --output-format postgis --schema us_enc_all --enable-parallel \\
+    --output-format postgis --schema enc_west --enable-parallel \\
     --benchmark-output benchmarks.csv --verify
         """
     )
@@ -704,10 +704,12 @@ def main():
     args = parser.parse_args()
 
     # Setup logging
+    log_dir = Path(__file__).parent / 'logs'
+    log_dir.mkdir(parents=True, exist_ok=True)
     logger = setup_logging(
         verbose=args.verbose,
         quiet=args.quiet,
-        log_file='s57_import.log'
+        log_file=str(log_dir / 's57_import.log')
     )
 
     logger.info("S-57 ENC Data Import Tool Starting")

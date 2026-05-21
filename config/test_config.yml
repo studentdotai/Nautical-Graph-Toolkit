@@ -1,0 +1,47 @@
+# ===============================================
+# Test Integration Configuration
+# ===============================================
+#
+# Defines which data files and database objects are used for integration tests.
+# Provides reproducible defaults so tests run consistently without developer-specific
+# environment setup.
+#
+# Override any value by setting the corresponding environment variable (see conftest.py).
+# Environment variable takes priority → test_config.yml value → skip (for missing files).
+#
+# NOTE: DB credentials (DB_NAME, DB_USER, DB_PASSWORD, DB_HOST, DB_PORT) are still
+#       loaded from .env — they are secrets and not stored here.
+
+postgis:
+  enc_schema: "enc_west"                              # Schema where S-57 ENC layers are stored
+  graph_schema: "graph"                               # Schema where graph tables are stored
+  grid_schema:  "grid"                                # Schema where grid tables are stored
+  work_mem: "512MB"                                   # PostGIS work memory for spatial operations
+  temp_buffers: "512MB"                               # PostGIS temp table memory
+  maintenance_work_mem: "4GB"                         # Memory for CTAS index builds
+  ctas_threshold: 0.5                                 # CTAS vs UPDATE threshold
+
+  graph_name:          "fine_graph_test_graph"             # Undirected graph name in PostGIS
+  directed_graph_name: "test_graph_directed_postgis_v22w"  # Directed graph name for bearing/edge tests
+
+paths:
+  gpkg_graph_source: "data/fine_graph_test_graph.gpkg"   # Undirected graph GeoPackage (relative to project root)
+  enc_gpkg: "data/enc_west.gpkg"                          # ENC data GeoPackage (relative to project root)
+
+# ===============================================
+# Compare Weights Configuration
+# ===============================================
+# Used by scripts/compare_weights.py for cross-backend, cross-system weight comparisons
+
+compare:
+  # GeoPackage paths (relative to project root or absolute)
+  gpkg_weights:      "data/compare_graphs/test_graph_directed_mem_v22w.gpkg"
+  gpkg_weights_open: "data/compare_graphs/test_graph_directed_mem_v22o.gpkg"
+
+  # PostGIS table names (edges suffix is not added automatically here)
+  pg_table_weights:      "test_graph_directed_postgis_v22w_edges"
+  pg_table_weights_open: "test_graph_directed_postgis_v22o_edges"
+
+  # Comparison settings
+  tolerance: 1e-6           # Float comparison threshold for adjusted_weight divergence
+  batch_size: 50000         # Rows per PostGIS batch in pass-1

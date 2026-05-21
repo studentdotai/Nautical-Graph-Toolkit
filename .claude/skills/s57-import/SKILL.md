@@ -24,7 +24,7 @@ python scripts/import_s57.py --mode base \
 python scripts/import_s57.py --mode advanced \
   --input-path data/ENCs \
   --output-format postgis \
-  --schema us_enc_all
+  --schema enc_west
 ```
 
 ### Update PostGIS with new charts
@@ -32,7 +32,7 @@ python scripts/import_s57.py --mode advanced \
 python scripts/import_s57.py --mode update \
   --update-source data/ENCs/updates \
   --output-format postgis \
-  --schema us_enc_all
+  --schema enc_west
 ```
 
 ## Understanding Conversion Modes
@@ -288,7 +288,7 @@ python scripts/import_s57.py --mode base \
 **Questions asked**:
 - Input path: `data/ENCs` ✓
 - Output format: `postgis` ✓
-- Schema name: ? (ask: "maritime_db", "us_enc_all", etc.)
+- Schema name: ? (ask: "maritime_db", "us_enc_all", "enc_west", etc.)
 - Enable verification: ? (recommend: yes)
 
 **Command** (with --dry-run first):

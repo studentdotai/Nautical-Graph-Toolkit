@@ -15,7 +15,7 @@ Interactive controller for maritime navigation graph creation, weighting, and pa
 ### Create maritime route (auto-detect optimal backend)
 ```bash
 python scripts/maritime_graph_geopackage_workflow.py \
-  --config docs/maritime_workflow_config.yml \
+  --config config/workflow_config.yml \
   --graph-mode h3 \
   --dry-run
 ```
@@ -23,14 +23,14 @@ python scripts/maritime_graph_geopackage_workflow.py \
 ### PostGIS backend (production)
 ```bash
 python scripts/maritime_graph_postgis_workflow.py \
-  --config docs/maritime_workflow_config.yml \
+  --config config/workflow_config.yml \
   --graph-mode h3
 ```
 
 ### GeoPackage backend (portable, single-user)
 ```bash
 python scripts/maritime_graph_geopackage_workflow.py \
-  --config docs/maritime_workflow_config.yml \
+  --config config/workflow_config.yml \
   --graph-mode h3
 ```
 
@@ -142,7 +142,7 @@ The workflow orchestrates a 4-step maritime navigation pipeline:
 
 | Flag | Purpose | Default | Example |
 |---|---|---|---|
-| `--config` | Configuration file path | `docs/maritime_workflow_config.yml` | `--config docs/maritime_workflow_config.yml` |
+| `--config` | Configuration file path | `config/workflow_config.yml` | `--config config/workflow_config.yml` |
 | `--graph-mode` | Graph type: `fine` (regular grid) or `h3` (hexagonal) | From config | `--graph-mode h3` |
 | `--skip-base` | Skip Step 1 (base graph) | False | `--skip-base` |
 | `--skip-fine` | Skip Step 2 (fine/H3 graph) | False | `--skip-fine` |
@@ -234,7 +234,7 @@ If needed:
 Construct full command with all parameters:
 ```bash
 python scripts/maritime_graph_postgis_workflow.py \
-  --config docs/maritime_workflow_config.yml \
+  --config config/workflow_config.yml \
   --graph-mode h3 \
   --vessel-draft 10.5 \
   --log-level INFO \
@@ -292,7 +292,7 @@ After execution completes:
 6. Preview with `--dry-run`:
    ```bash
    python scripts/maritime_graph_geopackage_workflow.py \
-     --config docs/maritime_workflow_config.yml \
+     --config config/workflow_config.yml \
      --graph-mode h3 \
      --dry-run
    ```
@@ -317,7 +317,7 @@ After execution completes:
 4. Preview:
    ```bash
    python scripts/maritime_graph_postgis_workflow.py \
-     --config docs/maritime_workflow_config.yml \
+     --config config/workflow_config.yml \
      --graph-mode h3 \
      --dry-run
    ```
@@ -562,7 +562,7 @@ ls -la output/*/maritime_routes.gpkg
 
 # 2. If missing, run complete workflow without --skip-base
 python scripts/maritime_graph_geopackage_workflow.py \
-  --config docs/maritime_workflow_config.yml
+  --config config/workflow_config.yml
 
 # 3. Check output directory structure
 find output/ -name "*.gpkg" -type f
@@ -604,7 +604,7 @@ python scripts/maritime_graph_geopackage_workflow.py
 
 **Solution**:
 ```bash
-# 1. Enable area slicing in maritime_workflow_config.yml:
+# 1. Enable area slicing in workflow_config.yml:
 fine_graph:
   slice_buffer: true
   slice_south_degree: 32.0
@@ -640,7 +640,7 @@ buffer_size_nm: 12.0  # Reduce from 24.0
 **Solution**:
 ```bash
 # Check default location
-ls -la docs/maritime_workflow_config.yml
+ls -la config/workflow_config.yml
 
 # If missing, restore from repository or template
 # Use correct path with --config flag
@@ -698,7 +698,7 @@ export PYTHONPATH=/path/to/project:$PYTHONPATH
 - `scripts/maritime_graph_geopackage_workflow.py` - GeoPackage workflow
 
 **Configuration** (read by workflow):
-- `docs/maritime_workflow_config.yml` - Universal workflow parameters
+- `config/workflow_config.yml` - Universal workflow parameters
 - `src/nautical_graph_toolkit/data/graph_config.yml` - Graph parameters (H3, spacing, etc.)
 - `.env` - Database credentials (PostGIS only)
 
@@ -746,7 +746,7 @@ Expected: Skill adds --log-level DEBUG → executes → reports log file locatio
 
 ## Configuration Example
 
-**Default configuration** (docs/maritime_workflow_config.yml):
+**Default configuration** (config/workflow_config.yml):
 ```yaml
 base_graph:
   departure_port: "Los Angeles"

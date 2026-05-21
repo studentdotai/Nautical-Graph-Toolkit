@@ -87,19 +87,23 @@ def test_environment():
     # --- Create the data sources using S57Advanced ---
     config = S57AdvancedConfig(enable_debug_logging=False)
 
-    # 1. Create PostGIS source (only if configured)
+    # 1. Create PostGIS source (only if configured and reachable)
     factory_pg = None
     if has_postgis:
         print("Creating PostGIS data source...")
-        pg_converter = S57Advanced(
-            input_path=s57_data_dir,
-            output_dest=db_params,
-            output_format='postgis',
-            overwrite=True,
-            schema=pg_schema,
-            config=config
-        )
-        pg_converter.convert_to_layers()
+        try:
+            pg_converter = S57Advanced(
+                input_path=s57_data_dir,
+                output_dest=db_params,
+                output_format='postgis',
+                overwrite=True,
+                schema=pg_schema,
+                config=config
+            )
+            pg_converter.convert_to_layers()
+        except Exception as e:
+            print(f"PostGIS connection failed: {e} - skipping PostGIS tests")
+            has_postgis = False
     else:
         print("PostGIS not configured - skipping PostGIS tests")
 

@@ -47,7 +47,7 @@ This toolkit transforms raw S-57 chart data into production-ready geospatial dat
 ### 🎯 Intelligent Route Optimization
 - **3-Tier Weighting System**: Static (terrain cost), directional (current/wind), dynamic (traffic patterns)
 - **Vessel Constraints**: Draft restrictions, air clearance, vessel type
-- **A* Pathfinding**: Fast optimal route computation with NetworkX
+- **A* Pathfinding**: Fast optimal route computation with NetworkX and optional Rustworkx acceleration
 - **Route Export**: GeoJSON format for GIS visualization and sharing
 
 ### 📊 Comprehensive ENC Analysis
@@ -156,9 +156,22 @@ See [INSTALL.md Section 4](docs/getting-started/install.md#4-docker-postgis-setu
 
 ### Quick Start Example
 
-The toolkit provides comprehensive workflow scripts and Jupyter notebooks for building maritime routing graphs.
+**Interactive Launcher** (recommended for new users):
 
-**Interactive Examples**: See the [Jupyter Notebooks](docs/notebooks/) for 13+ working examples covering:
+```bash
+python scripts/ngt.py
+```
+
+This launches a guided, menu-driven interface for all three workflows:
+- **S-57 Import** — Convert ENC data with backend selection and validation
+- **Graph Pipeline** — Build routing graphs with port selection, graph mode, vessel parameters, and step-by-step customization
+- **Weights Pipeline** — Compute edge weights and run pathfinding with per-step overrides
+
+The launcher provides autocomplete port search, dry-run preview, config file selection, and pipeline step skipping — no manual CLI flags needed.
+
+---
+
+**Interactive Examples**: See the [Jupyter Notebooks](docs/notebooks/) for 17+ working examples covering:
 - ENC data import and conversion
 - Graph creation (BaseGraph, FineGraph, H3Graph)
 - Route optimization with A* pathfinding
@@ -177,32 +190,32 @@ python scripts/maritime_graph_geopackage_workflow.py
 
 ## ⚡ Performance Benchmarks
 
-Comprehensive real-world performance analysis from production testing (Nov 2025). All metrics based on SF Bay to LA route processing (47 S-57 ENCs, ~400km coastal route).
+Real-world performance analysis from production testing (May 2026). Based on 50 complete workflow runs across 5 maritime routes on AMD Strix Halo (128 GB unified memory), Ubuntu 24.04. Full breakdown: [Technical Specifications](docs/reference/technical-specs.md).
 
 ### Total Processing Time - Backend Comparison
 
 ![Total Processing Time](docs/assets/Total%20processing.svg)
 
 **Key Findings:**
-- 🚀 **PostGIS is 2.0-2.4× faster** than GeoPackage across all graph modes
-- ⚠️ **Weighting bottleneck:** Accounts for 37-89% of total execution time
-- ⚡ **FINE 0.2nm mode:** Fastest option (7-14 minutes) - ideal for prototyping
-- 📊 **FINE 0.1nm mode:** Production sweet spot (21-52 minutes) - optimal detail/speed balance
-- 🔬 **H3 Hexagonal:** Research mode (107-180 minutes) - maximum flexibility
+- 📊 **Backend choice is scale-dependent**: GeoPackage matches or beats PostGIS up to ~1.37M edges; PostGIS wins at 3M+ edges (2.5-3.2× faster)
+- ⚠️ **Weighting bottleneck:** Accounts for 33-86% of total execution time (median ~59%)
+- ⚡ **FINE 0.2nm:** Fastest option (4-7 min) — ideal for prototyping
+- 📊 **FINE 0.1nm:** Production sweet spot (~19 min) — optimal detail/speed balance
+- 🔬 **H3 Hexagonal:** Research mode (5-71 min) — maximum flexibility
 
 ### Scaling Performance Analysis
 
 ![Performance per Million Nodes](docs/assets/Total%20processing%20per%20Million%20Nodes.svg)
 
-**Efficiency Metrics:**
-- PostGIS FINE 0.1nm: **6.92 ms/node** (fastest)
-- GeoPackage FINE 0.1nm: **17.9 ms/node**
-- PostGIS advantage: **2.6× faster** at scale
+**Head-to-Head Backend Comparison (matched node counts):**
 
-**Scaling Characteristics:**
-- Weighting step scales superlinearly with graph size
-- 4× more nodes → 3.6× total time (FINE 0.1nm vs 0.2nm)
-- 4.8× more nodes → 5× total time (H3 vs FINE 0.1nm)
+| Scale | GeoPackage | PostGIS | Winner |
+|-------|-----------|---------|--------|
+| ~80K nodes, 315K edges (FINE 0.2nm) | 6.3 min | 6.8 min | GP 1.08× faster |
+| ~321K nodes, 1.27M edges (FINE 0.1nm) | 19.2 min | 19.4 min | GP 1.01× faster |
+| ~455K nodes, 1.37M edges (H3 5/11) | 21.6 min | 22.4 min | GP 1.03× faster |
+
+**At 3M+ edges**, PostGIS pulls ahead: 2.5-3.2× faster due to bulk TEMP table operations and GiST-indexed spatial joins.
 
 ---
 
@@ -210,11 +223,11 @@ Comprehensive real-world performance analysis from production testing (Nov 2025)
 
 | Use Case | Backend | Graph Mode | Time | Nodes | Best For |
 |----------|---------|-----------|------|-------|----------|
-| **Quick Prototyping** | PostGIS | FINE 0.2nm | 7.3 min | 46K | Rapid testing, proof of concept |
-| **Production Routing** ⭐ | PostGIS | FINE 0.1nm | 21.3 min | 184K | Optimal balance - **RECOMMENDED** |
-| **Research/Analysis** | PostGIS | H3 Hexagonal | 106.6 min | 894K | Maximum detail, multi-resolution |
-| **Portable/Offline** | GeoPackage | FINE 0.2nm | 14.4 min | 43K | Single-user, no server |
-| **Portable Detailed** | GeoPackage | FINE 0.1nm | 52.0 min | 173K | Offline detailed routing |
+| **Quick Prototyping** | Either | FINE 0.2nm | 4-7 min | 44-80K | Rapid testing, proof of concept |
+| **Production Routing** | Either | FINE 0.1nm | ~19 min | ~321K | Optimal detail/speed balance |
+| **Research/Analysis** | Either | H3 5/11 | 5-71 min | 124K-1.1M | Maximum detail, multi-resolution |
+| **Large-Scale** (>3M edges) | PostGIS | FINE 0.2nm | 18-52 min | 297-414K | PostGIS 2.5-3.2× faster at scale |
+| **Portable/Offline** | GeoPackage | Any | 4-19 min | 44-321K | No server, single-user |
 
 ---
 
@@ -223,17 +236,36 @@ Comprehensive real-world performance analysis from production testing (Nov 2025)
 
 ### Full Benchmark Data Table
 
-| Backend | Graph Mode | Nodes | Edges | Step 1: Base | Step 2: Fine/H3 | Step 3: Weighting | Step 4: Pathfinding | **Total** |
-|---------|-----------|-------|-------|--------------|-----------------|-------------------|---------------------|-----------|
-| PostGIS | H3 Hexagonal | 894,220 | 5,347,212 | 194s (3.2min) | 468s (7.8min) | 4,916s (81.9min) | 815s (13.6min) | **6,393s (106.6min)** |
-| GeoPackage | H3 Hexagonal | 768,037 | 4,597,614 | 96s (1.6min) | 276s (4.6min) | 9,586s (159.8min) | 842s (14.0min) | **10,801s (180.0min)** |
-| PostGIS | FINE 0.1nm | 184,637 | 1,460,324 | 193s (3.2min) | 101s (1.7min) | 762s (12.7min) | 221s (3.7min) | **1,277s (21.3min)** |
-| GeoPackage | FINE 0.1nm | 173,877 | 1,377,240 | 99s (1.6min) | 36s (0.6min) | 2,703s (45.1min) | 279s (4.7min) | **3,117s (52.0min)** |
-| PostGIS | FINE 0.2nm | 46,071 | 361,192 | 202s (3.4min) | 28s (0.5min) | 161s (2.7min) | 48s (0.8min) | **439s (7.3min)** |
-| GeoPackage | FINE 0.2nm | 43,425 | 341,188 | 98s (1.6min) | 12s (0.2min) | 684s (11.4min) | 70s (1.2min) | **865s (14.4min)** |
+Based on 50 complete workflow runs. Representative runs selected across the full edge count range.
 
- **Test Configuration:** WSL2 Ubuntu, SSD storage, 47 S-57 ENCs covering SF Bay to Los Angeles. 
- Performance may vary ±20-35% based on system state, concurrent operations, and I/O load.
+| Backend | Mode | Nodes | Undir. Edges | Base (s) | Fine/H3 (s) | Weight (s) | Path (s) | Total (s) |
+|---------|------|------:|-------------:|----------:|-------------:|-----------:|---------:|----------:|
+| GeoPackage | FINE | 44K | 351K | 60 | 9 | 87 | 57 | 214 |
+| PostGIS | FINE | 49K | 194K | 91 | 21 | 178 | 48 | 338 |
+| GeoPackage | FINE | 80K | 315K | 10 | 15 | 257 | 96 | 378 |
+| PostGIS | FINE | 80K | 316K | 28 | 41 | 260 | 81 | 410 |
+| PostGIS | FINE | 68K | 267K | 118 | 43 | 216 | 65 | 432 |
+| GeoPackage | FINE | 76K | 301K | 9 | 13 | 160 | 89 | 271 |
+| PostGIS | FINE | 76K | 303K | 19 | 30 | 119 | 75 | 243 |
+| GeoPackage | FINE | 77K | 306K | 12 | 14 | 185 | 100 | 310 |
+| GeoPackage | FINE | 120K | 474K | 57 | 21 | 706 | 145 | 929 |
+| PostGIS | H3 | 124K | 740K | 8 | 42 | 157 | 100 | 308 |
+| GeoPackage | FINE | 321K | 1.27M | 10 | 44 | 720 | 380 | 1,154 |
+| PostGIS | FINE | 321K | 1.28M | 20 | 127 | 682 | 338 | 1,166 |
+| PostGIS | FINE | 297K | 1.18M | 118 | 126 | 522 | 289 | 1,056 |
+| GeoPackage | FINE | 301K | 1.19M | 54 | 48 | 2,806 | 345 | 3,253 |
+| PostGIS | FINE | 300K | 1.22M | 116 | 131 | 782 | 298 | 1,327 |
+| PostGIS | FINE | 320K | 1.30M | 49 | 123 | 581 | 322 | 1,076 |
+| GeoPackage | H3 | 455K | 1.37M | 10 | 114 | 717 | 457 | 1,298 |
+| PostGIS | H3 | 455K | 1.37M | 20 | 168 | 740 | 413 | 1,341 |
+| GeoPackage | FINE | 434K | 1.73M | 55 | 63 | 3,104 | 501 | 3,722 |
+| PostGIS | H3 | 437K | 1.31M | 10 | 162 | 748 | 366 | 1,286 |
+| PostGIS | FINE | 414K | 3.37M | 117 | 1,446 | 959 | 379 | 2,900 |
+| PostGIS | H3 | 685K | 4.13M | 53 | 254 | 1,281 | 578 | 2,166 |
+| PostGIS | H3 | 1,084K | 6.55M | 48 | 381 | 2,574 | 1,263 | 4,266 |
+
+**Test Configuration:** AMD Strix Halo, 128 GB unified memory, Ubuntu 24.04.
+Performance may vary ±20-35% based on system state, concurrent operations, and I/O load.
 
 ---
 
@@ -242,10 +274,9 @@ Comprehensive real-world performance analysis from production testing (Nov 2025)
 ![Base Graph Performance](docs/assets/Base%20Graph.svg)
 
 **Analysis:**
-- Consistent performance across graph modes (96-202s)
-- PostGIS takes 2× longer due to database connection overhead
-- GeoPackage faster for initial file-based operations
-- This step runs **once** - can be reused with `--skip-base`
+- Performance ranges from 8-122s depending on route extent (bounding box area)
+- GeoPackage typically 2-3× faster due to no database connection overhead
+- This step runs **once** — can be reused with `--skip-base`
 
 ---
 
@@ -254,10 +285,10 @@ Comprehensive real-world performance analysis from production testing (Nov 2025)
 ![Fine Graph Performance](docs/assets/Fine%20Graph.svg)
 
 **Analysis:**
-- **H3 Hexagonal:** 5-17× slower than FINE grid (complex geometry generation)
-- **FINE 0.2nm:** Fastest refinement (12-28s)
-- **FINE 0.1nm:** 4× more nodes, 3× longer (36-101s)
-- PostGIS handles H3 hexagons more efficiently (41% faster)
+- **H3 Hexagonal:** 5-10× slower than FINE grid (complex geometry generation)
+- **FINE 0.2nm:** Fastest refinement (9-48s)
+- **FINE 0.1nm:** ~4× more nodes, ~3× longer (44-127s)
+- PostGIS handles H3 hexagons more efficiently at large scales
 
 ---
 
@@ -265,21 +296,16 @@ Comprehensive real-world performance analysis from production testing (Nov 2025)
 
 ![Weighted Graph Performance](docs/assets/Weighted%20%26%20Directional%20Graph.svg)
 
-**Analysis - THE CRITICAL BOTTLENECK:**
-- **Dominates total time:** 37-89% of entire pipeline
-- **PostGIS advantage:** 2.0-3.5× faster than GeoPackage
-- **Database-side operations:** Spatial indexing dramatically reduces enrichment time
-- **Scaling:** Superlinear with graph size (4× nodes → 4.7× weighting time)
-
-**Performance by Mode:**
-- FINE 0.2nm: 161s (PostGIS) vs 684s (GeoPackage) - **4.2× faster**
-- FINE 0.1nm: 762s (PostGIS) vs 2,703s (GeoPackage) - **3.5× faster**
-- H3 Hexagonal: 4,916s (PostGIS) vs 9,586s (GeoPackage) - **2.0× faster**
+**Analysis — THE CRITICAL BOTTLENECK:**
+- **Dominates total time:** 33-86% of entire pipeline (median ~59%)
+- **Scales linearly** with directed edge count
+- **At small-medium scales (<1.37M edges):** Backends at near parity
+- **At large scales (3M+ edges):** PostGIS 2.5-3.2× faster (bulk TEMP table operations + GiST indexes)
 
 **Optimization Tips:**
 - Use `--skip-base --skip-fine` to resume from weighting
 - FINE 0.2nm if weighting time is critical constraint
-- PostGIS strongly recommended for graphs >500K nodes
+- PostGIS strongly recommended for graphs >3M edges
 
 ---
 
@@ -289,28 +315,39 @@ Comprehensive real-world performance analysis from production testing (Nov 2025)
 
 **Analysis:**
 - **Graph loading:** Dominates this step (83-85% of time)
-- **Actual A* routing:** <1 second (negligible for 396K edges)
-- **PostGIS advantage:** 1.2-1.3× faster graph loading from database
-- **GeoPackage:** File I/O overhead impacts loading time
-
-**Time Breakdown (FINE 0.1nm):**
-- PostGIS: 221s total (220s loading + 1s routing)
-- GeoPackage: 279s total (278s loading + 1s routing)
+- **Actual A* routing:** <1 second (negligible for most graph sizes)
+- **3-Pass Algorithm:** A* scout → Dijkstra corridor → string-pulling
+- Pathfinding scales sub-linearly — corridor search limits explored edges
 
 ---
 
 ### Backend Comparison Summary
 
-| Metric | PostGIS | GeoPackage | PostGIS Advantage |
-|--------|---------|------------|-------------------|
-| **Overall Winner** | ✅ All modes | - | 2.0-2.4× faster total |
-| **Weighting Step** | ✅ Database-side ops | File I/O limited | 2.0-4.2× faster |
-| **Base Graph** | Slower (DB overhead) | ✅ Faster | GeoPackage 2× faster |
-| **Fine Graph** | ✅ H3 efficient | Faster for small grids | Context-dependent |
-| **Pathfinding** | ✅ Faster loading | File-based | PostGIS 1.2× faster |
-| **Best For** | Production, >500K nodes | Portable, offline, <500K nodes | - |
+| Scale | Recommended Backend | Margin | Why |
+|-------|-------------------|--------|-----|
+| **<1M edges** (~80K nodes) | Either (parity) | GP 1.0-1.08× | PostGIS DB overhead not amortized |
+| **1-3M edges** (~300-455K nodes) | Either (parity) | Within 1.06× | Transition zone |
+| **>3M edges** (~400K+ nodes) | PostGIS | 2.5-3.2× | Bulk TEMP table ops + GiST indexes win |
+
+| Metric | PostGIS | GeoPackage | Notes |
+|--------|---------|------------|-------|
+| **Small graphs** (<1M edges) | Slightly slower | ✅ Slightly faster | PostGIS DB overhead |
+| **Large graphs** (>3M edges) | ✅ 2.5-3.2× faster | Slower | Bulk operations win |
+| **Weighting Step** | ✅ Bulk TEMP tables | Row-by-row SQL | Gap widens at scale |
+| **Base Graph** | Slower (DB overhead) | ✅ Faster | Direct file I/O |
+| **Best For** | Production, >3M edges | Portable, offline, <3M edges | |
 
 </details>
+
+---
+
+### Performance Tips & Best Practices
+
+- 💡 **Resume workflows:** Use `--skip-base --skip-fine` to skip already-created graphs
+- ⚡ **Fast iteration:** FINE 0.2nm for testing, FINE 0.1nm for production
+- 📊 **Choose backend by scale:** GeoPackage for <3M edges, PostGIS for >3M edges
+- 📦 **Portable scenarios:** GeoPackage matches PostGIS performance up to ~1.37M edges
+- 🔬 **Research use:** H3 hexagonal provides multi-resolution flexibility (expect 2-3× longer than FINE)
 
 ---
 
@@ -318,14 +355,16 @@ Comprehensive real-world performance analysis from production testing (Nov 2025)
 
 We have a comprehensive public roadmap that outlines our development journey from foundation to production-ready QGIS integration.
 
-**Current Status**: v0.1.2 Released ✅ (February 2026)
+**Current Status**: v0.1.5 Released ✅ (May 2026)
 
-**Near-term Goals** (v0.1.x Foundation Completion → v0.2.0 PyTorch Integration):
-- **v0.1.x**: Security audit, Weights class refactor (PyTorch prep), 80% test coverage
-- **v0.2.0**: PyTorch integration, limited PyPI distribution (no GDAL), full Docker packaging, mkdocstrings API docs
+**Near-term Goals** (v0.2.0 PyTorch Integration):
+- Transition to QGIS 4.0 compatible libraries
+- Include PyTorch support and optimization
+- Test RTZ route generation and export
+- Continue code and security hardening
 
 **Long-term Vision**:
-- **QGIS 4.0 Plugin Integration** (February 20, 2026) - Native QGIS plugin for maritime route planning
+- **QGIS 4.0 Plugin Integration** (Q4 2026) - Native QGIS plugin for maritime route planning
 - **Advanced Pathfinding** - Time-dependent routing with tidal currents (post-QGIS MVP)
 - **Advanced ML Models** - Build on PyTorch foundation for traffic amd weather optimization (post-v0.2.0)
 - **GPU Production Support** - Expand CUDA acceleration beyond experimental (post-v0.2.0)
@@ -335,14 +374,6 @@ We have a comprehensive public roadmap that outlines our development journey fro
 ➡️ **[View the Full Project Roadmap](docs/project/roadmap.md)** for detailed version plans, dependencies, and contribution opportunities.
 
 ---
-
-### Performance Tips & Best Practices
-
-- 💡 **Resume workflows:** Use `--skip-base --skip-fine` to skip already-created graphs (saves 5-10 min)
-- ⚡ **Fast iteration:** FINE 0.2nm for testing, FINE 0.1nm for production
-- 🚀 **Production deployments:** PostGIS strongly recommended (2.4× faster)
-- 📦 **Portable scenarios:** GeoPackage acceptable for moderate graphs (<500K nodes)
-- 🔬 **Research use:** H3 hexagonal provides multi-resolution flexibility (expect 2-3× longer runtime)
 
 ## 📚 Documentation
 
@@ -355,7 +386,7 @@ Built with **MkDocs** using the Material theme.
 - **[Quick Start Workflow](docs/getting-started/workflow-quickstart.md)** - 5-minute introduction
 - **[PostGIS Guide](docs/user-guides/workflow-postgis-guide.md)** - Production-scale setup
 - **[GeoPackage Guide](docs/user-guides/workflow-geopackage-guide.md)** - Portable single-file setup
-- **[Jupyter Notebooks](docs/notebooks/)** - 13 interactive examples and tutorials
+- **[Jupyter Notebooks](docs/notebooks/)** - 17 interactive examples and tutorials
 
 ### Preview Documentation Locally
 
@@ -379,15 +410,20 @@ The toolkit uses a clean, layered architecture:
 ```
 nautical_graph_toolkit/
    core/                    # Main conversion and routing classes
-      graph.py             # Graph classes (BaseGraph, FineGraph, H3Graph, Weights)
+      graph.py             # Graph classes (BaseGraph, FineGraph, H3Graph)
+      weights.py           # Weight classes (BaseWeights, Weights, WeightsOpen)
+      weight_calculator.py # Stateless weight calculation engine (three-tier)
+      weight_optimization.py # ML pipeline utilities (export, validate, PyTorch)
       s57_data.py          # S-57 conversion classes and database managers
-      pathfinding_lite.py  # A* pathfinding engine
+      pathfinding_lite.py  # A* pathfinding engine (Maritime, Smooth, Improved)
    utils/                   # Database and utility connectors
       db_utils.py          # Database operations (PostGIS, GeoPackage, SpatiaLite)
+      postgis_table_manager.py # PostGIS TEMP table lifecycle manager
       s57_utils.py         # S-57 attribute lookups and NOAA database
       port_utils.py        # World Port Index integration
       s57_classification.py # S-57 feature classification
-      geometry_utils.py    # Geometric operations (buffer, slice)
+      geometry_utils.py    # Geometric operations (Buffer, Bearing)
+      route_utils.py       # Route export utilities
       misc_utils.py        # Coordinate conversion and helpers
       plot_utils.py        # Plotly visualization utilities
       notebook_utils.py    # Jupyter notebook benchmarking
@@ -417,8 +453,13 @@ nautical_graph_toolkit/
 | `BaseGraph` | Coarse routing network | Large-scale maritime analysis |
 | `FineGraph` | Detailed routing network | Coastal route planning |
 | `H3Graph` | Hexagonal routing network | Multi-resolution flexibility |
+| `WeightCalculator` | Stateless weight calculation | Three-tier weight computation |
 | `Weights` | Edge weight calculation | Vessel-specific routing costs |
-| `Astar` | A* pathfinding | Route computation |
+| `WeightsOpen` | ML-optimized weight tracking | Per-layer GNN feature extraction |
+| `AstarMaritimeSmooth` | Three-pass A* routing | Optimal route with string-pulling |
+| `AstarMaritime` | Two-pass corridor routing | Maritime A* with corridor refinement |
+| `AstarImproved` | Pilot quantity heuristic | Straighter path optimization |
+| `PostgisTableManager` | PostGIS bulk operations | TEMP table lifecycle and CTAS |
 | `Route` | Route management | Export and analysis |
 | `NoaaDatabase` | NOAA ENC catalog | Chart metadata and updates |
 | `PortData` | Port information | World Port Index integration |
@@ -454,20 +495,20 @@ python scripts/maritime_graph_geopackage_workflow.py
 
 ### Find Optimal Vessel Route
 
-The toolkit provides A* pathfinding via the `Astar` class. See the [Weighted Workflow Example](docs/user-guides/weights-workflow-example.md) for a complete working example.
+The toolkit provides A* pathfinding via the `AstarMaritimeSmooth` class with three-pass routing (A* scout → Dijkstra corridor → string-pulling). See the [Weighted Workflow Example](docs/user-guides/weights-workflow-example.md) for a complete working example.
 
 ```python
-from nautical_graph_toolkit.core.pathfinding_lite import Astar
+from nautical_graph_toolkit.core.pathfinding_lite import AstarMaritimeSmooth
 from shapely.geometry import Point
 
 # Load your graph (from PostGIS, GeoPackage, etc.)
 # graph = ... (load from your data source)
 
-# Create pathfinder
-pathfinder = Astar(graph)
+# Create pathfinder — three-pass routing: A* scout → Dijkstra corridor → string-pulling
+pathfinder = AstarMaritimeSmooth(graph)
 
 # Compute route
-route = pathfinder.compute_route(
+route = pathfinder.compute_route_maritime_smooth(
     start_point=Point(-122.33, 47.60),  # Seattle
     end_point=Point(-122.92, 46.75),    # Astoria
     weight_key='adjusted_weight'
@@ -608,7 +649,7 @@ AGPL-3.0 means:
 
 ## 🤝 Contributing
 
-**Note:** This project is currently in active early development (v{{ project_version }}). We will begin accepting community contributions starting with **v0.2.0** as the codebase stabilizes and comprehensive contribution guidelines are established. See the [Roadmap](#-roadmap) for timeline details.
+**Note:** This project is currently in active early development (v0.1.5). We will begin accepting community contributions starting with **v0.2.0** as the codebase stabilizes and comprehensive contribution guidelines are established. See the [Roadmap](#-roadmap) for timeline details.
 
 In the meantime, you can:
 - Report bugs or request features on [GitHub Issues](https://github.com/studentdotai/Nautical-Graph-Toolkit/issues)
@@ -639,7 +680,7 @@ While the core development is a one-person effort carried out part-time (often a
 
 ### Flagship Product: Nautical Graph Toolkit
 
-Our first step toward this vision is the **Nautical Graph Toolkit (v{{ project_version }})**. It is an open-source engine designed to bridge the gap between raw hydrographic data (S-57 ENCs) and intelligent routing. It transforms static charts into vessel-aware, weighted graphs, allowing developers and mariners to analyze the marine environment without the barriers of legacy software.
+Our first step toward this vision is the **Nautical Graph Toolkit (v0.1.5)**. It is an open-source engine designed to bridge the gap between raw hydrographic data (S-57 ENCs) and intelligent routing. It transforms static charts into vessel-aware, weighted graphs, allowing developers and mariners to analyze the marine environment without the barriers of legacy software.
 
 ### Why We Need Your Support: The Hardware Fund
 

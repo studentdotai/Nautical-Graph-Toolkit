@@ -19,11 +19,11 @@
       # seaare is processed specially by both graphs
       # FineGraph: progressive refinement by bands 1-6
       # H3Graph: resolution mapping by bands
-      - { layer: "seaare", bands: [1, 2], resolution: 6 }
-      - { layer: "seaare", bands: [3],    resolution: 9 }
+      - { layer: "seaare", bands: [1, 2], resolution: 5 }
+      - { layer: "seaare", bands: [3],    resolution: 8 }
       - { layer: "seaare", bands: [4],    resolution: 10 }
-      - { layer: "seaare", bands: [5],    resolution: 11 }
-      - { layer: "seaare", bands: [6],    resolution: 12 }
+      - { layer: "seaare", bands: [5],    resolution: 10 }
+      - { layer: "seaare", bands: [6],    resolution: 11 }
 
       # Additional navigable layers (both graphs use same logic)
       - { layer: "drgare", bands: [3, 4, 5, 6], resolution: 11 }
@@ -65,6 +65,59 @@
   # Weight values are retrieved from S57Classifier
   # Users can customize by editing CSV: S57Classifier.generate_static_files()
   weight_settings:
+    # Weight system constants (single source of truth)
+    constants:
+      blocking_threshold: 999.0    # Value for absolute blocking constraints
+      max_penalty: 100.0            # Maximum cumulative penalty cap
+      min_bonus_factor: 0.3        # Minimum bonus factor floor (allows adjusted_weight < base_weight for preferred routes)
+      open_water_base_multiplier: 2.0  # Default cost for undesignated open water
+      step_band_bonus_strength: 0.85   # Step-band mode: bonus = OWB × (1 - preference × strength). Controls how aggressively step-band favors preferred routes
+      soundg_buffer_meters: 50.0       # Buffer radius (m) around SOUNDG points for edge enrichment spatial join
+
+    # Dynamic vessel-specific weight constants
+    # Single source of truth for all implementations (Python, GPKG SQL, PostGIS SQL)
+    dynamic_weights:
+      # UKC band penalties (applied when depth is known)
+      ukc_restricted_penalty: 30.0    # 0 < UKC <= safety_margin  (Band 3 - very shallow)
+      ukc_shallow_penalty: 4.0        # safety_margin < UKC <= 0.5*draft  (Band 2)
+      ukc_safe_penalty: 2.5           # 0.5*draft < UKC <= draft  (Band 1 - adequate clearance)
+      deep_water_bonus: 1.5          # UKC > draft  (preferred route bonus)
+
+      # Sounding hazard penalties (from wrecks/obstructions, ft_sounding)
+      sounding_high_risk_penalty: 20.0      # 0 < sounding_ukc <= safety_margin
+      sounding_moderate_risk_penalty: 4.0  # safety_margin < sounding_ukc <= draft
+
+      # Vertical clearance
+      clearance_restricted_penalty: 50.0  # clearance >= height but < height + margin
+
+      # Anchorage category bonus (vessel-type matching)
+      anchorage_bonus: 1.5  # cargo/passenger vessels at preferred anchorage categories
+
+    # Smooth weight functions (feature-flagged — default disabled for backward compatibility)
+    # Set enabled: true to use continuous differentiable functions instead of step bands.
+    # Smooth mode uses exp/log curves suitable for PyTorch/GNN pipelines.
+    smooth_weights:
+      enabled: false                # Feature flag — false = legacy band behavior (default)
+      bonus_decay_rate: 3.0         # k in bonus_factor = 1 + exp(-k * preference_score); higher = steeper curve
+      penalty_hazard_scale: 1.0     # scalar applied to hazard_score before log
+      sounding_hazard_weight: 0.5   # relative weight of sounding vs depth risk contribution
+
+    # Static weight penalty aggregation mode
+    # 'max' = GREATEST for all tiers (default, backward-compatible)
+    # 'exp' = MULTIPLY (EXP(SUM(LN()))) for penalty tier — overlapping CAUTION hazards compound
+    aggr_mode: 'max'
+
+    # Buffer zone distances (NM from land) for coastal proximity classification
+    buffer_zones:
+      distances_nm: [3.0, 4.0, 12.0]
+      buffer_mode: 'fine'        # 'fast' (degrees approx) or 'fine' (UTM geodesic)
+      simplify_tolerance: 0.0005  # Land geometry simplification tolerance (degrees). 0 disables. 0.0005 ≈ 55m
+      zone_penalties:            # default penalty multipliers per zone (full-compliance baseline)
+        0.0: 1.0                 # open water — no restriction
+        3.0: 2.5                 # coastal zone (<3 NM) — strongest routing preference away
+        4.0: 2.0                 # contiguous zone (<4 NM) — moderate preference
+        12.0: 1.8                # territorial waters (<12 NM) — mild preference
+
     # Path to custom S57 classification CSV (null = use built-in defaults)
     classifier_csv_path: null
 
@@ -75,8 +128,10 @@
       beam: 25.0              # meters - vessel width
       length: 150.0           # meters - vessel length
       vessel_type: 'cargo'    # cargo, tanker, passenger, fishing
-      safety_margin: 2.0      # meters - UKC safety buffer (Under Keel Clearance)
-      clearance_safety: 3.0   # meters - vertical clearance buffer (bridges)
+      ukc_safety_margin: 2.0      # meters - UKC safety buffer (Under Keel Clearance)
+      ver_clearance_margin: 5.0   # meters - vertical clearance buffer (bridges)
+      hor_clearance_margin: 20.0  # meters - horizontal clearance buffer (obstacles)
+      compliance_zone: null       # null = use zone_penalties defaults; or e.g. [2.5, 1.8, 1.3]
 
     # Static layers: weight factors retrieved from S57Classifier during graph construction
     # List only the layer names - actual weight values come from the classifier
@@ -88,16 +143,18 @@
       - uwtroc      # Underwater rock (DANGEROUS - high penalty)
       - wrecks      # Wrecks (DANGEROUS - high penalty)
       - slcons      # Shoreline construction (DANGEROUS - blocker)
-      - coalne      # Coastline (DANGEROUS - blocker)
+      #- coalne      # Coastline (DANGEROUS - blocker)
       - fairwy      # Fairway (SAFE - preferred route)
-      - tsslpt      # Traffic separation lane (CAUTION - moderate penalty)
+      - tsslpt      # Traffic separation lane (SAFE - preferred route)
       - drgare      # Dredged area (SAFE - slight preference)
-      - prcare      # Precautionary area (CAUTION - moderate penalty)
-      - resare      # Restricted area (CAUTION - moderate penalty)
-      - cblare      # Cable area (CAUTION - moderate penalty)
-      - pipare      # Pipeline area (CAUTION - moderate penalty)
+      - prcare      # Precautionary area (SAFE - preferred route)
+      #- resare      # Restricted area (CAUTION - moderate penalty)
+      #- cblare      # Cable area (CAUTION - moderate penalty)
+      #- pipare      # Pipeline area (CAUTION - moderate penalty)
       - rectrc      # Recommended track (SAFE - preferred route)
       - dwrtcl      # Deep water route centerline (SAFE - preferred route)
+      - tselne      # Traffic separation line (CAUTION - low penalty)
+      - tssbnd      # Traffic separation boundary (CAUTION - low penalty)
 
     # Directional weights: traffic flow alignment (orientation-based penalties/rewards)
     # Applied to layers with ORIENT attribute (tsslpt, dwrtcl, rectrc, fairwy, etc.)
@@ -107,13 +164,17 @@
       # Layers to apply directional weights (null = all layers with ORIENT attribute)
       apply_to_layers: null  # Or specify: ['tsslpt', 'dwrtcl', 'rectrc', 'fairwy']
 
-      # Angle-based weight bands (angular difference between edge and feature orientation)
+      # Directional weight bands (angular difference between edge and feature orientation)
+      # NOTE: Bearings are rounded to nearest integer degree by default (±0.5° error).
+      # Minimum threshold gap is 10° (85° → 95°), so rounding is safe.
+      # wt_dir semantic scale: 1.0 = aligned (reward), 2.0 = neutral (open-water baseline),
+      # >2.0 = penalty. Unoriented edges receive wt_dir = 2.0 in code (not listed here).
       angle_bands:
-        - { max_angle: 30, weight: 0.9, description: 'Aligned - following intended direction' }
-        - { max_angle: 60, weight: 1.3, description: 'Slight deviation' }
-        - { max_angle: 85, weight: 5.0, description: 'Significant deviation' }
-        - { max_angle: 95, weight: 20.0, description: 'Crossing/perpendicular' }
-        - { max_angle: 180, weight: 99.0, description: 'Opposite - against traffic flow' }
+        - { max_angle: 30,  weight: 1.0,   name: 'aligned',        description: 'Aligned - reward for following intended direction' }
+        - { max_angle: 60,  weight: 2.5,   name: 'small deviation', description: 'Slight deviation above neutral' }
+        - { max_angle: 85,  weight: 10.0,  name: 'big deviation',   description: 'Significant deviation' }
+        - { max_angle: 95,  weight: 50.0,  name: 'crossing',        description: 'Crossing/perpendicular' }
+        - { max_angle: 180, weight: 200.0, name: 'opposite',        description: 'Opposite - against traffic flow' }
 
       # Two-way traffic handling (for TRAFIC=4 features)
       two_way_traffic:
